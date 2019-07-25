@@ -1,0 +1,44 @@
+{
+  "name": "node-red-contrib-cron-plus",
+  "version": "0.1.0",
+  "description": "A flexible scheduler node for Node-RED (incl Timezone support)",
+  "main": "cronplus.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "publish": "npm publish"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Steve-Mcl/node-red-contrib-cron-plus.git"
+  },
+  "keywords": [
+    "node-red",
+    "scheduler",
+    "cron",
+    "timer"
+  ],
+  "node-red": {
+    "nodes": {
+      "cronplus": "cronplus.js"
+    }
+  },
+  "author": {
+    "name": "Steve-Mcl"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Steve-Mcl/node-red-contrib-cron-plus/issues"
+  },
+  "homepage": "https://github.com/Steve-Mcl/node-red-contrib-cron-plus#readme",
+  "dependencies": {
+    "cronosjs": "^1.2.1",
+    "cronstrue": "^1.81.0",
+    "pretty-ms": "^5.0.0"
+  },
+  "maintainers": [
+    {
+      "name": "Steve-Mcl",
+      "email": "44235289+Steve-Mcl@users.noreply.github.com"
+    }
+  ]
+}

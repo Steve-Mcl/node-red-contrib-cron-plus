@@ -1,0 +1,13 @@
+.*.swp
+.DS_Store
+.git
+.npmrc
+npm-debug.log
+
+*.tgz
+
+.vscode
+docker-compose.yml
+temp
+test
+test.js

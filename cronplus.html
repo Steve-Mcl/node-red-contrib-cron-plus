@@ -1,0 +1,322 @@
+<script type="text/javascript">
+    RED.nodes.registerType('cronplus', {
+        category: "input",
+        icon: "timer.png",
+        color: "#a6bbcf",
+        outputs: 1,
+        defaults: {
+            name: { value: "" },
+            crontab: { value: "* * * * * *", required: true },
+            topic: { value: "" },
+            payload: { value: "", validate: RED.validators.typedInput("payloadType") },
+            payloadType: { value: "date" },
+            outputField: { value: "payload" },
+            timeZone: { value: "" }
+        },
+        label: function () {
+            return this.name || "CRON+"
+        },
+        oneditprepare: function () {
+            debugger
+
+            if (this.payloadType == null) {
+                if (this.payload == "") {
+                    this.payloadType = "date";
+                } else {
+                    this.payloadType = "str";
+                }
+            } else if (this.payloadType === 'string' || this.payloadType === 'none') {
+                this.payloadType = "str";
+            }
+            $("#node-input-payloadType").val(this.payloadType);
+            $("#node-input-payload").typedInput({
+                default: 'str',
+                typeField: $("#node-input-payloadType"),
+                types: ['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']
+            });
+
+            $( "#node-input-timeZone" ).autocomplete({
+                source: function( request, response ) {
+                    var matcher = new RegExp( $.ui.autocomplete.escapeRegex(request.term), "i" );
+                    $.ajax({
+                        url: 'cronplustz',
+                        type: 'POST',
+                        datatype: 'json'
+                    })
+                    .done(function (data) { 
+                        response($.map(data, function(item){
+                            if(item && item.tz){
+                                var label = `${item.code ? item.code + ", ": ""}${item.tz} (UTC: ${item.UTCOffset}, DST: ${item.UTCDSTOffset})`;
+                                if ( label && ( !request.term || matcher.test(label) ) ) {
+                                    return {
+                                        label: label,
+                                        value: item
+                                    };
+                                }
+                            }
+                        }));
+                    })
+                    .fail(function (jqXHR, textStatus, errorThrown) { 
+                        console.error(jqXHR,textStatus,errorThrown)
+                    });
+                },
+                minLength: 2,
+                open: function() {
+                    $( this ).removeClass( "ui-corner-all" ).addClass( "ui-corner-top" );
+                },
+                close: function() {
+                    $( this ).removeClass( "ui-corner-top" ).addClass( "ui-corner-all" );
+                },
+                focus: function (event, ui) {
+                    event.preventDefault();
+                    $("#node-input-timeZone").val(ui.item.label);
+                },
+                select: function (event, ui) {
+                    event.preventDefault();
+                    this.value = ui.item.value.tz;
+                    updateCronDescription();
+                }
+            });
+
+            var formatDateTimeWithTZ = function (timestampOrDate, tz) {
+                if (!timestampOrDate) {
+                    return "";
+                }
+                let prettyNextDate;
+                if (tz) {
+                    let o = {
+                        timeZone: tz,
+                        timeZoneName: "short",
+                        weekday: "short",
+                        hour12: false,
+                        year: "numeric",
+                        month: "short",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit"
+                    };
+                    prettyNextDate = new Intl.DateTimeFormat('default', o).format(new Date(timestampOrDate))
+                } else {
+                    prettyNextDate = Date(timestampOrDate).toString();
+                }
+                return prettyNextDate;
+            }
+            var updateCronDescription = function () {
+                let $tip = $("#node-input-crontab-tip");
+                try {
+                    $tip.text("Getting description...");
+                    let $tz = $("#node-input-timeZone");
+                    let $expression = $("#node-input-crontab");
+                    let e = { expression: $expression.val() };
+                    let tz = $tz.val();
+                    if (tz) {
+                        e.timeZone = tz;
+                    }
+                    $.ajax({
+                        url: 'cronplus',
+                        type: 'POST',
+                        data: e,
+                        datatype: 'json'
+                    })
+                        .done(function (data) {
+                            let tiptext = data.description
+                            let now = new Date();
+                            let next = now;
+                            if (data.prettyNext) {
+                                tiptext += "\n\nNext run...\n- " + data.prettyNext;
+                                if (data.nextDates && data.nextDates.length) {
+                                    let map1;
+                                    if (tz) {
+                                        map1 = data.nextDates.map(x => {
+                                            let fd = formatDateTimeWithTZ(x, tz);
+                                            return fd ? fd : undefined;
+                                        });
+                                    } else {
+                                        map1 = data.nextDates.map(x => x = new Date(x).toString());
+                                    }
+                                    tiptext += "\n- at " + map1.join("\n- at ");
+                                }
+                            }
+                            $tip.text(tiptext);
+                        })
+                        .fail(function (jqXHR, textStatus, errorThrown) {
+                            debugger
+                            console.error(jqXHR, textStatus, errorThrown)
+                            $tip.text("Cannot get cron description from node-red");
+                        });
+                } catch (error) {
+                    $tip.text("");
+                    console.error(error);
+                }
+            }
+            $("#node-input-timeZone").change(function () {
+                updateCronDescription();
+            });
+            $("#node-input-crontab").change(function () {
+                updateCronDescription();
+            });
+            $("#node-input-crontab").on("input", function () {
+                updateCronDescription();
+            });
+        },
+        oneditsave: function () {
+            $("#node-input-timeZone").off();
+            $("#node-input-crontab").off();
+        },
+        button: {
+            enabled: function () {
+                return !this.changed
+            },
+            onclick: function () {
+                debugger
+                var node = this;
+                if (node.changed) {
+                    return RED.notify(RED._("notification.warning", { message: RED._("notification.warnings.undeployedChanges") }), "warning");
+                }
+                var payload = node.payload;
+                if ((node.payloadType === 'flow') ||
+                    (node.payloadType === 'global')) {
+                    var key = RED.utils.parseContextKey(payload);
+                    payload = node.payloadType + "." + key.key;
+                }
+                var label = node._def.label.call(node);
+                if (label.length > 30) {
+                    label = label.substring(0, 50) + "...";
+                }
+                label = label.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                
+                $.ajax({
+                    url: "cronplus/" + node.id,
+                    type: "POST",
+                    success: function (resp) {
+                        RED.notify(node._("inject.success", { label: label }), { type: "success", id: "inject" });
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        if (jqXHR.status == 404) {
+                            RED.notify(node._("common.notification.error", { message: node._("common.notification.errors.not-deployed") }), "error");
+                        } else if (jqXHR.status == 500) {
+                            RED.notify(node._("common.notification.error", { message: node._("inject.errors.failed") }), "error");
+                        } else if (jqXHR.status == 0) {
+                            RED.notify(node._("common.notification.error", { message: node._("common.notification.errors.no-response") }), "error");
+                        } else {
+                            RED.notify(node._("common.notification.error", { message: node._("common.notification.errors.unexpected", { status: jqXHR.status, message: textStatus }) }), "error");
+                        }
+                    }
+                });
+            }
+        }
+    });
+</script>
+
+<script type="text/x-red" data-template-name="cronplus">
+    <style>
+        .form-row .form-tip {
+            background: #ffe;
+            width: 70%;
+            padding: 6px 6px;
+            border-radius: 2px;
+            border: 1px solid #ddd;
+            display: inline-block;
+            vertical-align: middle;           		
+            font-size: 12px;
+            line-height: 20px;
+            box-sizing: border-box;
+            border-radius: 4px;
+            overflow: auto;
+            word-break: keep-all;
+        }
+        .form-row .form-tip-spacer {
+            display: inline-block;
+            width: 100px
+        }
+    </style>            
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+	<div class="form-row">
+        <label for="node-input-topic"><i class="fa fa-tasks"></i> <span data-i18n="common.label.payload">Topic</span></label>
+        <input type="text" id="node-input-topic" placeholder="Topic">
+    </div>
+    <div class="form-row">
+        <label for="node-input-payload"><i class="fa fa-envelope"></i> <span data-i18n="common.label.payload">Payload</span></label>
+        <input type="text" id="node-input-payload" style="width:70%">
+        <input type="hidden" id="node-input-payloadType">
+    </div>
+	<div class="form-row">
+        <label for="node-input-outputField"><i class="fa fa-envelope"></i> Output to</label>
+        <input type="text" id="node-input-outputField" placeholder="payload">
+    </div>       
+	<div class="form-row">
+        <label for="node-input-timeZone"><i class="fa fa-globe"></i> Timezone</label>
+        <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
+    </div>    
+	<div class="form-row">
+        <label for="node-input-crontab"><i class="fa fa-clock-o"></i> Expression</label>
+        <input type="text" id="node-input-crontab" placeholder="CRON">
+        <div class="form-tip-spacer"> </div>
+        <pre class="form-tip" id="node-input-crontab-tip"></pre>
+    </div>
+</script>
+
+<script type="text/x-red" data-help-name="cronplus">
+    <p>Schedule the injection of a payload to start a flow</p>
+    <h3>Properties...</h3>
+    <dl class="message-properties">
+        <h4>Payload</h4>
+        <div style="padding-left: 15px">
+            What to send when node is triggered.
+        </div>
+        <h4>Output to</h4>
+        <div style="padding-left: 15px">
+            The <code>msg.</code> property to send the payload to.  Typically this would be payload.
+        </div>
+        <h4>Timezone (optional)</h4>
+        <div style="padding-left: 15px">
+            If provided, the timezone to use. If excluded, system timezone will be used.
+        </div>    
+        <h4>Expression</h4>
+        <div style="padding-left: 15px">
+            The cron expression / schedule
+            <p>Format...</p>
+            <pre style="white-space: pre">
+    s  m  h  md m  wd y
+    |  |  |  |  |  |  |
+    *  *  *  *  *  *  *    Field              Allowed values    Special symbols
+    |  |  |  |  |  |  |    -----------------  ---------------   ---------------
+    `--|--|--|--|--|--|->  Second (optional)  0-59              * / , -
+    `--|--|--|--|--|->  Minute             0-59              * / , -
+        `--|--|--|--|->  Hour               0-23              * / , -
+            `--|--|--|->  Day of Month       1-31              * / , - L W
+                `--|--|->  Month              1-12 or JAN-DEC   * / , -
+                `--|->  Day of Week        0-7 or SUN-SAT    * / , - L #
+                    `->  Year (optional)    1970-2099         * / , -
+            </pre>
+        
+        <p>Examples...</p>
+        <ul>
+            <li><code>* * * * * *</code> Every Second</li>
+            <li><code>0 * * * * *</code> Every minute</li>
+            <li><code>0 */10 * * * *</code> Every 10 minutes</li>
+            <li><code>0 */20 1 * * *</code> Every 20 minutes, between 01:00 AM and 01:59 AM</li>
+            <li><code>0 15,30,45 * * * *</code> At 15, 30, and 45 minutes past the hour</li>
+            <li><code>0 0 12 * * *</code> Every day at noon - 12pm</li>
+            <li><code>0 0 2 29 FEB * 2020-2040</code> At 02:00 AM, on day 29 of the month, only in February, every 4 years, 2020 through 2040</li>
+            <li><code>0 0 7 * * MON#1 *</code> At 07:00 AM, on the first Monday of the month</li>
+            <li><code>0 0 12 * JAN,FEB,MAR,APR *</code> Every day at noon in January, February, March and April</li>
+            <li><code>* * 1W * *</code> Every minute, on the first weekday of the month</li>
+            <li><code>* * * * Tue#3</code> Every minute, on the third Tuesday of the month</li>
+            <li><code>0 12 * * MONL</code> At 12:00 PM, on the last Monday of the month</li>
+            <li>See <a href="https://github.com/jaclarke/cronosjs">here</a> for more examples and info</li>
+        </ul>
+        </div>
+    </dl>
+    <h3>Output</h3>
+    <dl class="message-properties">
+        <dt><i>payload (see 'Output to')</i> <span class="property-type">number|string|boolean|object|buffer</span></dt>
+        <dd>msg.[Output to] will contain whatever is configured in 'payload'</dd>
+        <dd>e.g. if 'Output to' is set to <b>data</b> then <code>msg.data</code> will contain the value of 'payload'</dd>
+    </dl>
+   
+</script>
