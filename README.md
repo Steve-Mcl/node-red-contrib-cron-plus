@@ -8,7 +8,10 @@ FEATURES
   * Human readable CRON descriptions
 * Send timestamp, string, number, boolean, flow variable, global variable, JSON, Buffer or Env variable as the output.
 * Settable output variable (normally `msg.payload` but it is up to you)
-* Optional timezone setting
+* Multiple schedules can be entered by the UI
+* Ability to add, remove, list, stop, start, pause schedules by a payload input permitting full flexability & dynamic control
+* Full demo flow provided in node-red editors menu > import > examples.
+* Optional timezone setting suppoting UTC and Region/Area (e.g. Europe/London)
 
 Install
 -------
