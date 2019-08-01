@@ -3,22 +3,38 @@
         category: "input",
         icon: "timer.png",
         color: "#a6bbcf",
+        inputs: 1,
         outputs: 1,
         defaults: {
             name: { value: "" },
-            crontab: { value: "* * * * * *", required: true },
-            topic: { value: "" },
-            payload: { value: "", validate: RED.validators.typedInput("payloadType") },
-            payloadType: { value: "date" },
+            // crontab: { value: "* * * * * *", required: true },
+            // topic: { value: "" },
+            // payload: { value: "", validate: RED.validators.typedInput("payloadType") },
+            // payloadType: { value: "date" },
             outputField: { value: "payload" },
-            timeZone: { value: "" }
+            timeZone: { value: "" },
+            options: {
+                value:[{payload: '', topic : '', expression : ''}], 
+                validate:function(value) { 
+                    if (value.length) {
+                        for (var i = 0; i < value.length; i++) {
+                            if (!value[i].expression || !value[i].topic) {
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                },
+                required: true
+            },
         },
         label: function () {
             return this.name || "CRON+"
         },
         oneditprepare: function () {
             debugger
-
+            let $tip = $("#node-input-crontab-tip-container");
+            $tip.hide();
             if (this.payloadType == null) {
                 if (this.payload == "") {
                     this.payloadType = "date";
@@ -78,38 +94,43 @@
                 }
             });
 
-            var formatDateTimeWithTZ = function (timestampOrDate, tz) {
-                if (!timestampOrDate) {
+            var formatDateTimeWithTZ = function (date, tz) {
+                if (!date) {
                     return "";
                 }
-                let prettyNextDate;
-                if (tz) {
-                    let o = {
-                        timeZone: tz,
-                        timeZoneName: "short",
-                        weekday: "short",
-                        hour12: false,
-                        year: "numeric",
-                        month: "short",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit"
-                    };
-                    prettyNextDate = new Intl.DateTimeFormat('default', o).format(new Date(timestampOrDate))
-                } else {
-                    prettyNextDate = Date(timestampOrDate).toString();
-                }
-                return prettyNextDate;
-            }
-            var updateCronDescription = function () {
-                let $tip = $("#node-input-crontab-tip");
+                let datestring;
+                let o = {
+                    timeZone: tz ? tz : undefined,
+                    timeZoneName: "short",
+                    hour12: false,
+                    year: "numeric",
+                    month: "short",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit"
+                };
                 try {
-                    $tip.text("Getting description...");
-                    let $tz = $("#node-input-timeZone");
-                    let $expression = $("#node-input-crontab");
-                    let e = { expression: $expression.val() };
-                    let tz = $tz.val();
+                    datestring = new Intl.DateTimeFormat('default', o).format(new Date(date))
+                } catch (error) {
+                    datestring = "Error. Check timezone setting"
+                }
+
+                return datestring;
+            }
+            var updateCronDescription = function (target) {
+                updateCronDescription.target = target ? target : updateCronDescription.target;
+                let $tip = $("#node-input-crontab-tip");
+                let $tipTitle = $("#node-input-crontab-tip-title");
+                try {
+                    let $expression = $(updateCronDescription.target);
+                    let expression = $expression.val();
+                    if(!expression){
+                        return;
+                    }
+                    let e = { expression: expression };
+                    $tip.text("Getting description for " + e.expression + "...").show();
+                    let tz = $("#node-input-timeZone").val();
                     if (tz) {
                         e.timeZone = tz;
                     }
@@ -120,9 +141,8 @@
                         datatype: 'json'
                     })
                         .done(function (data) {
-                            let tiptext = data.description
-                            let now = new Date();
-                            let next = now;
+                            $tipTitle.text("Expression " + e.expression + " description...");
+                            let tiptext = data.description;
                             if (data.prettyNext) {
                                 tiptext += "\n\nNext run...\n- " + data.prettyNext;
                                 if (data.nextDates && data.nextDates.length) {
@@ -150,21 +170,131 @@
                     console.error(error);
                 }
             }
+
+
+            function generateOption(i, option) {
+                var $tip = $("#node-input-crontab-tip-container");
+                
+                var container = $('<li/>',{style:"background: #fff; margin:0; padding:8px 0px 0px; border-bottom: 1px solid #ccc;"});
+                var row = $('<div/>').appendTo(container);
+                var row2 = $('<div/>',{style:"padding-top:5px; padding-left:175px;"}).appendTo(container);
+                var row3 = $('<div/>',{style:"padding-top:5px; padding-left:120px;"}).appendTo(container);
+                
+                var div = row.append( '<div/>' )
+
+                var span = $('<span/>',{style:"float:right; margin-right:5px;"}).appendTo(div);
+                var deleteButton = $('<a/>',{href:"#",class:"editor-button editor-button-small", style:"margin-top:7px; margin-left:5px;"}).appendTo(span);
+                $('<i/>',{class:"fa fa-remove"}).appendTo(deleteButton);
+
+                var topicClass ="node-input-option-topic" + ((!option.topic) ? " input-error" : "");
+                var topicField = $('<input/>',{class:topicClass,type:"text",style:"margin-left:5px; width:calc(26% - 20px);", placeholder: 'name',value:option.topic}).appendTo(div);
+                //div.append( "<br>" )
+                var payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:7px; width:calc(36% - 20px);", placeholder: 'payload', value:option.payload}).appendTo(div).typedInput({default:option.type||'str',types:['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']});
+                //div.append( "<br>" )
+                
+                var expressionClass = "node-input-option-expression" + ((!option.expression) ? " input-error" : "");
+                var expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:7px; width:calc(36% - 20px);", placeholder: 'expression', value:option.expression}).appendTo(div);
+
+                expressionField.keyup(function() {
+                    if ($(this).val() && $(this).hasClass('input-error')) {
+                        $(this).removeClass('input-error')
+                    }
+                    else {
+                        if (!$(this).val()) {
+                            $(this).addClass('input-error')
+                        }
+                    }
+                });
+                topicField.keyup(function() {
+                    if ($(this).val() && $(this).hasClass('input-error')) {
+                        $(this).removeClass('input-error')
+                    }
+                    else {
+                        if (!$(this).val()) {
+                            $(this).addClass('input-error')
+                        }
+                    }
+                });
+
+                debugger
+                expressionField.on('focus keyup paste cut',function() {
+                    $tip.show();
+                    updateCronDescription(this);
+                });                
+                expressionField.on('blur',function() {
+                    $tip.hide();
+                });
+                
+
+                deleteButton.click(function() {
+                    container.css({"background":"#fee"});
+                    container.fadeOut(300, function() {
+                        $(this).remove();
+                    });
+                });
+
+                $("#node-input-option-container").append(container);
+            }
+
+            $("#node-input-add-option").click(function() {
+                generateOption($("#node-input-option-container").children().length+1, {});
+                $("#node-input-option-container-div").scrollTop($("#node-input-option-container-div").get(0).scrollHeight);
+            });
+
+            for (var i=0; i<this.options.length; i++) {
+                var option = this.options[i];
+                generateOption(i+1,option);
+            }
+
+            $( "#node-input-option-container" ).sortable({
+                axis: "y",
+                handle:".node-input-option-handle",
+                cursor: "move"
+            });
+
             $("#node-input-timeZone").change(function () {
                 updateCronDescription();
             });
             $("#node-input-crontab").change(function () {
-                updateCronDescription();
+                updateCronDescription("#node-input-crontab");
             });
             $("#node-input-crontab").on("input", function () {
-                updateCronDescription();
+                updateCronDescription("#node-input-crontab");
             });
         },
         oneditsave: function () {
+
+            var options = $("#node-input-option-container").children();
+            var node = this;
+            node.options = [];
+            options.each(function(i) {
+                var option = $(this);
+                var o = {
+                    topic: option.find(".node-input-option-topic").val(),
+                    payload: option.find(".node-input-option-payload").typedInput('value'),
+                    type: option.find(".node-input-option-payload").typedInput('type'),
+                    expression: option.find(".node-input-option-expression").val()
+                };
+                if (option.find(".node-input-option-value").typedInput('type') === "num") {
+                    o.payload = Number(o.value);
+                }
+                if (option.find(".node-input-option-value").typedInput('type') === "bool") {
+                    o.payload = (o.value == "true");
+                }
+                node.options.push(o);
+            });
+
+
             $("#node-input-timeZone").off();
             $("#node-input-crontab").off();
         },
         button: {
+            visible: function () {
+                if(this.options && this.options.length == 1){
+                    return true;
+                }
+                return false;
+            },
             enabled: function () {
                 return !this.changed
             },
@@ -211,9 +341,9 @@
 
 <script type="text/x-red" data-template-name="cronplus">
     <style>
-        .form-row .form-tip {
+        .form-tip {
             background: #ffe;
-            width: 70%;
+            width: 100%;
             padding: 6px 6px;
             border-radius: 2px;
             border: 1px solid #ddd;
@@ -226,7 +356,7 @@
             overflow: auto;
             word-break: keep-all;
         }
-        .form-row .form-tip-spacer {
+        .form-tip-spacer {
             display: inline-block;
             width: 100px
         }
@@ -235,48 +365,69 @@
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
         <input type="text" id="node-input-name" placeholder="Name">
     </div>
-	<div class="form-row">
+	<!-- <div class="form-row">
         <label for="node-input-topic"><i class="fa fa-tasks"></i> <span data-i18n="common.label.payload">Topic</span></label>
         <input type="text" id="node-input-topic" placeholder="Topic">
+    </div> -->
+    <div class="form-row">
+        <label for="node-input-outputField"><i class="fa fa-envelope"></i> Output to</label>
+        <input type="text" id="node-input-outputField" placeholder="payload">
+    </div>         
+    <div class="form-row">
+        <label for="node-input-timeZone"><i class="fa fa-globe"></i> Timezone</label>
+        <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
+    </div>  
+    <div class="form-row node-input-option-container-row" style="margin-bottom: 0px;width: 100%">
+        <label for="node-input-width" style="vertical-align:top"><i class="fa fa-list-alt"></i> Options</label>
+        <div id="node-input-option-container-div" style="box-sizing: border-box; border-radius: 5px; height: 257px; padding: 5px; border: 1px solid #ccc; overflow-y:scroll;display: inline-block; width: calc(70% + 15px);">
+            <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;"></ol>
+        </div>
     </div>
     <div class="form-row">
+        <a href="#" class="editor-button editor-button-small" id="node-input-add-option" style="margin-top: 4px; margin-left: 103px;"><i class="fa fa-plus"></i> <span>option</span></a>
+    </div>
+
+    <!-- <div class="form-row">
         <label for="node-input-payload"><i class="fa fa-envelope"></i> <span data-i18n="common.label.payload">Payload</span></label>
         <input type="text" id="node-input-payload" style="width:70%">
         <input type="hidden" id="node-input-payloadType">
+    </div> -->
+
+    <div id="node-input-crontab-tip-container">
+        <hr>
+        <fieldset class="form-row">
+            <legend id="node-input-crontab-tip-title">Expression description...</legend>
+            <pre class="form-tip" id="node-input-crontab-tip"></pre>
+        </fieldset>
     </div>
-	<div class="form-row">
-        <label for="node-input-outputField"><i class="fa fa-envelope"></i> Output to</label>
-        <input type="text" id="node-input-outputField" placeholder="payload">
-    </div>       
-	<div class="form-row">
-        <label for="node-input-timeZone"><i class="fa fa-globe"></i> Timezone</label>
-        <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
-    </div>    
-	<div class="form-row">
-        <label for="node-input-crontab"><i class="fa fa-clock-o"></i> Expression</label>
-        <input type="text" id="node-input-crontab" placeholder="CRON">
-        <div class="form-tip-spacer"> </div>
-        <pre class="form-tip" id="node-input-crontab-tip"></pre>
-    </div>
+
 </script>
 
 <script type="text/x-red" data-help-name="cronplus">
     <p>Schedule the injection of a payload to start a flow</p>
     <h3>Properties...</h3>
     <dl class="message-properties">
-        <h4>Payload</h4>
-        <div style="padding-left: 15px">
-            What to send when node is triggered.
-        </div>
         <h4>Output to</h4>
         <div style="padding-left: 15px">
             The <code>msg.</code> property to send the payload to.  Typically this would be payload.
         </div>
         <h4>Timezone (optional)</h4>
         <div style="padding-left: 15px">
-            If provided, the timezone to use. If excluded, system timezone will be used.
+            A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area (<a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">list</a>)
         </div>    
-        <h4>Expression</h4>
+        <h4>Options</h4>
+        <div style="padding-left: 15px">
+            A table of schedules
+        </div>
+        <h4>Options - Name</h4>
+        <div style="padding-left: 15px">
+            The name is used to both identify the schedule and will be sent in <code>msg.topic</code> when the schedule triggers. This is to permit the user to determine which schedule has triggered.
+        </div>
+        <h4>Options - Payload</h4>
+        <div style="padding-left: 15px">
+            The value to send in the payload when the schedule triggers. (NOTE: the property that the payload gets written to is determined by "output to").
+        </div>        
+        <h4>Options - Expression</h4>
         <div style="padding-left: 15px">
             The cron expression / schedule
             <p>Format...</p>
@@ -286,12 +437,12 @@
     *  *  *  *  *  *  *    Field              Allowed values    Special symbols
     |  |  |  |  |  |  |    -----------------  ---------------   ---------------
     `--|--|--|--|--|--|->  Second (optional)  0-59              * / , -
-    `--|--|--|--|--|->  Minute             0-59              * / , -
-        `--|--|--|--|->  Hour               0-23              * / , -
-            `--|--|--|->  Day of Month       1-31              * / , - L W
+       `--|--|--|--|--|->  Minute             0-59              * / , -
+          `--|--|--|--|->  Hour               0-23              * / , -
+             `--|--|--|->  Day of Month       1-31              * / , - L W
                 `--|--|->  Month              1-12 or JAN-DEC   * / , -
-                `--|->  Day of Week        0-7 or SUN-SAT    * / , - L #
-                    `->  Year (optional)    1970-2099         * / , -
+                   `--|->  Day of Week        0-7 or SUN-SAT    * / , - L #
+                      `->  Year (optional)    1970-2099         * / , -
             </pre>
         
         <p>Examples...</p>
@@ -311,12 +462,136 @@
             <li>See <a href="https://github.com/jaclarke/cronosjs">here</a> for more examples and info</li>
         </ul>
         </div>
+
     </dl>
     <h3>Output</h3>
     <dl class="message-properties">
         <dt><i>payload (see 'Output to')</i> <span class="property-type">number|string|boolean|object|buffer</span></dt>
         <dd>msg.[Output to] will contain whatever is configured in 'payload'</dd>
-        <dd>e.g. if 'Output to' is set to <b>data</b> then <code>msg.data</code> will contain the value of 'payload'</dd>
+        <dd>e.g. if 'Output to' is set to <b>data.value</b> then <code>msg.data.value</code> will contain the value of the <i>payload</i></dd>
+        <dd>msg.topic will contain the name of the schedule. This simplifies separating out which schedule has triggered</dd>
+        <dd>Additional properties are also added to the msg object. Check the debug output (use show complete msg)</dd>
     </dl>
-   
+
+    <h3>Inputs <i>(Advanced Usage)</i></h3>
+    <dl class="message-properties">
+        <dt><i>payload</i> <span class="property-type">object|Array</span></dt>
+        <dd>It is possible to dynamically add, remove & control schedules by injecting a payload object into the node. The format of the payload object (or array of objects) depends on the operation. See below for details.</dd>
+        <dd>
+            <p><b>Adding one (or more) schedules</b><br>Example...<br>
+                <pre>[
+  {
+    "command": "add",
+    "name": "every 6",
+    "expression": "*/6 * * * * * *",
+    "payload": "hi every 6",
+    "type": "str",
+    "limit": 3 
+  }
+]</pre>
+                
+                <p><i>Details...</i><br>
+                    <ul>
+                        <li>Multiple schedules can be added if the payload is an array of objects/li>
+                        <li>command: (string|required) The operation to perform</li>
+                        <li>name: (string|required) This will be used as the topic when the schedule triggers</li>
+                        <li>expression: (string|required) The cron expression</li>
+                        <li>payload: (any|optional) What to send when schedule triggers</li>
+                        <li>type: (string|optional) The payload type (e.g. 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
+                        <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
+                    </ul>
+                </p>
+            </p>
+            <p><i>Notes...</i><br>
+                <ul>
+                    <li>This option has no output.</li>
+                </ul>
+            </p>
+
+            <p><b>Removing, stopping, pausing, starting, a schedule</b><br>Example...<br>
+                <pre>{
+    "command": "*see details below*",
+    "name": "every 6",
+}</pre>
+                <p><i>Details...</i><br>
+                    <ul>
+                        <li>command: (string|required) The operation to perform - this can be one of the following...
+                            <ul>
+                                <li>"status"</li>
+                                <li>"remove"</li>
+                                <li>"stop"</li>
+                                <li>"pause"</li>
+                                <li>"start"</li>
+                            </ul>
+                        </li>
+                        <li>name: (string|required) The name of the schedule to affect</li>
+                    </ul>
+                </p>
+                <p><i>Notes...</i><br>
+                    <ul>
+                        <li>status returns an object with the config and status of the named schedule</li>
+                        <li>remove will stop and remove the schedule. This option has no output.</li>
+                        <li>stop-all will stop all schedules and reset internal counters. This option has no output.</li>
+                        <li>pause-all will stop all schedules but will not reset internal counters. This option has no output.</li>
+                        <li>start-all will (re)start all schedules. Any schedule that reached its limit will start from the begining. Paused schedules will resume. This option has no output.</li>
+                    </ul>
+                </p>
+            </p>                
+
+            <p><b>Status all, remove all, stop all, pause all, start all...</b><br>Example...<br>
+                <pre>{
+    "command": "*see details below*"
+}</pre>
+                <p><i>Details...</i><br>
+                    <ul>
+                        <li>command: (string|required) The operation to perform - this can be one of the following...
+                            <ul>
+                                <li>"status-all"</li>
+                                <li>"remove-all"</li>
+                                <li>"stop-all"</li>
+                                <li>"pause-all"</li>
+                                <li>"start-all"</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </p>
+                <p><i>Notes...</i><br>
+                    <ul>
+                        <li>status-all returns an array of all schedules (both those added in the UI and those added dynamically)</li>
+                        <li>remove-all will stop and remove all schedules. This option has no output</li>
+                        <li>stop-all will stop all schedules and reset internal counters. This option has no output</li>
+                        <li>pause-all will stop all schedules but will not reset internal counters. This option has no output</li>
+                        <li>start-all will (re)start all schedules. Any schedule that reached its limit will start from the begining. Paused schedules will resume. This option has no output</li>
+                    </ul>
+                </p>
+            </p>  
+
+            <p><b>Describe</b><br>Example...<br>
+                <pre>{
+    "command": "describe",
+    "expression": "0 */5 * * * MON *",
+    "timeZone": "Europe/London"
+}</pre>
+
+                <p><i>Details...</i><br>
+                    Returns an object in payload containing human readable info for the given expression.
+                    <ul>
+                        <li>command: (string|required) The operation to perform</li>
+                        <li>expression: (string|required) The cron expression to describe</li>
+                        <li>timeZone: (string|optional) A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area (<a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">list</a>) </li>
+                    </ul>
+                </p>
+            </p>                
+        </dd>
+
+        <dd>GENERAL NOTES...<br>
+        <ul>
+            <li>Adding a schedule with the same name as an existing schedule will replace the existing one</li>
+            <li>Adding a schedule with property <code>"limit":3</code> will cause that schedule to be stopped after the third trigger. It can be started again by injecting a payload of <code>{"command":"start" "name": "schedule name"}</code></li>
+            <li>UI added tasks can be also be updated by using the name specified in the UI</li>
+            <li>When a cron-plus node is modified and deployed (or node-red is restarted), dynamic entries are discarded & must be injected again</li>
+        </ul>
+        </dd>
+    </dl>
+    
 </script>

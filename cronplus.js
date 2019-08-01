@@ -24,49 +24,44 @@ var humanizeCron = function (expression) {
  * @returns {string}
  * 			The formatted date or empty string if `date` is null|undefined
  */
-function formatDateTimeWithTZ(date, tz) {
+function formatShortDateTimeWithTZ(date, tz) {
 	if (!date) {
 		return "";
 	}
-	let prettyNextDate;
-	if (tz) {
-		let o = {
-			timeZone: tz,
-			timeZoneName: "short",
-			weekday: "short",
-			hour12: false,
-			year: "numeric",
-			month: "short",
-			day: "2-digit",
-			hour: "2-digit",
-			minute: "2-digit",
-			second: "2-digit"
-		};
-		try {
-			prettyNextDate = new Intl.DateTimeFormat('default', o).format(new Date(date))	
-		} catch (error) {
-			prettyNextDate = "Error. Check timezone setting"
-		}
-		
-	} else {
-		prettyNextDate = Date(date).toString();
+	let datestring;
+	let o = {
+		timeZone: tz ? tz : undefined,
+		timeZoneName: "short",
+		hour12: false,
+		year: "numeric",
+		month: "short",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit"
+	};
+	try {
+		datestring = new Intl.DateTimeFormat('default', o).format(new Date(date))	
+	} catch (error) {
+		datestring = "Error. Check timezone setting"
 	}
-	return prettyNextDate;
+		
+	return datestring;
 }
 
 module.exports = function (RED) {
 	function CronPlus(n) {
 		RED.nodes.createNode(this, n);
 		var node = this;
-		node.topic = n.topic;
 		node.name = n.name;
 		node.payload = n.payload;
 		node.payloadType = n.payloadType || "date";
 		node.crontab = n.crontab;
 		node.outputField = n.outputField || "payload";
 		node.timeZone = n.timeZone;
+		node.options = n.options;
 
-		const setResult = function (msg, field, value) {
+		const setProperty = function (msg, field, value) {
 			const set = (obj, path, val) => {
 				const keys = path.split('.');
 				const lastKey = keys.pop();
@@ -79,106 +74,465 @@ module.exports = function (RED) {
 		};
 
 		const updateDoneStatus = (node) => {
-			node.status({ fill: "green", shape: "dot", text: "Done " + formatDateTimeWithTZ(Date.now(), node.timeZone) });
+			node.status({ fill: "green", shape: "dot", text: "Done: " + formatShortDateTimeWithTZ(Date.now(), node.timeZone) });
+			node.nextDate = getNextDate(node.tasks);
 			if (node.nextDate) {
 				let now = Date.now();
 				let next = new Date(node.nextDate).valueOf();
 				//node.nextDate
 				let msTillNext = next - now;
 				if (msTillNext > 5000)
-					setTimeout(() => {
-						node.status({ fill: "blue", shape: "dot", text: "Next Run " + formatDateTimeWithTZ(node.nextDate, node.timeZone) });
+					setTimeout(function() {
+						updateNextStatus(node);
 					}, 4000);
 			}
 		}
 
-		const sendMsg = (node, msg) => {
-			msg.topic = node.topic;
+		const sendMsg = (node, task, crontimestamp) => {
+			msg = {cronplus: {}};
+			msg.topic = task.node_topic;
+			msg.cronplus.triggerTimestamp = crontimestamp;
+			msg.cronplus.status = getTaskStatus(node, task);
+			msg.cronplus.config = exportTask(task);
 			node.status({ fill: "green", shape: "ring", text: "Job started" });
-			if (node.payloadType !== 'flow' && node.payloadType !== 'global') {
-				try {
+			try {
+				if (task.node_type !== 'flow' && task.node_type !== 'global') {
 					let pl;
-					if ((node.payloadType == null && node.payload === "") || node.payloadType === "date") {
+					if ((task.node_type == null && task.node_payload === "") || task.node_type === "date") {
 						pl = Date.now();
-					} else if (node.payloadType == null) {
-						pl = node.payload;
-					} else if (node.payloadType === 'none') {
+					} else if (task.node_type == null) {
+						pl = task.node_payload;
+					} else if (task.node_type === 'none') {
 						pl = "";
 					} else {
-						pl = RED.util.evaluateNodeProperty(node.payload, node.payloadType, node, msg);
+						pl = RED.util.evaluateNodeProperty(task.node_payload, task.node_type, node, msg);
 					}
-					setResult(msg, node.outputField, pl);
+					setProperty(msg, node.outputField, pl);
 					node.send(msg);
-					node.status({ fill: "green", shape: "dot", text: "Done " + formatDateTimeWithTZ(Date.now(), node.timeZone) });
 					updateDoneStatus(node);
-				} catch (err) {
-					node.error(err, msg);
+				} else {
+					RED.util.evaluateNodeProperty(task.node_payload, task.node_type, node, msg, function (err, res) {
+						if (err) {
+							node.error(err, msg);
+						} else {
+							setProperty(msg, node.outputField, res);
+							node.send(msg);
+							updateDoneStatus(node);
+						}
+					});
 				}
-			} else {
-				RED.util.evaluateNodeProperty(node.payload, node.payloadType, node, msg, function (err, res) {
-					if (err) {
-						node.error(err, msg);
-					} else {
-						setResult(msg, node.outputField, res);
-						node.send(msg);
-						updateDoneStatus(node);
-					}
-				});
+			} catch (err) {
+				node.error(err, msg);
 			}
+		}
+
+		function getTask(node,name){
+			let task = node.tasks.find(function(task){
+				return task.name == name;
+			})
+			return task;
+		}
+
+		function exportTask(task) {
+			return {
+				name: task.name || task.node_topic,
+				expression: task.node_expression,
+				payload: task.node_payload,
+				type: task.node_type,
+				limit: task.node_limit || null,
+			}
+		}
+		function getTaskStatus(node, task){
+			let h = describeExpression(task.node_expression, node.timeZone)
+			let nextDescription = null;
+			let nextDate = null;
+			let running = task.isRunning ? (task.node_limit ? task.node_count < task.node_limit: true) : false;
+			if(running){
+				nextDescription = h.nextDescription;
+				nextDate = h.nextDate;
+			}
+			return {
+					type: task.isDynamic ? "dynamic" : "static",
+					isRunning: task.isRunning,
+					count: task.node_count,
+					limit: task.node_limit,
+					nextDescription: nextDescription,
+					nextDate: nextDate,
+					description: h.description,
+				}
+		}
+		function describeExpression(expression, timeZone){
+			let result = {};
+			let cronOpts = node.timeZone ? { timezone: timeZone } : undefined;
+			let cronExpression = cronosjs.CronosExpression.parse(expression, cronOpts)
+			let nextRun = cronExpression.nextDate();
+			if(nextRun){
+				let now = new Date();
+				let ms = nextRun.valueOf() - now.valueOf();
+				result.nextDescription = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
+			}
+			result.nextDate = nextRun;
+			result.description = humanizeCron(expression);
+			return result;
+		}
+		function stopTask(node,name,resetCounter){
+			let task = getTask(node,name);
+			if(task){
+				task.stop();
+				if(resetCounter){ task.node_count = 0; }
+			}
+			updateNextStatus(node);
+			return task;
+		}
+		function stopAllTasks(node,resetCounter){
+			if(node.tasks){
+				for (let index = 0; index < node.tasks.length; index++) {
+					let task = node.tasks[index];
+					if(task){
+						task.stop();
+						if(resetCounter){ task.node_count = 0; }
+					}	
+				}
+			}
+			updateNextStatus(node);
+		}
+		function startTask(node,name){
+			let task = getTask(node,name);
+			if(task){
+				if(task.node_limit && task.node_count >= task.node_limit){
+					task.node_count = 0;
+				}
+				task.start();
+			}
+			updateNextStatus(node);
+			return task;
+		}
+		function startAllTasks(node){
+			if(node.tasks){
+				for (let index = 0; index < node.tasks.length; index++) {
+					let task = node.tasks[index];
+					if(task){
+						if(task.node_limit && task.node_count >= task.node_limit){
+							task.node_count = 0;
+						}
+						task.start();
+					}	
+				}
+			}
+			updateNextStatus(node);
+		}
+		function deleteAllTasks(node){
+			if(node.tasks){
+				for (let index = 0; index < node.tasks.length; index++) {
+					let task = node.tasks[index];
+					if(task){
+						task.stop();
+						task.off("ended")
+						task.off("started")
+						task.off("stopped")
+						task = null;
+					}	
+				}
+			}
+			node.tasks = [];
+			updateNextStatus(node);
+		}
+		function deleteTask(node,name){
+			let task = getTask(node,name);
+			if(task){
+				task.stop();
+				task.off("ended")
+				task.off("started")
+				task.off("stopped")
+				node.tasks = node.tasks.filter(t => t.name != name);
+				task = null;
+			}
+			updateNextStatus(node);
+		}
+		
+		function updateTask(node,options,msg){
+			if(!options || typeof options != "object"){
+				node.warn("schedule settings are not valid",msg);
+				return null;
+			}
+
+			if(Array.isArray(options) == false){
+				options = [options];
+			}
+
+			for (let index = 0; index < options.length; index++) {
+				let opt = options[index];
+				try {
+					validateOpt(opt);					
+				} catch (error) {
+					node.warn(error,msg);
+					return
+				}
+			}
+
+			for (let index = 0; index < options.length; index++) {
+				let opt = options[index];
+				let task = getTask(node,opt.name);
+				if(task){
+					deleteTask(node,opt.name);
+				}
+				let t = createTask(node,opt);	
+				t.isDynamic = true;
+			}
+			updateNextStatus(node);
+		}
+
+		function validateOpt(opt, permitDefaults=true) {
+			if (!opt) {
+				throw new Error(`Schedule options are undefined`);
+			}
+			if (!opt.name) {
+				throw new Error(`Schedule name property missing`);
+			}
+			if (!opt.expression) {
+				throw new Error(`Schedule '${opt.name}' - expression property missing`);
+			}
+			opt.payload = permitDefaults ? opt.payload || "payload" : opt.payload;
+			if (!opt.payload) {
+				throw new Error(`Schedule '${opt.name}' - payload property missing`);
+			}
+			opt.type = permitDefaults ? opt.type || "date" : opt.type;
+			if (!opt.type) {
+				throw new Error(`Schedule '${opt.name}' - type property missing`);
+			}
+			let okTypes = ['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']
+			let typeOK = okTypes.find( el => {return el == opt.type})
+			if (!typeOK) {
+				throw new Error(`Schedule '${opt.name}' - type property '${opt.type}' is not valid. Must be one of the following... ${okTypes.join(",")}`);
+			}
+			if (!cronosjs.validate(opt.expression)) {
+				throw new Error(`Schedule '${opt.name}' - expression '${opt.expression}' is invalid`);
+			}
+			return true;
+		}
+
+		function createTask(node,opt) {
+			try {
+					validateOpt(opt);					
+			} catch (error) {
+				node.warn(error,msg);
+				node.status({ fill: "red", shape: "dot", text: error.message });
+				return null
+			}
+			let cronOpts = node.timeZone ? { timezone: node.timeZone } : undefined;
+			let expression = cronosjs.CronosExpression.parse(opt.expression, cronOpts)
+			let task = new cronosjs.CronosTask(expression);
+			task.name = ""+opt.name;
+			task.node_topic = opt.name
+			task.node_expression = opt.expression
+			task.node_payload = opt.payload
+			task.node_type = opt.type
+			task.node_count = 0;
+			task.node_limit = opt.limit || 0;
+			task.stop();
+			task.on('run', (timestamp) => {
+				node.debug(`topic: ${task.node_topic}\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
+				node.status({ fill: "green", shape: "ring", text: "Running " + formatShortDateTimeWithTZ(timestamp, node.timeZone) });
+				if(task.node_limit && task.node_count >= task.node_limit){
+					process.nextTick(function(){
+						//using nextTick is a work around for an issue (#3) in cronosjs where the job restarts itself after this event handler has exited
+						task.stop();
+						updateNextStatus(node);
+					})
+					return;
+				} 
+				task.node_count = task.node_count + 1;//++ stops at 2147483647
+				sendMsg(node, task, timestamp);
+			})
+			.on('ended', () => {
+				updateNextStatus(node);
+			})
+			.on('started', () => {
+				// node.nextDate = getNextDate(node.tasks);
+				// let next = formatShortDateTimeWithTZ(node.nextDate, node.timeZone);
+				// next = next ? next : "Never"
+				// node.status({ fill: "blue", shape: "dot", text: "Next: " + next });
+			})
+			.on('stopped', () => {
+				updateNextStatus(node);
+			});
+			task.start()
+			node.tasks.push(task);
+			return task;
 		}
 
 		try {
+			node.status({});
 			node.nextDate = null;
-			if (node.task) {
-				node.task.stop()
-			}
-			let cronExpression = n.crontab;
-			let exOk = cronosjs.validate(cronExpression);
-			if (!exOk) {
-				node.status({ fill: "red", shape: "dot", text: "Cannot validate CRON expression" });
-				return;
-			}
-			let opts = node.timeZone ? { timezone: node.timeZone } : undefined;
-			let expression = cronosjs.CronosExpression.parse(cronExpression, opts)
-			node.task = new cronosjs.CronosTask(expression);
-			node.task.stop();
-			node.nextDate = null;
-			node.task
-				.on('run', (timestamp) => {
-					node.debug(`topic: ${node.topic}\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
-					node.status({ fill: "green", shape: "ring", text: "Running task " + formatDateTimeWithTZ(timestamp, node.timeZone) });
-					node.nextDate = node.task._expression.nextDate();
-					sendMsg(node, { crontime: timestamp, nextDate: node.nextDate });
-				})
-				.on('ended', () => {
-					node.status({ fill: "grey", shape: "dot", text: "Job ended" });
-				})
-				.on('started', () => {
-					let now = new Date();
-					let next = node.task._expression.nextDate(now);
-					node.status({ fill: "blue", shape: "dot", text: "Next run: " + formatDateTimeWithTZ(next, node.timeZone) });
-				})
-				.on('stopped', () => {
-					node.status({ fill: "blue", shape: "dot", text: "Job stopped" });
-				});
 
-			node.task.start();
+			if(!node.options){
+				node.status({ fill: "grey", shape: "dot", text: "Nothing set" });
+				return;
+			} 
+
+			node.tasks = [];
+			for(var iOpt = 0; iOpt < node.options.length; iOpt++){
+				let opt = node.options[iOpt];
+				opt.name = opt.name || opt.topic;
+				createTask(node,opt);
+			}
+
+			updateNextStatus(node);
+
 			node.on('close', function (done) {
-				if (node.task) {
-					node.task.stop()
+				if (node.tasks) {
+					node.tasks.forEach((task) => {
+						task.stop()
+					})
 				}
 				done();
 			});
+
 		} catch (err) {
-			if (node.task) {
-				node.task.stop()
+			if (node.tasks) {
+				node.tasks.forEach(task => task.stop())
 			}
+
 			node.status({ fill: "red", shape: "dot", text: "Error creating Job" });
 			node.error(err);
 		}
+		
+		function updateNextStatus(node) {
+			if (node.tasks) {
+				node.nextDate = getNextDate(node.tasks);
+				if (node.nextDate) {
+					let d = formatShortDateTimeWithTZ(node.nextDate, node.timeZone) || "Never";
+					node.status({ fill: "blue", shape: "dot", text: "Next: " + d });
+				} else {
+					node.status({ fill: "grey", shape: "dot", text: "Job stopped" });
+				}
+			} else {
+					node.status({});
+			}
+		}
+
+		function getNextDate(tasks) {
+			try {
+				if(!tasks || !tasks.length)
+					return null;
+				let runningTasks = tasks.filter(function(task){
+					return task.isRunning && task._expression;
+				})
+				if(!runningTasks || !runningTasks.length){
+					return null;
+				}
+
+				let d;
+				if(runningTasks.length == 1){
+					d = runningTasks[0]._expression.nextDate();
+				} else {
+					nextToRunTask = runningTasks.reduce(function (prev, current) {
+						let p, c; 
+						if(!prev) return current;
+						if(!current) return prev;
+						return (prev._expression.nextDate() < current._expression.nextDate()) ? prev : current;
+					});
+					if(nextToRunTask)
+						d = nextToRunTask._expression.nextDate();
+					else
+						d = null;
+				}
+				if(d instanceof Date){ 
+					return d;
+				}
+			} catch (error) {
+				node.debug(error);
+			}
+			return null;
+		}
+
 		this.on("input", function (msg) {
-			sendMsg(node, msg);
+
+			//is this an button press?...
+			if(!msg.payload && !msg.topic){//TODO: better method of differenciating between bad input and button press
+				sendMsg(node, node.tasks[0], msg);
+				return;
+			}
+			if(typeof msg.payload != "object"){
+				return;
+			}
+
+			try {
+				let input = msg.payload;
+				if(Array.isArray(msg.payload) == false){
+					input = [input];
+				}
+				
+				for (let i = 0; i < input.length; i++) {
+					let cmd = input[i];
+					let action = cmd.command;
+					let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
+					switch (action) {
+						case "describe":
+							newMsg.payload.result = describeExpression(cmd.expression, cmd.timeZone);
+							node.send(newMsg);
+							break;
+						case "status":
+						case "export":
+							let task = getTask(node,cmd.name);
+							if(task){
+								newMsg.payload.result.config = exportTask(task);
+								newMsg.payload.result.status = getTaskStatus(node, task);
+							} else {
+								newMsg.error = `${cmd.name} not found`;
+							}
+							node.send(newMsg);
+							break;
+						case "list-all":
+						case "status-all":
+						case "export-all":
+							let results = [];
+							if(node.tasks){
+								for (let index = 0; index < node.tasks.length; index++) {
+									const task = node.tasks[index];
+									let result = {};
+									result.config = exportTask(task);
+									result.status = getTaskStatus(node, task);
+									results.push(result);	
+								}
+							}
+							newMsg.payload.result = results;
+							node.send(newMsg);
+							break;
+						case "add":
+						case "update":
+							updateTask(node,cmd,msg);
+							break;
+						case "clear":
+						case "remove-all":
+						case "delete-all":
+							deleteAllTasks(node);
+							break;
+						case "remove":
+						case "delete":
+							deleteTask(node,cmd.name);
+							break;
+						case "start":
+							startTask(node,cmd.name);
+							break;
+						case "start-all":
+							startAllTasks(node);
+							break;
+						case "stop":
+						case "pause":
+							stopTask(node,cmd.name,cmd.command == "stop");
+							break;
+						case "stop-all":
+						case "pause-all":
+							stopAllTasks(node,cmd.command == "stop-all");
+							break;
+					}
+				}
+			} catch (error) {
+				node.error(error,msg);
+			}			
 		});
+
 	}
 	RED.nodes.registerType("cronplus", CronPlus);
 
