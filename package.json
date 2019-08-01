@@ -1,7 +1,7 @@
 {
   "name": "node-red-contrib-cron-plus",
-  "version": "0.1.0",
-  "description": "A flexible scheduler node for Node-RED (incl Timezone support)",
+  "version": "0.2.0",
+  "description": "A flexible scheduler node for Node-RED (incl dynamic control and Timezone support)",
   "main": "cronplus.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -15,6 +15,7 @@
     "node-red",
     "scheduler",
     "cron",
+    "crontab",
     "timer"
   ],
   "node-red": {
