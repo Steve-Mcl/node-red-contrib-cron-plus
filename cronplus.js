@@ -347,12 +347,6 @@ module.exports = function (RED) {
 			.on('ended', () => {
 				updateNextStatus(node);
 			})
-			.on('started', () => {
-				// node.nextDate = getNextDate(node.tasks);
-				// let next = formatShortDateTimeWithTZ(node.nextDate, node.timeZone);
-				// next = next ? next : "Never"
-				// node.status({ fill: "blue", shape: "dot", text: "Next: " + next });
-			})
 			.on('stopped', () => {
 				updateNextStatus(node);
 			});
@@ -416,7 +410,8 @@ module.exports = function (RED) {
 				if(!tasks || !tasks.length)
 					return null;
 				let runningTasks = tasks.filter(function(task){
-					return task.isRunning && task._expression;
+					let finished = task.node_limit ? task.node_count >= task.node_limit : false;
+					return task.isRunning && task._expression && !finished;
 				})
 				if(!runningTasks || !runningTasks.length){
 					return null;

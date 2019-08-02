@@ -7,10 +7,6 @@
         outputs: 1,
         defaults: {
             name: { value: "" },
-            // crontab: { value: "* * * * * *", required: true },
-            // topic: { value: "" },
-            // payload: { value: "", validate: RED.validators.typedInput("payloadType") },
-            // payloadType: { value: "date" },
             outputField: { value: "payload" },
             timeZone: { value: "" },
             options: {
@@ -33,8 +29,8 @@
         },
         oneditprepare: function () {
             debugger
-            let $tip = $("#node-input-crontab-tip-container");
-            $tip.hide();
+            let $tipContainer = $("#node-input-crontab-tip-container");
+            $tipContainer.hide();
             if (this.payloadType == null) {
                 if (this.payload == "") {
                     this.payloadType = "date";
@@ -115,19 +111,21 @@
                 } catch (error) {
                     datestring = "Error. Check timezone setting"
                 }
-
                 return datestring;
             }
             var updateCronDescription = function (target) {
                 updateCronDescription.target = target ? target : updateCronDescription.target;
+                let $tipContainer = $("#node-input-crontab-tip-container");
                 let $tip = $("#node-input-crontab-tip");
                 let $tipTitle = $("#node-input-crontab-tip-title");
                 try {
                     let $expression = $(updateCronDescription.target);
                     let expression = $expression.val();
                     if(!expression){
+                        $tipContainer.hide();
                         return;
                     }
+                    $tipContainer.show();
                     let e = { expression: expression };
                     $tip.text("Getting description for " + e.expression + "...").show();
                     let tz = $("#node-input-timeZone").val();
@@ -140,31 +138,31 @@
                         data: e,
                         datatype: 'json'
                     })
-                        .done(function (data) {
-                            $tipTitle.text("Expression " + e.expression + " description...");
-                            let tiptext = data.description;
-                            if (data.prettyNext) {
-                                tiptext += "\n\nNext run...\n- " + data.prettyNext;
-                                if (data.nextDates && data.nextDates.length) {
-                                    let map1;
-                                    if (tz) {
-                                        map1 = data.nextDates.map(x => {
-                                            let fd = formatDateTimeWithTZ(x, tz);
-                                            return fd ? fd : undefined;
-                                        });
-                                    } else {
-                                        map1 = data.nextDates.map(x => x = new Date(x).toString());
-                                    }
-                                    tiptext += "\n- at " + map1.join("\n- at ");
+                    .done(function (data) {
+                        $tipTitle.html('Description of <span class="cron-expression">' + e.expression + '</span> ...');
+                        let tiptext = data.description;
+                        if (data.prettyNext) {
+                            tiptext += "\n\nNext run...\n- " + data.prettyNext;
+                            if (data.nextDates && data.nextDates.length) {
+                                let map1;
+                                if (tz) {
+                                    map1 = data.nextDates.map(x => {
+                                        let fd = formatDateTimeWithTZ(x, tz);
+                                        return fd ? fd : undefined;
+                                    });
+                                } else {
+                                    map1 = data.nextDates.map(x => x = new Date(x).toString());
                                 }
+                                tiptext += "\n- at " + map1.join("\n- at ");
                             }
-                            $tip.text(tiptext);
-                        })
-                        .fail(function (jqXHR, textStatus, errorThrown) {
-                            debugger
-                            console.error(jqXHR, textStatus, errorThrown)
-                            $tip.text("Cannot get cron description from node-red");
-                        });
+                        }
+                        $tip.text(tiptext);
+                    })
+                    .fail(function (jqXHR, textStatus, errorThrown) {
+                        debugger
+                        console.error(jqXHR, textStatus, errorThrown)
+                        $tip.text("Cannot get cron description from node-red");
+                    });
                 } catch (error) {
                     $tip.text("");
                     console.error(error);
@@ -187,13 +185,11 @@
                 $('<i/>',{class:"fa fa-remove"}).appendTo(deleteButton);
 
                 var topicClass ="node-input-option-topic" + ((!option.topic) ? " input-error" : "");
-                var topicField = $('<input/>',{class:topicClass,type:"text",style:"margin-left:5px; width:calc(26% - 20px);", placeholder: 'name',value:option.topic}).appendTo(div);
-                //div.append( "<br>" )
-                var payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:7px; width:calc(36% - 20px);", placeholder: 'payload', value:option.payload}).appendTo(div).typedInput({default:option.type||'str',types:['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']});
-                //div.append( "<br>" )
+                var topicField = $('<input/>',{class:topicClass,type:"text",style:"margin-left:5px; width:calc(23% - 16px);", placeholder: 'name',value:option.topic}).appendTo(div);
+                var payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:7px; width:calc(37% - 16px);", placeholder: 'payload', value:option.payload}).appendTo(div).typedInput({default:option.type||'str',types:['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']});
                 
                 var expressionClass = "node-input-option-expression" + ((!option.expression) ? " input-error" : "");
-                var expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:7px; width:calc(36% - 20px);", placeholder: 'expression', value:option.expression}).appendTo(div);
+                var expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:7px; width:calc(37% - 16px);", placeholder: 'expression', value:option.expression}).appendTo(div);
 
                 expressionField.keyup(function() {
                     if ($(this).val() && $(this).hasClass('input-error')) {
@@ -360,15 +356,24 @@
             display: inline-block;
             width: 100px
         }
+        .cron-expression {
+            font-family: monospace;
+            padding-left: 5px;
+            padding-right: 5px;
+            text-align: left;
+            color: #666;
+            background: #ffe;
+            height: 30px;
+            vertical-align: middle;
+            border-top: 1px solid #f0f0f0;
+            border-bottom: 1px solid #f0f0f0
+        }
     </style>            
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
         <input type="text" id="node-input-name" placeholder="Name">
     </div>
-	<!-- <div class="form-row">
-        <label for="node-input-topic"><i class="fa fa-tasks"></i> <span data-i18n="common.label.payload">Topic</span></label>
-        <input type="text" id="node-input-topic" placeholder="Topic">
-    </div> -->
+
     <div class="form-row">
         <label for="node-input-outputField"><i class="fa fa-envelope"></i> Output to</label>
         <input type="text" id="node-input-outputField" placeholder="payload">
@@ -378,28 +383,22 @@
         <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
     </div>  
     <div class="form-row node-input-option-container-row" style="margin-bottom: 0px;width: 100%">
-        <label for="node-input-width" style="vertical-align:top"><i class="fa fa-list-alt"></i> Options</label>
-        <div id="node-input-option-container-div" style="box-sizing: border-box; border-radius: 5px; height: 257px; padding: 5px; border: 1px solid #ccc; overflow-y:scroll;display: inline-block; width: calc(70% + 15px);">
+        <label for="node-input-width" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
+        <div id="node-input-option-container-div" style="box-sizing: border-box; border-radius: 5px; height: 150px; padding: 5px; border: 1px solid #ccc; overflow-y:scroll;display: inline-block; width: calc(70% + 15px);">
             <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;"></ol>
         </div>
     </div>
     <div class="form-row">
         <a href="#" class="editor-button editor-button-small" id="node-input-add-option" style="margin-top: 4px; margin-left: 103px;"><i class="fa fa-plus"></i> <span>option</span></a>
     </div>
-
-    <!-- <div class="form-row">
-        <label for="node-input-payload"><i class="fa fa-envelope"></i> <span data-i18n="common.label.payload">Payload</span></label>
-        <input type="text" id="node-input-payload" style="width:70%">
-        <input type="hidden" id="node-input-payloadType">
-    </div> -->
-
     <div id="node-input-crontab-tip-container">
         <hr>
-        <fieldset class="form-row">
-            <legend id="node-input-crontab-tip-title">Expression description...</legend>
+        <div class="form-row">
+            <p style="font-size: 14px; font-weight: bold" id="node-input-crontab-tip-title"></p>
             <pre class="form-tip" id="node-input-crontab-tip"></pre>
-        </fieldset>
+        </div>
     </div>
+</div>
 
 </script>
 
@@ -415,19 +414,19 @@
         <div style="padding-left: 15px">
             A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area (<a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">list</a>)
         </div>    
-        <h4>Options</h4>
+        <h4>Schedules</h4>
         <div style="padding-left: 15px">
-            A table of schedules
+            A table of schedules. 
         </div>
-        <h4>Options - Name</h4>
+        <h4>Schedules - Name</h4>
         <div style="padding-left: 15px">
             The name is used to both identify the schedule and will be sent in <code>msg.topic</code> when the schedule triggers. This is to permit the user to determine which schedule has triggered.
         </div>
-        <h4>Options - Payload</h4>
+        <h4>Schedules - Payload</h4>
         <div style="padding-left: 15px">
             The value to send in the payload when the schedule triggers. (NOTE: the property that the payload gets written to is determined by "output to").
         </div>        
-        <h4>Options - Expression</h4>
+        <h4>Schedules - Expression</h4>
         <div style="padding-left: 15px">
             The cron expression / schedule
             <p>Format...</p>
