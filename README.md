@@ -4,11 +4,12 @@ _A flexible scheduler node for Node-RED (incl Timezone support)_
 
 FEATURES
 --------
-* Evaluate CRON expressions
-  * Human readable CRON descriptions
+* Schedule by CRON, date and date sequences
+  * Human readable descriptions of your CRON expression are provided as you type.
 * Send timestamp, string, number, boolean, flow variable, global variable, JSON, Buffer or Env variable as the output.
 * Settable output variable (normally `msg.payload` but it is up to you)
 * Multiple schedules can be entered by the UI
+* Additional info about the triggered scedule is always send in `msg.cronplus`
 * Ability to add, remove, list, stop, start, pause schedules by a payload input permitting full flexability & dynamic control
 * Full demo flow provided in node-red editors menu > import > examples.
 * Optional timezone setting suppoting UTC and Region/Area (e.g. Europe/London)

@@ -48,6 +48,29 @@ function formatShortDateTimeWithTZ(date, tz) {
 		
 	return datestring;
 }
+function isNumber(n) {
+	return !isNaN(parseFloat(n)) && isFinite(n);
+}
+function parseDateSequence(expression){
+	let result = {isDateSequence: false, expression: expression};
+	let dates = expression;
+	if(typeof expression == "string"){
+		let spl = expression.split(",");
+		dates = spl.map(x => {
+			if(isNumber(x)){
+				x = parseInt(x)
+			}
+			return new Date(x);
+		})
+	}			
+	let ds = new cronosjs.CronosTask(dates);
+	if(ds && ds._sequence){
+		result.dates = ds._sequence._dates;
+		result.task = ds;
+		result.isDateSequence = true;
+	}
+	return result;	
+}
 
 module.exports = function (RED) {
 	function CronPlus(n) {
@@ -161,18 +184,43 @@ module.exports = function (RED) {
 					description: h.description,
 				}
 		}
+		
 		function describeExpression(expression, timeZone){
-			let result = {};
-			let cronOpts = node.timeZone ? { timezone: timeZone } : undefined;
-			let cronExpression = cronosjs.CronosExpression.parse(expression, cronOpts)
-			let nextRun = cronExpression.nextDate();
-			if(nextRun){
-				let now = new Date();
-				let ms = nextRun.valueOf() - now.valueOf();
-				result.nextDescription = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
+			let now = new Date();
+			let result = {description:undefined,nextDate:undefined,nextDescription:undefined};
+			try {
+				let cronOpts = node.timeZone ? { timezone: timeZone } : undefined;
+				let ds = null;
+				try {
+					ds = parseDateSequence(expression);
+				} catch (e) {
+				}
+				if(ds && ds.isDateSequence){
+					let task = ds.task;
+					let dates = ds.dates;
+					result.description = "Date sequence with " + dates.length +  " fixed dates";
+					if(task && task._sequence && dates){
+						result.nextDate = task._sequence.nextDate(now);
+						let first = dates[0]; 
+						let count = dates.length;
+						if(count == 1){
+							result.description	= "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
+						} else {
+							result.description	= count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
+						}
+					}
+				} else {
+					let cronExpression = cronosjs.CronosExpression.parse(expression, cronOpts)
+					result.nextDate = cronExpression.nextDate();
+					result.description = humanizeCron(expression);	
+				}
+				if(result.nextDate){
+					let ms = result.nextDate.valueOf() - now.valueOf();
+					result.nextDescription = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
+				}
+			} catch (error) {
+				node.debug(error);
 			}
-			result.nextDate = nextRun;
-			result.description = humanizeCron(expression);
 			return result;
 		}
 		function stopTask(node,name,resetCounter){
@@ -282,6 +330,16 @@ module.exports = function (RED) {
 			updateNextStatus(node);
 		}
 
+		function isDateSequence(data){
+			try {
+				let ds = parseDateSequence(data)
+				return (ds && ds.isDateSequence);	
+			} catch (error) {
+				
+			}
+			return false;
+		}
+
 		function validateOpt(opt, permitDefaults=true) {
 			if (!opt) {
 				throw new Error(`Schedule options are undefined`);
@@ -306,28 +364,42 @@ module.exports = function (RED) {
 				throw new Error(`Schedule '${opt.name}' - type property '${opt.type}' is not valid. Must be one of the following... ${okTypes.join(",")}`);
 			}
 			if (!cronosjs.validate(opt.expression)) {
-				throw new Error(`Schedule '${opt.name}' - expression '${opt.expression}' is invalid`);
+				if(isDateSequence(opt.expression)){
+					opt.expressionType = "datesequence";	
+				} else {
+					throw new Error(`Schedule '${opt.name}' - expression '${opt.expression}' must be either a cron expression, a date or a CSV of dates`);
+				}
+			} else {
+				opt.expressionType = "cron";
 			}
 			return true;
 		}
 
 		function createTask(node,opt) {
 			try {
-					validateOpt(opt);					
+				validateOpt(opt);					
 			} catch (error) {
-				node.warn(error,msg);
+				node.warn(error);
 				node.status({ fill: "red", shape: "dot", text: error.message });
 				return null
 			}
 			let cronOpts = node.timeZone ? { timezone: node.timeZone } : undefined;
-			let expression = cronosjs.CronosExpression.parse(opt.expression, cronOpts)
-			let task = new cronosjs.CronosTask(expression);
+			let task;
+			if(opt.expressionType == "cron"){
+				let expression = cronosjs.CronosExpression.parse(opt.expression, cronOpts)
+				task = new cronosjs.CronosTask(expression);
+			} else {
+				let ds = parseDateSequence(opt.expression);			
+				task = ds.task;
+			}
+			
 			task.name = ""+opt.name;
 			task.node_topic = opt.name
 			task.node_expression = opt.expression
 			task.node_payload = opt.payload
 			task.node_type = opt.type
 			task.node_count = 0;
+			task.node_expressionType = opt.expressionType;
 			task.node_limit = opt.limit || 0;
 			task.stop();
 			task.on('run', (timestamp) => {
@@ -346,6 +418,11 @@ module.exports = function (RED) {
 			})
 			.on('ended', () => {
 				updateNextStatus(node);
+			})
+			.on('started', () => {
+				process.nextTick(function(){
+					updateNextStatus(node);
+				})
 			})
 			.on('stopped', () => {
 				updateNextStatus(node);
@@ -407,11 +484,12 @@ module.exports = function (RED) {
 
 		function getNextDate(tasks) {
 			try {
+				let now = new Date();
 				if(!tasks || !tasks.length)
 					return null;
 				let runningTasks = tasks.filter(function(task){
 					let finished = task.node_limit ? task.node_count >= task.node_limit : false;
-					return task.isRunning && task._expression && !finished;
+					return task.isRunning && (task._expression || task._sequence) && !finished;
 				})
 				if(!runningTasks || !runningTasks.length){
 					return null;
@@ -419,18 +497,24 @@ module.exports = function (RED) {
 
 				let d;
 				if(runningTasks.length == 1){
-					d = runningTasks[0]._expression.nextDate();
+					let x = (runningTasks[0]._expression || runningTasks[0]._sequence)
+					d = x.nextDate(now);
 				} else {
 					nextToRunTask = runningTasks.reduce(function (prev, current) {
 						let p, c; 
 						if(!prev) return current;
 						if(!current) return prev;
-						return (prev._expression.nextDate() < current._expression.nextDate()) ? prev : current;
+						let px = (prev._expression || prev._sequence)
+						let cx = (current._expression || current._sequence)
+						return (px.nextDate(now) < cx.nextDate(now)) ? prev : current;
 					});
-					if(nextToRunTask)
-						d = nextToRunTask._expression.nextDate();
-					else
+					if(nextToRunTask){
+						let nx = (nextToRunTask._expression || nextToRunTask._sequence)
+						d = nx.nextDate(now);
+					}
+					else{
 						d = null;
+					}
 				}
 				if(d instanceof Date){ 
 					return d;
@@ -548,15 +632,25 @@ module.exports = function (RED) {
 
 	RED.httpAdmin.post("/cronplus", RED.auth.needsPermission("cronplus.read"), function (req, res) {
 		var e = req.body.expression;
-		var opts = req.body.timeZone ? { timezone: req.body.timeZone } : undefined;
+		let tz = req.body.timeZone ? req.body.timeZone : undefined;
+		var opts = tz ? { timezone: tz } : undefined;
 		try {
-			let exOk = cronosjs.validate(e);
+			let isValidCron = cronosjs.validate(e);
+			let ds, next, nextDates, desc;
+			let exOk = false;
+			let dsOk = false;
+			let now = new Date();
+			let prettyNext = "Never";
+			if(isValidCron){
+				exOk = cronosjs.validate(e);
+			} else { 
+				ds = parseDateSequence(e);
+				dsOk = ds.isDateSequence;
+			} 
+			 
 			if (exOk) {
-				let ex = cronosjs.CronosExpression.parse(e, opts);
-				let now = new Date();
-				let next = ex.nextDate(now);
-				let prettyNext = "Never";
-				let nextDates;
+				let ex = cronosjs.CronosExpression.parse(e, opts);	
+				next = ex.nextDate(now);
 				if (next) {
 					let ms = next.valueOf() - now.valueOf();
 					prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
@@ -566,13 +660,35 @@ module.exports = function (RED) {
 						node.debug(error);
 					}
 				}
-				let desc = humanizeCron(e);
-				let r = { expression: e, description: desc, next: next, prettyNext: prettyNext, nextDates: nextDates };
-				res.json(r);
+				desc = humanizeCron(e);
+			} else if(dsOk) {
+				let ex = ds.task._sequence;
+				next = ex.nextDate(now);
+				if (next) {
+					let ms = next.valueOf() - now.valueOf();
+					prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
+					try {
+						let futureDates = ex._dates.filter(d => d > next)
+						nextDates = futureDates.slice(0,5);
+					} catch (error) {
+						node.debug(error);
+					}
+				}
+				let first = ex._dates[0]; 
+				let count = ex._dates.length;
+				if(count == 1){
+					desc	= "One time at " + formatShortDateTimeWithTZ(first,tz) ;
+				} else {
+					desc	= count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,tz) ;
+				}
+			 
 			} else {
 				let r = { expression: e, description: "Invalid or unsupported expression" };
 				res.json(r);
 			}
+			let r = { expression: e, description: desc, next: next, prettyNext: prettyNext, nextDates: nextDates };
+			res.json(r);
+
 		} catch (err) {
 			res.sendStatus(500);
 			console.error(err)

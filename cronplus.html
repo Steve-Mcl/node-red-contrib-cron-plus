@@ -428,8 +428,13 @@
         </div>        
         <h4>Schedules - Expression</h4>
         <div style="padding-left: 15px">
-            The cron expression / schedule
-            <p>Format...</p>
+            A CRON expression, a date, a comma seperated list of dates or an array of dates<br><br>
+            <p> Date or Date Sequnce Format...<br>
+                When you wish to use a fixed date or sequnce of dates, the expression can be a string date, comma separated list of dates, an array of dates (The array can contain a mix of string, date objects and timestamps).
+                When specifying a string date, you can use timezone e.g. "2020-01-01 00:00 GMT+2".
+                You can even mix time zones e.g. "2020-01-01 00:00 GMT+2, 2020-01-01 00:00 GMT-7"
+            </p>
+            <p>CRON Format...</p>
             <pre style="white-space: pre">
     s  m  h  md m  wd y
     |  |  |  |  |  |  |
@@ -494,7 +499,7 @@
                         <li>Multiple schedules can be added if the payload is an array of objects/li>
                         <li>command: (string|required) The operation to perform</li>
                         <li>name: (string|required) This will be used as the topic when the schedule triggers</li>
-                        <li>expression: (string|required) The cron expression</li>
+                        <li>expression: (string|required) A CRON expression, a date, a comma seperated list of dates or an array of dates</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
                         <li>type: (string|optional) The payload type (e.g. 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
                         <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
@@ -576,7 +581,7 @@
                     Returns an object in payload containing human readable info for the given expression.
                     <ul>
                         <li>command: (string|required) The operation to perform</li>
-                        <li>expression: (string|required) The cron expression to describe</li>
+                        <li>expression: (string|required) The expression to describe</li>
                         <li>timeZone: (string|optional) A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area (<a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">list</a>) </li>
                     </ul>
                 </p>
