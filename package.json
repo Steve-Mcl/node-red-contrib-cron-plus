@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-cron-plus",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "A flexible scheduler node for Node-RED (incl dynamic control and Timezone support)",
   "main": "cronplus.js",
   "scripts": {

@@ -29,8 +29,6 @@
         },
         oneditprepare: function () {
             debugger
-            let $tipContainer = $("#node-input-crontab-tip-container");
-            $tipContainer.hide();
             if (this.payloadType == null) {
                 if (this.payload == "") {
                     this.payloadType = "date";
@@ -86,7 +84,7 @@
                 select: function (event, ui) {
                     event.preventDefault();
                     this.value = ui.item.value.tz;
-                    updateCronDescription();
+                    //updateCronDescription();
                 }
             });
 
@@ -113,65 +111,87 @@
                 }
                 return datestring;
             }
-            var updateCronDescription = function (target) {
-                updateCronDescription.target = target ? target : updateCronDescription.target;
-                let $tipContainer = $("#node-input-crontab-tip-container");
-                let $tip = $("#node-input-crontab-tip");
-                let $tipTitle = $("#node-input-crontab-tip-title");
-                try {
-                    let $expression = $(updateCronDescription.target);
-                    let expression = $expression.val();
-                    if(!expression){
-                        $tipContainer.hide();
-                        return;
-                    }
-                    $tipContainer.show();
-                    let e = { expression: expression };
-                    $tip.text("Getting description for " + e.expression + "...").show();
-                    let tz = $("#node-input-timeZone").val();
-                    if (tz) {
-                        e.timeZone = tz;
-                    }
-                    $.ajax({
-                        url: 'cronplus',
-                        type: 'POST',
-                        data: e,
-                        datatype: 'json'
-                    })
-                    .done(function (data) {
-                        $tipTitle.html('Description of <span class="cron-expression">' + e.expression + '</span> ...');
-                        let tiptext = data.description;
-                        if (data.prettyNext) {
-                            tiptext += "\n\nNext run...\n- " + data.prettyNext;
-                            if (data.nextDates && data.nextDates.length) {
-                                let map1;
-                                if (tz) {
-                                    map1 = data.nextDates.map(x => {
-                                        let fd = formatDateTimeWithTZ(x, tz);
-                                        return fd ? fd : undefined;
-                                    });
-                                } else {
-                                    map1 = data.nextDates.map(x => x = new Date(x).toString());
-                                }
-                                tiptext += "\n- at " + map1.join("\n- at ");
-                            }
-                        }
-                        $tip.text(tiptext);
-                    })
-                    .fail(function (jqXHR, textStatus, errorThrown) {
-                        debugger
-                        console.error(jqXHR, textStatus, errorThrown)
-                        $tip.text("Cannot get cron description from node-red");
-                    });
-                } catch (error) {
-                    $tip.text("");
-                    console.error(error);
-                }
-            }
-
-
+           
             function generateOption(i, option) {
-                var $tip = $("#node-input-crontab-tip-container");
+                function buildExpresionTip(title,text){
+	return `
+  <div>
+  <p style="font-size: 12px; font-weight: bold">${title}</p>
+  <pre  class="form-tip" >
+${text}</pre>
+  </div>
+`
+}
+                function initTooltip(selector){
+                    selector.off("mouseleave").off("mouseenter").tooltip({
+                        tooltipClass: "expression-tip",
+                        position: { my: "center bottom", at: "center top", of: $("#options-div") },
+                        content: function () { return buildExpresionTip("Expression...", "") } ,
+                        disabled: true
+                    }).on("blur", function () {
+                        $(this).tooltip("close").tooltip("disable");
+                    }).on("focusin change keyup", function () {
+                        var $this = $(this);
+                        var expression = $this.val();
+                        if(!expression){
+                            $this.tooltip("close").tooltip("disable");
+                            return;
+                        } else {
+                            $(this).tooltip("enable").tooltip("open");
+                        }
+                        var tz = $("#node-input-timeZone").val();
+                        $this
+                            .tooltip({ 
+                                position: { my: "center bottom", at: "center top", of: $("#options-div") },
+                                disabled: false,
+                                show: { effect: "blind", duration: 300 },
+                                content: function (callback) {
+                                let e = { expression: expression };
+                                if (tz) {
+                                    e.timeZone = tz;
+                                }
+                                $.ajax({
+                                    url: 'cronplus',
+                                    type: 'POST',
+                                    data: e,
+                                    datatype: 'json'
+                                })
+                                .done(function (data) {
+                                    const maxlen = 5;
+                                    let t = e.expression;
+                                    if(t.length > maxlen)
+                                        t = t.slice(0,maxlen) + "..."
+                                    let title_html = 'Description of <span class="cron-expression">' + t + '</span>';
+                                    let tiptext = data.description;
+                                    if (data.prettyNext) {
+                                        tiptext += "\n\nNext run...\n- " + data.prettyNext;
+                                        if (data.nextDates && data.nextDates.length) {
+                                            let map1;
+                                            if (tz) {
+                                                map1 = data.nextDates.map(x => {
+                                                    let fd = formatDateTimeWithTZ(x, tz);
+                                                    return fd ? fd : undefined;
+                                                });
+                                            } else {
+                                                map1 = data.nextDates.map(x => x = new Date(x).toString());
+                                            }
+                                            tiptext += "\n- at " + map1.join("\n- at ");
+                                        }
+                                    }
+                                    var okcontent = buildExpresionTip(title_html, tiptext);
+                                    callback(okcontent);
+                                })
+                                .fail(function (jqXHR, textStatus, errorThrown) {
+                                    debugger
+                                    console.error(jqXHR, textStatus, errorThrown)
+                                    var errcontent = buildExpresionTip("Error...", "Cannot get description from node-red");
+                                    callback(errcontent);
+                                });
+                                    
+                            } 
+                        });
+                    });
+                }
                 
                 var container = $('<li/>',{style:"background: #fff; margin:0; padding:8px 0px 0px; border-bottom: 1px solid #ccc;"});
                 var row = $('<div/>').appendTo(container);
@@ -190,6 +210,10 @@
                 
                 var expressionClass = "node-input-option-expression" + ((!option.expression) ? " input-error" : "");
                 var expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:7px; width:calc(37% - 16px);", placeholder: 'expression', value:option.expression}).appendTo(div);
+                expressionField.prop("title", "Expression...");
+
+                debugger
+                initTooltip(expressionField);
 
                 expressionField.keyup(function() {
                     if ($(this).val() && $(this).hasClass('input-error')) {
@@ -210,17 +234,7 @@
                             $(this).addClass('input-error')
                         }
                     }
-                });
-
-                debugger
-                expressionField.on('focus keyup paste cut',function() {
-                    $tip.show();
-                    updateCronDescription(this);
-                });                
-                expressionField.on('blur',function() {
-                    $tip.hide();
-                });
-                
+                });           
 
                 deleteButton.click(function() {
                     container.css({"background":"#fee"});
@@ -247,19 +261,8 @@
                 handle:".node-input-option-handle",
                 cursor: "move"
             });
-
-            $("#node-input-timeZone").change(function () {
-                updateCronDescription();
-            });
-            $("#node-input-crontab").change(function () {
-                updateCronDescription("#node-input-crontab");
-            });
-            $("#node-input-crontab").on("input", function () {
-                updateCronDescription("#node-input-crontab");
-            });
         },
         oneditsave: function () {
-
             var options = $("#node-input-option-container").children();
             var node = this;
             node.options = [];
@@ -337,20 +340,29 @@
 
 <script type="text/x-red" data-template-name="cronplus">
     <style>
-        .form-tip {
+        .expression-tip {
             background: #ffe;
             width: 100%;
+            max-width: 450px;
+            max-height: 450px;
+            overflow:auto;
+            font-size: 11px;
+            } 
+        .form-tip {
+            background: #ffe;
             padding: 6px 6px;
-            border-radius: 2px;
-            border: 1px solid #ddd;
-            display: inline-block;
             vertical-align: middle;           		
             font-size: 12px;
             line-height: 20px;
             box-sizing: border-box;
-            border-radius: 4px;
             overflow: auto;
             word-break: keep-all;
+        }
+        span .form-tip {
+            border-radius: 2px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: inline-block;
         }
         .form-tip-spacer {
             display: inline-block;
@@ -368,7 +380,8 @@
             border-top: 1px solid #f0f0f0;
             border-bottom: 1px solid #f0f0f0
         }
-    </style>            
+    </style>
+    
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
         <input type="text" id="node-input-name" placeholder="Name">
@@ -382,7 +395,7 @@
         <label for="node-input-timeZone"><i class="fa fa-globe"></i> Timezone</label>
         <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
     </div>  
-    <div class="form-row node-input-option-container-row" style="margin-bottom: 0px;width: 100%">
+    <div id="options-div" class="form-row node-input-option-container-row" style="margin-bottom: 0px;width: 100%">
         <label for="node-input-width" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
         <div id="node-input-option-container-div" style="box-sizing: border-box; border-radius: 5px; height: 150px; padding: 5px; border: 1px solid #ccc; overflow-y:scroll;display: inline-block; width: calc(70% + 15px);">
             <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;"></ol>
@@ -390,13 +403,6 @@
     </div>
     <div class="form-row">
         <a href="#" class="editor-button editor-button-small" id="node-input-add-option" style="margin-top: 4px; margin-left: 103px;"><i class="fa fa-plus"></i> <span>option</span></a>
-    </div>
-    <div id="node-input-crontab-tip-container">
-        <hr>
-        <div class="form-row">
-            <p style="font-size: 14px; font-weight: bold" id="node-input-crontab-tip-title"></p>
-            <pre class="form-tip" id="node-input-crontab-tip"></pre>
-        </div>
     </div>
 </div>
 
