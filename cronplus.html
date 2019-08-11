@@ -44,7 +44,6 @@
                 typeField: $("#node-input-payloadType"),
                 types: ['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']
             });
-
             $( "#node-input-timeZone" ).autocomplete({
                 source: function( request, response ) {
                     var matcher = new RegExp( $.ui.autocomplete.escapeRegex(request.term), "i" );
@@ -84,7 +83,6 @@
                 select: function (event, ui) {
                     event.preventDefault();
                     this.value = ui.item.value.tz;
-                    //updateCronDescription();
                 }
             });
 
@@ -126,7 +124,7 @@ ${text}</pre>
                     selector.off("mouseleave").off("mouseenter").tooltip({
                         tooltipClass: "expression-tip",
                         position: { my: "center bottom", at: "center top", of: $("#options-div") },
-                        content: function () { return buildExpresionTip("Expression...", "") } ,
+                        content: function () { return buildExpresionTip("Expression...", "Getting description...") } ,
                         disabled: true
                     }).on("blur", function () {
                         $(this).tooltip("close").tooltip("disable");
@@ -136,59 +134,59 @@ ${text}</pre>
                         if(!expression){
                             $this.tooltip("close").tooltip("disable");
                             return;
-                        } else {
-                            $(this).tooltip("enable").tooltip("open");
                         }
-                        var tz = $("#node-input-timeZone").val();
+                        var title_html = 'Description of <span class="cron-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
+                        $this.tooltip("option", "position", { my: "center bottom", at: "center top", of: $("#options-div") });
+                        $this.tooltip("enable").tooltip("open");
                         $this
                             .tooltip({ 
                                 position: { my: "center bottom", at: "center top", of: $("#options-div") },
                                 disabled: false,
-                                show: { effect: "blind", duration: 300 },
+                                show: { effect: "fade" },
                                 content: function (callback) {
-                                let e = { expression: expression };
-                                if (tz) {
-                                    e.timeZone = tz;
-                                }
-                                $.ajax({
-                                    url: 'cronplus',
-                                    type: 'POST',
-                                    data: e,
-                                    datatype: 'json'
-                                })
-                                .done(function (data) {
-                                    const maxlen = 5;
-                                    let t = e.expression;
-                                    if(t.length > maxlen)
-                                        t = t.slice(0,maxlen) + "..."
-                                    let title_html = 'Description of <span class="cron-expression">' + t + '</span>';
-                                    let tiptext = data.description;
-                                    if (data.prettyNext) {
-                                        tiptext += "\n\nNext run...\n- " + data.prettyNext;
-                                        if (data.nextDates && data.nextDates.length) {
-                                            let map1;
-                                            if (tz) {
-                                                map1 = data.nextDates.map(x => {
-                                                    let fd = formatDateTimeWithTZ(x, tz);
-                                                    return fd ? fd : undefined;
-                                                });
-                                            } else {
-                                                map1 = data.nextDates.map(x => x = new Date(x).toString());
-                                            }
-                                            tiptext += "\n- at " + map1.join("\n- at ");
-                                        }
+                                    expression = $this.val();
+                                    let tz = $("#node-input-timeZone").val();
+                                    let e = { expression: expression };
+                                    if (tz) {
+                                        e.timeZone = tz;
                                     }
-                                    var okcontent = buildExpresionTip(title_html, tiptext);
-                                    callback(okcontent);
-                                })
-                                .fail(function (jqXHR, textStatus, errorThrown) {
-                                    debugger
-                                    console.error(jqXHR, textStatus, errorThrown)
-                                    var errcontent = buildExpresionTip("Error...", "Cannot get description from node-red");
-                                    callback(errcontent);
-                                });
-                                    
-                            } 
+                                    $.ajax({
+                                        url: 'cronplus',
+                                        type: 'POST',
+                                        data: e,
+                                        datatype: 'json'
+                                    })
+                                    .done(function (data) {
+                                        //console.log("Ajax done, data...")
+                                        //console.log(data)
+                                        let tiptext = data.description;
+                                        if (data.prettyNext) {
+                                            tiptext += "\n\nNext run...\n- " + data.prettyNext;
+                                            if (data.nextDates && data.nextDates.length) {
+                                                let map1;
+                                                if (tz) {
+                                                    map1 = data.nextDates.map(x => {
+                                                        let fd = formatDateTimeWithTZ(x, tz);
+                                                        return fd ? fd : undefined;
+                                                    });
+                                                } else {
+                                                    map1 = data.nextDates.map(x => x = new Date(x).toString());
+                                                }
+                                                tiptext += "\n- at " + map1.join("\n- at ");
+                                            }
+                                        }
+                                        var okcontent = buildExpresionTip(title_html, tiptext);
+                                        //console.log("Contnent created...")
+                                        //console.log(okcontent);
+                                        callback(okcontent);
+                                    })
+                                    .fail(function (jqXHR, textStatus, errorThrown) {
+                                        debugger
+                                        console.error(jqXHR, textStatus, errorThrown)
+                                        var errcontent = buildExpresionTip("Error...", "Cannot get description from node-red");
+                                        callback(errcontent);
+                                    });
+                                } 
                         });
                     });
                 }
@@ -283,7 +281,6 @@ ${text}</pre>
                 node.options.push(o);
             });
 
-
             $("#node-input-timeZone").off();
             $("#node-input-crontab").off();
         },
@@ -344,6 +341,7 @@ ${text}</pre>
             background: #ffe;
             width: 100%;
             max-width: 450px;
+            <!-- min-height: 350px; -->
             max-height: 450px;
             overflow:auto;
             font-size: 11px;
