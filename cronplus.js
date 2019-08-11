@@ -51,16 +51,32 @@ function formatShortDateTimeWithTZ(date, tz) {
 function isNumber(n) {
 	return !isNaN(parseFloat(n)) && isFinite(n);
 }
+function isCronLike(expression){
+	if(expression.includes("*")){
+		return true;
+	}
+	let cleaned = expression.replace(/\s\s+/g, ' ');
+	let spaces = cleaned.split(" ");
+	return spaces.length >= 4 && spaces.length <= 6 ; 
+}
+
 function parseDateSequence(expression){
 	let result = {isDateSequence: false, expression: expression};
 	let dates = expression;
 	if(typeof expression == "string"){
 		let spl = expression.split(",");
+		for (let index = 0; index < spl.length; index++) {
+			spl[index] = spl[index].trim();
+			if(isCronLike(spl[index])){
+				return result;//fail
+			}
+		}
 		dates = spl.map(x => {
 			if(isNumber(x)){
 				x = parseInt(x)
 			}
-			return new Date(x);
+			let d = new Date(x); 
+			return d;
 		})
 	}			
 	let ds = new cronosjs.CronosTask(dates);
