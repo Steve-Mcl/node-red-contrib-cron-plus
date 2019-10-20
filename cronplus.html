@@ -1,4 +1,26 @@
 <script type="text/javascript">
+
+    function updateEditorLayout(){
+        console.log("cronplus-updateEditorLayout")
+        var dlg = $("#dialog-form");
+        var height = dlg.height() - 5;
+        var expandRow = dlg.find('.form-row-auto-height');
+        if(expandRow && expandRow.length){
+            let childRows = dlg.find('.form-row:not(.form-row-auto-height)');
+            for (var i=0; i<childRows.size(); i++) {
+                var cr = $(childRows[i]);
+                if(cr.is(":visible"))
+                    height -= cr.outerHeight(true);
+            }
+            let ol = $(expandRow.find(".red-ui-editableList-list"));
+            if(ol && ol.length){
+                ol.editableList("height",height);
+            } else {
+                expandRow.css("height",height+"px");
+            }
+        } 
+    }
+
     RED.nodes.registerType('cronplus', {
         category: "input",
         icon: "timer.png",
@@ -28,22 +50,7 @@
             return this.name || "CRON+"
         },
         oneditprepare: function () {
-            debugger
-            if (this.payloadType == null) {
-                if (this.payload == "") {
-                    this.payloadType = "date";
-                } else {
-                    this.payloadType = "str";
-                }
-            } else if (this.payloadType === 'string' || this.payloadType === 'none') {
-                this.payloadType = "str";
-            }
-            $("#node-input-payloadType").val(this.payloadType);
-            $("#node-input-payload").typedInput({
-                default: 'str',
-                typeField: $("#node-input-payloadType"),
-                types: ['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']
-            });
+            var node = this;
             $( "#node-input-timeZone" ).autocomplete({
                 source: function( request, response ) {
                     var matcher = new RegExp( $.ui.autocomplete.escapeRegex(request.term), "i" );
@@ -55,7 +62,7 @@
                     .done(function (data) { 
                         response($.map(data, function(item){
                             if(item && item.tz){
-                                var label = `${item.code ? item.code + ", ": ""}${item.tz} (UTC: ${item.UTCOffset}, DST: ${item.UTCDSTOffset})`;
+                                var label = item.code ? item.code + ", " : "" + item.tz + "  (UTC: " + item.UTCOffset + ", DST: " + item.UTCDSTOffset + ")";
                                 if ( label && ( !request.term || matcher.test(label) ) ) {
                                     return {
                                         label: label,
@@ -111,24 +118,33 @@
             }
            
             function generateOption(i, option) {
-                function buildExpresionTip(title,text){
-	return `
-  <div>
-  <p style="font-size: 12px; font-weight: bold">${title}</p>
-  <pre  class="form-tip" >
-${text}</pre>
-  </div>
-`
-}
+                function buildExpresionTip(title, desc, text){
+	                return '<div><p style="font-size: 12px; font-weight: bold">' + title + '</p>' +
+                            '<div>' + desc + '</div>' +
+                            '<pre  class="form-tip">' + text + '</pre></div>'
+                }
                 function initTooltip(selector){
-                    selector.off("mouseleave").off("mouseenter").tooltip({
+                    var pos = { my: "right top", at: "right+90 bottom+5", of: selector, collision: "flipfit" };
+                    selector.off("mouseenter").tooltip({
+                        show: { effect: "fade" },
                         tooltipClass: "expression-tip",
-                        position: { my: "center bottom", at: "center top", of: $("#options-div") },
-                        content: function () { return buildExpresionTip("Expression...", "Getting description...") } ,
+                        position: pos,
+                        content: function () { return buildExpresionTip("Expression...", "Getting description...","") } ,
                         disabled: true
+                    }).off('focusout').off('mouseleave').mouseleave(function(e){
+                        console.log("initTooltip--mouseleave")
+                        if (selector.is(':focus')) {
+                            console.log("initTooltip--mouseleave selector:is(':focus')")
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            selector.tooltip('open');
+                            return false;
+                        }
                     }).on("blur", function () {
+                        console.log("initTooltip-->on-blur")
                         $(this).tooltip("close").tooltip("disable");
-                    }).on("focusin change keyup", function () {
+                    }).on("focusin change keyup", function (e) {
+                        console.log("initTooltip--focusin change keyup",e )
                         var $this = $(this);
                         var expression = $this.val();
                         if(!expression){
@@ -136,57 +152,61 @@ ${text}</pre>
                             return;
                         }
                         var title_html = 'Description of <span class="cron-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
-                        $this.tooltip("option", "position", { my: "center bottom", at: "center top", of: $("#options-div") });
+                        $this.tooltip("option", "position", pos);
                         $this.tooltip("enable").tooltip("open");
-                        $this
-                            .tooltip({ 
-                                position: { my: "center bottom", at: "center top", of: $("#options-div") },
-                                disabled: false,
-                                show: { effect: "fade" },
-                                content: function (callback) {
-                                    expression = $this.val();
-                                    let tz = $("#node-input-timeZone").val();
-                                    let e = { expression: expression };
-                                    if (tz) {
-                                        e.timeZone = tz;
-                                    }
-                                    $.ajax({
-                                        url: 'cronplus',
-                                        type: 'POST',
-                                        data: e,
-                                        datatype: 'json'
-                                    })
-                                    .done(function (data) {
-                                        //console.log("Ajax done, data...")
-                                        //console.log(data)
-                                        let tiptext = data.description;
-                                        if (data.prettyNext) {
-                                            tiptext += "\n\nNext run...\n- " + data.prettyNext;
-                                            if (data.nextDates && data.nextDates.length) {
-                                                let map1;
-                                                if (tz) {
-                                                    map1 = data.nextDates.map(x => {
-                                                        let fd = formatDateTimeWithTZ(x, tz);
-                                                        return fd ? fd : undefined;
-                                                    });
-                                                } else {
-                                                    map1 = data.nextDates.map(x => x = new Date(x).toString());
-                                                }
-                                                tiptext += "\n- at " + map1.join("\n- at ");
+                        $this.tooltip({ 
+                            position: pos,
+                            disabled: false,
+                            show: { effect: "fade" },
+                            content: function (callback) {
+                                console.log("initTooltip-->content")
+                                expression = $this.val();
+                                let tz = $("#node-input-timeZone").val();
+                                let e = { expression: expression };
+                                if (tz) {
+                                    e.timeZone = tz;
+                                }
+                                $.ajax({
+                                    url: 'cronplus',
+                                    type: 'POST',
+                                    data: e,
+                                    datatype: 'json'
+                                })
+                                .done(function (data) {
+                                    console.log("initTooltip-->Ajax done, data...",data)
+                                    let nextInfo = "";
+                                    let desc = data.description;
+                                    if (data.prettyNext) {
+                                        nextInfo = "Next run...\n- " + data.prettyNext;
+                                        if (data.nextDates && data.nextDates.length) {
+                                            let map1;
+                                            if (tz) {
+                                                map1 = data.nextDates.map(x => {
+                                                    let fd = formatDateTimeWithTZ(x, tz);
+                                                    return fd ? fd : undefined;
+                                                });
+                                            } else {
+                                                map1 = data.nextDates.map(x => x = new Date(x).toString());
                                             }
+                                            nextInfo += "\n- at " + map1.join("\n- at ");
                                         }
-                                        var okcontent = buildExpresionTip(title_html, tiptext);
-                                        //console.log("Contnent created...")
-                                        //console.log(okcontent);
-                                        callback(okcontent);
-                                    })
-                                    .fail(function (jqXHR, textStatus, errorThrown) {
-                                        debugger
-                                        console.error(jqXHR, textStatus, errorThrown)
-                                        var errcontent = buildExpresionTip("Error...", "Cannot get description from node-red");
-                                        callback(errcontent);
-                                    });
-                                } 
+                                    }
+                                    var okcontent = function(){
+                                        setTimeout(function(){
+                                            console.log("initTooltip-->callback-->setTimeout--> option-->position");
+                                            $this.tooltip("option", "position", pos);
+                                            $this.tooltip("enable").tooltip("open");
+                                        },100)
+                                        return buildExpresionTip(title_html, desc, nextInfo);
+                                    } 
+                                    callback(okcontent);
+                                })
+                                .fail(function (jqXHR, textStatus, errorThrown) {
+                                    console.error(jqXHR, textStatus, errorThrown)
+                                    var errcontent = buildExpresionTip("Error...", "Cannot get description from node-red","");
+                                    callback(errcontent);
+                                });
+                            } 
                         });
                     });
                 }
@@ -204,13 +224,13 @@ ${text}</pre>
 
                 var topicClass ="node-input-option-topic" + ((!option.topic) ? " input-error" : "");
                 var topicField = $('<input/>',{class:topicClass,type:"text",style:"margin-left:5px; width:calc(23% - 16px);", placeholder: 'name',value:option.topic}).appendTo(div);
-                var payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:7px; width:calc(37% - 16px);", placeholder: 'payload', value:option.payload}).appendTo(div).typedInput({default:option.type||'str',types:['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']});
-                
+                var payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:7px; width:calc(37% - 16px);", placeholder: 'payload', value:option.payload}).appendTo(div);
+                payloadField.typedInput({default:option.type||'str',types:['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']});
+
                 var expressionClass = "node-input-option-expression" + ((!option.expression) ? " input-error" : "");
                 var expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:7px; width:calc(37% - 16px);", placeholder: 'expression', value:option.expression}).appendTo(div);
                 expressionField.prop("title", "Expression...");
 
-                debugger
                 initTooltip(expressionField);
 
                 expressionField.keyup(function() {
@@ -259,6 +279,7 @@ ${text}</pre>
                 handle:".node-input-option-handle",
                 cursor: "move"
             });
+            updateEditorLayout();
         },
         oneditsave: function () {
             var options = $("#node-input-option-container").children();
@@ -295,16 +316,9 @@ ${text}</pre>
                 return !this.changed
             },
             onclick: function () {
-                debugger
                 var node = this;
                 if (node.changed) {
                     return RED.notify(RED._("notification.warning", { message: RED._("notification.warnings.undeployedChanges") }), "warning");
-                }
-                var payload = node.payload;
-                if ((node.payloadType === 'flow') ||
-                    (node.payloadType === 'global')) {
-                    var key = RED.utils.parseContextKey(payload);
-                    payload = node.payloadType + "." + key.key;
                 }
                 var label = node._def.label.call(node);
                 if (label.length > 30) {
@@ -331,18 +345,21 @@ ${text}</pre>
                     }
                 });
             }
+        },
+        oneditresize: function(){
+            updateEditorLayout()
         }
     });
 </script>
 
-<script type="text/x-red" data-template-name="cronplus">
+<script type="text/html" data-template-name="cronplus">
     <style>
         .expression-tip {
             background: #ffe;
             width: 100%;
-            max-width: 450px;
+            max-width: 475px;
             <!-- min-height: 350px; -->
-            max-height: 450px;
+            max-height: 460px;
             overflow:auto;
             font-size: 11px;
             } 
@@ -355,6 +372,9 @@ ${text}</pre>
             box-sizing: border-box;
             overflow: auto;
             word-break: keep-all;
+        }
+        .form-tip > div {
+            white-space: pre-wrap;
         }
         span .form-tip {
             border-radius: 2px;
@@ -393,20 +413,21 @@ ${text}</pre>
         <label for="node-input-timeZone"><i class="fa fa-globe"></i> Timezone</label>
         <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
     </div>  
-    <div id="options-div" class="form-row node-input-option-container-row" style="margin-bottom: 0px;width: 100%">
+
+    <div id="node-cronplus-tab-static-schedules" class="form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%">
         <label for="node-input-width" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
-        <div id="node-input-option-container-div" style="box-sizing: border-box; border-radius: 5px; height: 150px; padding: 5px; border: 1px solid #ccc; overflow-y:scroll;display: inline-block; width: calc(70% + 15px);">
+        <div id="node-input-option-container-div" style="box-sizing: border-box; border-radius: 5px; padding: 5px; border: 1px solid #ccc; overflow-y:scroll;display: inline-block; width: 100%; height: calc(100% - 28px); min-height: 150px;">
             <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;"></ol>
         </div>
-    </div>
+    </div> 
     <div class="form-row">
-        <a href="#" class="editor-button editor-button-small" id="node-input-add-option" style="margin-top: 4px; margin-left: 103px;"><i class="fa fa-plus"></i> <span>option</span></a>
+        <a href="#" class="editor-button editor-button-small" id="node-input-add-option" style="margin-top: 4px;"><i class="fa fa-plus"></i> <span>option</span></a>
     </div>
 </div>
 
 </script>
 
-<script type="text/x-red" data-help-name="cronplus">
+<script type="text/html" data-help-name="cronplus">
     <p>Schedule the injection of a payload to start a flow</p>
     <h3>Properties...</h3>
     <dl class="message-properties">
