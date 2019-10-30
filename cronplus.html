@@ -62,7 +62,7 @@
                     .done(function (data) { 
                         response($.map(data, function(item){
                             if(item && item.tz){
-                                var label = item.code ? item.code + ", " : "" + item.tz + "  (UTC: " + item.UTCOffset + ", DST: " + item.UTCDSTOffset + ")";
+                                var label = (item.code ? item.code + ", " : "") + item.tz + " (UTC: " + item.UTCOffset + ", DST: " + item.UTCDSTOffset + ")";
                                 if ( label && ( !request.term || matcher.test(label) ) ) {
                                     return {
                                         label: label,
