@@ -245,7 +245,7 @@ module.exports = function (RED) {
 		node.outputField = config.outputField || "payload";
 		node.timeZone = config.timeZone;
 		node.options = config.options;
-		node.controlMsgOutput = config.controlMsgOutput;
+		node.controlMsgOutput = config.controlMsgOutput || "output1";
 		node.outputs = config.controlMsgOutput === "output2" ? 2 : 1;//1 output pins if throw or msg.error, 2 outputs if errors to go to seperate output pin
 	
 		const setProperty = function (msg, field, value) {
