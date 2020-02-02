@@ -923,6 +923,8 @@
             <li>Adding a schedule with property <code>"limit":3</code> will cause that schedule to be stopped after the third trigger. It can be started again by injecting a payload of <code>{"command":"start" "name": "schedule name"}</code></li>
             <li>UI added tasks can be also be updated by using the name specified in the UI</li>
             <li>When a cron-plus node is modified and deployed (or node-red is restarted), dynamic entries are discarded & must be injected again</li>
+            <li>When a cron-plus node outputs a msg in response to a command, <code>msg.commandResponse</code> will be <code>true</code> to indicate the message is in response to a command and not a scheduled event</li>
+            <li>When a cron-plus node outputs a msg for a cron/sunrise/sunset scheduled event, <code>msg.scheduledEvent</code> will be <code>true</code> to indicate the message is due to a scheduled event and not a control response</li>
         </ul>
         </dd>
     </dl>

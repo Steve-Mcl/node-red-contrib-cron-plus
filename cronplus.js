@@ -281,6 +281,7 @@ module.exports = function (RED) {
 			msg.cronplus.triggerTimestamp = crontimestamp;
 			msg.cronplus.status = getTaskStatus(node, task);
 			msg.cronplus.config = exportTask(task);
+			msg.scheduledEvent = true;
 			node.status({ fill: "green", shape: "ring", text: "Job started" });
 			try {
 				if (task.node_type !== 'flow' && task.node_type !== 'global') {
