@@ -161,10 +161,13 @@
         color: "#a6bbcf",
         inputs: 1,
         outputs: 1,
+        outputLabels: ["Output","Control Responses"],
         defaults: {
             name: { value: "" },
             outputField: { value: "payload" },
             timeZone: { value: "" },
+            controlMsgOutput: { value: 0 },
+            outputs: { value: 1 },
             options: {
                 value:[{payload: '', topic : '', expression : ''}], 
                 validate:function(value) { 
@@ -546,8 +549,10 @@
             updateEditorLayout();
         },
         oneditsave: function () {
-            var options = $("#node-input-option-container").children();
             var node = this;
+            var ctrlOutput = $("#node-input-controlMsgOutput").val();
+            node.outputs = ctrlOutput === "output2" ? 2 : 1;
+            var options = $("#node-input-option-container").children();
             node.options = [];
             options.each(function(i) {
                 var option = $(this);
@@ -691,7 +696,13 @@
         <label for="node-input-timeZone"><i class="fa fa-globe"></i> Timezone</label>
         <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
     </div>  
-
+    <div class="form-row">
+        <label for="node-input-controlMsgOutput"><i class="fa fa-dot-circle-o"></i><span> Control msgs</span></label>
+        <select style="width: 70%" id="node-input-controlMsgOutput">
+          <option value="output1">Output 1 (default)</option>
+          <option value="output2">Send to seperate output</option>
+        </select>
+      </div>  
     <div id="node-cronplus-tab-static-schedules" class="form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%">
         <label for="node-input-option-container-div" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
         <div id="node-input-option-container-div" style="min-width: 350px; box-sizing: border-box; border-radius: 5px; padding: 5px; border: 1px solid #ccc; overflow-y:scroll;display: inline-block; width: 100%; height: calc(100% - 28px); min-height: 150px;">

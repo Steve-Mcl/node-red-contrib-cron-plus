@@ -7,6 +7,7 @@ FEATURES
 * Schedule by CRON, date and date sequences, sunrise & sunset (with offset)
   * Human readable descriptions of your CRON expression are provided as you type.
 * Send timestamp, string, number, boolean, flow variable, global variable, JSON, Buffer or Env variable as the output.
+* Option to separate control responses from output 1 to seperate 2nd output 
 * Settable output variable (normally `msg.payload` but it is up to you)
 * Inject-like button to fire the node (available when only one schedule is added) 
 * Multiple schedules can be entered by the UI

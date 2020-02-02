@@ -235,17 +235,19 @@ function parseSunTime(opt, count){
 }
 
 module.exports = function (RED) {
-	function CronPlus(n) {
-		RED.nodes.createNode(this, n);
+	function CronPlus(config) {
+		RED.nodes.createNode(this, config);
 		var node = this;
-		node.name = n.name;
-		node.payload = n.payload;
-		node.payloadType = n.payloadType || "date";
-		node.crontab = n.crontab;
-		node.outputField = n.outputField || "payload";
-		node.timeZone = n.timeZone;
-		node.options = n.options;
-
+		node.name = config.name;
+		node.payload = config.payload;
+		node.payloadType = config.payloadType || "date";
+		node.crontab = config.crontab;
+		node.outputField = config.outputField || "payload";
+		node.timeZone = config.timeZone;
+		node.options = config.options;
+		node.controlMsgOutput = config.controlMsgOutput;
+		node.outputs = config.controlMsgOutput === "output2" ? 2 : 1;//1 output pins if throw or msg.error, 2 outputs if errors to go to seperate output pin
+	
 		const setProperty = function (msg, field, value) {
 			const set = (obj, path, val) => {
 				const keys = path.split('.');
@@ -754,7 +756,13 @@ module.exports = function (RED) {
 				if(Array.isArray(msg.payload) == false){
 					input = [input];
 				}
-				
+				var sendControlResponse = function(msg){
+					if(node.outputs == 2){
+						node.send([null,msg]);
+					} else {
+						node.send(msg);
+					}
+				}
 				for (let i = 0; i < input.length; i++) {
 					let cmd = input[i];
 					let action = cmd.command;
@@ -762,7 +770,9 @@ module.exports = function (RED) {
 					switch (action) {
 						case "describe":
 							newMsg.payload.result = describeExpression(cmd.expression, cmd.expressionType, cmd.timeZone);
-							node.send(newMsg);
+							if(node.outputs == 2){
+								sendControlResponse(newMsg);
+							} else {}
 							break;
 						case "status":
 						case "export":
@@ -773,7 +783,7 @@ module.exports = function (RED) {
 							} else {
 								newMsg.error = `${cmd.name} not found`;
 							}
-							node.send(newMsg);
+							sendControlResponse(newMsg);
 							break;
 						case "list-all":
 						case "status-all":
@@ -789,7 +799,7 @@ module.exports = function (RED) {
 								}
 							}
 							newMsg.payload.result = results;
-							node.send(newMsg);
+							sendControlResponse(newMsg);
 							break;
 						case "add":
 						case "update":
