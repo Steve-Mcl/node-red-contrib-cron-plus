@@ -161,12 +161,12 @@
         color: "#a6bbcf",
         inputs: 1,
         outputs: 1,
-        outputLabels: ["Output","Control Responses"],
+        outputLabels: ["Output","Command Responses"],
         defaults: {
             name: { value: "" },
             outputField: { value: "payload" },
             timeZone: { value: "" },
-            controlMsgOutput: { value: "output1" },
+            commandResponseMsgOutput: { value: "output1" },
             outputs: { value: 1 },
             options: {
                 value:[{payload: '', topic : '', expression : ''}], 
@@ -550,7 +550,7 @@
         },
         oneditsave: function () {
             var node = this;
-            var ctrlOutput = $("#node-input-controlMsgOutput").val();
+            var ctrlOutput = $("#node-input-commandResponseMsgOutput").val();
             node.outputs = ctrlOutput === "output2" ? 2 : 1;
             var options = $("#node-input-option-container").children();
             node.options = [];
@@ -697,8 +697,8 @@
         <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
     </div>  
     <div class="form-row">
-        <label for="node-input-controlMsgOutput"><i class="fa fa-dot-circle-o"></i><span> Control msgs</span></label>
-        <select style="width: 70%" id="node-input-controlMsgOutput">
+        <label for="node-input-commandResponseMsgOutput"><i class="fa fa-dot-circle-o"></i><span> Command Resp</span></label>
+        <select style="width: 70%" id="node-input-commandResponseMsgOutput">
           <option value="output1">Send to output 1 (default)</option>
           <option value="output2">Send to seperate output</option>
         </select>
