@@ -502,8 +502,10 @@ module.exports = function (RED) {
 					deleteTask(node,opt.name);
 				}
 				let t = createTask(node,opt);	
-				t.node_count = taskcount;
-				t.isDynamic = true;
+				if(t){
+					t.node_count = taskcount;
+					t.isDynamic = true;
+				}
 			}
 			updateNextStatus(node);
 		}
@@ -525,19 +527,32 @@ module.exports = function (RED) {
 			if (!opt.name) {
 				throw new Error(`Schedule name property missing`);
 			}
-			if(!opt.expressionType || opt.expressionType === "cron"){//cron
+			if(!opt.expressionType || opt.expressionType === "cron" || opt.expressionType === "datesequence"){//cron
 				if (!opt.expression) {
 					throw new Error(`Schedule '${opt.name}' - expression property missing`);
 				}	
-				if (!cronosjs.validate(opt.expression)) {
-					if(isDateSequence(opt.expression)){
-						opt.expressionType = "datesequence";	
-					} else {
-						throw new Error(`Schedule '${opt.name}' - expression '${opt.expression}' must be either a cron expression, a date or a CSV of dates`);
-					}
-				} else {
-					opt.expressionType = "cron";
+				let valid = false;
+				try {
+					valid = cronosjs.validate(opt.expression);	
+					if(valid)
+						opt.expressionType = "cron";
+				} catch (error) {
+					node.debug(error);
 				}
+				try {
+					if(!valid){
+						valid = isDateSequence(opt.expression)
+						if(valid)
+							opt.expressionType = "datesequence";
+					}	
+				} catch (error) {
+					node.debug(error);
+				}
+
+				if(!valid){
+					throw new Error(`Schedule '${opt.name}' - expression '${opt.expression}' must be either a cron expression, a date, an a array of dates or a CSV of dates`);
+				}					
+	
 			} else if(opt.expressionType === "sunrise" || opt.expressionType === "sunset"){//sunrise/sunset
 				if (!opt.offset) {
 					opt.offset = 0;
@@ -614,13 +629,7 @@ module.exports = function (RED) {
 					if(t){
 						t.node_count = t.node_count + 1;//++ stops at 2147483647
 						sendMsg(node, t, timestamp);	
-					}
-					// let opts = {};
-					// opts.location = task.node_location;
-					// opts.offset = task.node_offset;
-					// var ds = parseSunTime(opts,1);
-					// //testing task._sequence._dates = [new Date(Date.now() + 30000)] 
-					// task._sequence._dates = ds.dates;	
+					}	
 				} else {
 					task.node_count = task.node_count + 1;//++ stops at 2147483647
 					sendMsg(node, task, timestamp);	
@@ -744,7 +753,7 @@ module.exports = function (RED) {
 
 			//is this an button press?...
 			if(!msg.payload && !msg.topic){//TODO: better method of differenciating between bad input and button press
-				sendMsg(node, node.tasks[0], msg);
+				sendMsg(node, node.tasks[0], Date.now());
 				return;
 			}
 			if(typeof msg.payload != "object"){
@@ -756,7 +765,7 @@ module.exports = function (RED) {
 				if(Array.isArray(msg.payload) == false){
 					input = [input];
 				}
-				var sendControlResponse = function(msg){
+				var sendCommandResponse = function(msg){
 					if(node.outputs == 2){
 						node.send([null,msg]);
 					} else {
@@ -771,9 +780,7 @@ module.exports = function (RED) {
 					switch (action) {
 						case "describe":
 							newMsg.payload.result = describeExpression(cmd.expression, cmd.expressionType, cmd.timeZone);
-							if(node.outputs == 2){
-								sendControlResponse(newMsg);
-							} else {}
+							sendCommandResponse(newMsg);
 							break;
 						case "status":
 						case "export":
@@ -784,7 +791,7 @@ module.exports = function (RED) {
 							} else {
 								newMsg.error = `${cmd.name} not found`;
 							}
-							sendControlResponse(newMsg);
+							sendCommandResponse(newMsg);
 							break;
 						case "list-all":
 						case "status-all":
@@ -800,7 +807,7 @@ module.exports = function (RED) {
 								}
 							}
 							newMsg.payload.result = results;
-							sendControlResponse(newMsg);
+							sendCommandResponse(newMsg);
 							break;
 						case "add":
 						case "update":
