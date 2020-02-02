@@ -1,6 +1,128 @@
 const parser = require('cronstrue');
 const cronosjs = require("cronosjs");
 const prettyMs = require('pretty-ms');
+const srss = require('sunrise-sunset-js');
+const coordParser = require("coord-parser")
+//import { sunrise, sunset } from 'sunrise-sunset-js';
+
+
+// function coordHelper(){
+//     //Credits to 
+// 	//https://www.npmjs.com/package/coord-parser
+// 	/* 
+// 	License
+// 	The MIT License (MIT)
+
+// 	Copyright © 2015 Natural Atlas, Inc.
+
+// 	Permission is hereby granted, free of charge, to any person obtaining a copy 
+// 	of this software and associated documentation files (the "Software"), to deal 
+// 	in the Software without restriction, including without limitation the rights 
+// 	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+// 	copies of the Software, and to permit persons to whom the Software is 
+// 	furnished to do so, subject to the following conditions:
+
+// 	The above copyright notice and this permission notice shall be included in 
+// 	all copies or substantial portions of the Software.
+
+// 	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+// 	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+// 	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL 
+// 	THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR 
+// 	OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, 
+// 	ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+// 	DEALINGS IN THE SOFTWARE.
+// 	*/
+
+
+// 	var TOKEN_WHITESPACE = '\\s*';
+// 	var TOKEN_SEPARATOR = '[,;\\s]*';
+// 	var TOKEN_FLOAT = '(-?\\d+(?:\\.\\d+)?)';
+// 	var TOKEN_DEG = TOKEN_FLOAT + TOKEN_WHITESPACE + '[°º:d]?';
+// 	var TOKEN_MIN = TOKEN_FLOAT + TOKEN_WHITESPACE + '[\'’‘′:]';
+// 	var TOKEN_SEC = TOKEN_FLOAT + TOKEN_WHITESPACE + '(?:"|″|’’|\'\'|”|“)?';
+// 	var TOKEN_DMS = TOKEN_DEG + optional(TOKEN_WHITESPACE + TOKEN_MIN) + optional(TOKEN_WHITESPACE + TOKEN_SEC);
+// 	var TOKEN_DIR = '([NSEW]?)';
+
+// 	function optional(re) {
+// 		return '(?:' + re + ')?';
+// 	}
+// 	function inRange(value, a, b) {
+// 		return value >= a && value <= b;
+// 	}
+
+// 	function dmsToDec(deg, min, sec) {
+// 		deg = parseFloat(deg);
+// 		min = parseFloat(min) || 0;
+// 		sec = parseFloat(sec) || 0;
+// 		var sign = deg < 0 ? -1 : 1;
+// 		if (!inRange(min, 0, 60)) throw new Error('Minutes out of range');
+// 		if (!inRange(sec, 0, 60)) throw new Error('Seconds out of range');
+// 		return (deg + sign * min / 60 + sign * sec / 3600);
+// 	}
+
+// 	function apply(deg, min, sec, cardinality, result) {
+// 		if (typeof deg === 'undefined') return;
+// 		var prop = 'lat', coeff = 1;
+// 		if (cardinality === 'e' || cardinality === 'w') {
+// 			prop = 'lon';
+// 		}
+
+// 		// 1E -> 1.0, 1W -> -1.0
+// 		// 1N -> 1.0, 1S -> -1.0
+// 		if (cardinality === 's') coeff = -1;
+// 		if (cardinality === 'w') coeff = -1;
+// 		result[prop] = coeff * dmsToDec(deg, min, sec);
+// 	}
+
+// 	function normalizeCardinality(a, b) {
+// 		a = (a || '').toLowerCase();
+// 		b = (b || '').toLowerCase();
+// 		// +n, +e
+// 		if (!a && !b) return ['n', 'e'];
+// 		if (a && !b) return [a, a === 'n' || a === 's' ? 'e' : 'n'];
+// 		if (!a && b) return [b === 'n' || b === 's' ? 'e' : 'n', b];
+// 		return [a, b];
+// 	}
+
+
+// 	var parse = function(input) {
+// 		input = input.trim();
+
+// 		var regExpA = new RegExp('^' + TOKEN_FLOAT + '$', 'ig');
+// 		var regExpB = new RegExp('^' + TOKEN_FLOAT + TOKEN_SEPARATOR + TOKEN_FLOAT + '$', 'ig');
+// 		var regExpC = new RegExp('^' + TOKEN_DMS + TOKEN_WHITESPACE + TOKEN_DIR + '(?:' + TOKEN_SEPARATOR + TOKEN_DMS + TOKEN_WHITESPACE + TOKEN_DIR + ')?$', 'ig'); // 0°W, O°N
+// 		var regExpD = new RegExp('^' + TOKEN_DIR + TOKEN_WHITESPACE + TOKEN_DMS + '(?:' + TOKEN_SEPARATOR + TOKEN_DIR + TOKEN_WHITESPACE + TOKEN_DMS + ')?$', 'ig'); // N0, WO
+
+// 		var match, cardinality;
+// 		var result = {};
+// 		if (match = regExpA.exec(input)) {
+// 			return parseFloat(match[1]);
+// 		} else if (match = regExpB.exec(input)) {
+// 			return {
+// 				lat: parseFloat(match[1]),
+// 				lon: parseFloat(match[2])
+// 			};
+// 		} else if (match = regExpC.exec(input)) {
+// 			cardinality = normalizeCardinality(match[4], match[8]);
+// 			if (!match[4] && !match[5]) return dmsToDec(match[1], match[2], match[3]);
+// 			apply(match[1], match[2], match[3], cardinality[0], result);
+// 			apply(match[5], match[6], match[7], cardinality[1], result);
+// 		} else if (match = regExpD.exec(input)) {
+// 			cardinality = normalizeCardinality(match[1], match[5]);
+// 			apply(match[2], match[3], match[4], cardinality[0], result);
+// 			apply(match[6], match[7], match[8], cardinality[1], result);
+// 		} else {
+// 			throw new Error('Could not parse string: ' + input);
+// 		}
+
+// 		return result;
+// 	};
+
+// 	return parse;
+
+// }
+
 
 /**
  * Humanize a cron express
@@ -88,6 +210,30 @@ function parseDateSequence(expression){
 	return result;	
 }
 
+function parseSunTime(opt, count){
+	count = count || 1;
+	//let coordParser = new coordHelper();
+	let pos = coordParser(opt.location || "0.0,0.0" );
+	//let pos = {lat: 54.123 , lon: -1.4123};
+	let dates = []; 
+	var date = new Date();
+	date.setHours(0,0,0,0);
+	var offset = opt.offset ? parseInt(opt.offset) : 0;
+	var f = opt.expressionType == "sunrise" ? srss.getSunrise : srss.getSunset;
+	while(dates.length < count){
+		let time = f(pos.lat, pos.lon, date);
+		let timeOffset = new Date(time.getTime() + offset*60000);
+		if(timeOffset.getTime() < Date.now()){
+			date.setDate(date.getDate() + 1);					
+			continue;
+		}
+		dates.push(timeOffset);
+		date.setDate(date.getDate() + 1);					
+	}
+	opt.expression = dates;
+	return parseDateSequence(dates);
+}
+
 module.exports = function (RED) {
 	function CronPlus(n) {
 		RED.nodes.createNode(this, n);
@@ -173,19 +319,26 @@ module.exports = function (RED) {
 		}
 
 		function exportTask(task) {
-			return {
+			var o = {
 				name: task.name || task.node_topic,
-				expression: task.node_expression,
 				payload: task.node_payload,
 				type: task.node_type,
 				limit: task.node_limit || null,
+				expressionType: task.node_expressionType
 			}
+			if(o.expressionType == "sunrise" || o.expressionType == "sunset"){
+				o.location = task.node_location;
+				o.offset = task.node_offset;
+			} else {
+				o.expression = task.node_expression;
+			}
+			return o;
 		}
 		function getTaskStatus(node, task){
-			let h = describeExpression(task.node_expression, node.timeZone)
+			let h = describeExpression(task.node_expression, task.node_expressionType, node.timeZone)
 			let nextDescription = null;
 			let nextDate = null;
-			let running = task.isRunning ? (task.node_limit ? task.node_count < task.node_limit: true) : false;
+			let running = !isTaskFinished(task);
 			if(running){
 				nextDescription = h.nextDescription;
 				nextDate = h.nextDate;
@@ -201,7 +354,7 @@ module.exports = function (RED) {
 				}
 		}
 		
-		function describeExpression(expression, timeZone){
+		function describeExpression(expression, expressionType, timeZone){
 			let now = new Date();
 			let result = {description:undefined,nextDate:undefined,nextDescription:undefined};
 			try {
@@ -220,7 +373,11 @@ module.exports = function (RED) {
 						let first = dates[0]; 
 						let count = dates.length;
 						if(count == 1){
-							result.description	= "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
+							if(expressionType === "sunrise" || expressionType === "sunset"){
+								result.description	= "At " + formatShortDateTimeWithTZ(first,timeZone) ;
+							} else {
+								result.description	= "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
+							}
 						} else {
 							result.description	= count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
 						}
@@ -263,7 +420,7 @@ module.exports = function (RED) {
 		function startTask(node,name){
 			let task = getTask(node,name);
 			if(task){
-				if(task.node_limit && task.node_count >= task.node_limit){
+				if(isTaskFinished(task)){
 					task.node_count = 0;
 				}
 				task.start();
@@ -276,7 +433,7 @@ module.exports = function (RED) {
 				for (let index = 0; index < node.tasks.length; index++) {
 					let task = node.tasks[index];
 					if(task){
-						if(task.node_limit && task.node_count >= task.node_limit){
+						if(isTaskFinished(task)){
 							task.node_count = 0;
 						}
 						task.start();
@@ -337,10 +494,13 @@ module.exports = function (RED) {
 			for (let index = 0; index < options.length; index++) {
 				let opt = options[index];
 				let task = getTask(node,opt.name);
+				let taskcount = 0;
 				if(task){
+					taskcount  = task.node_count || 0; 
 					deleteTask(node,opt.name);
 				}
 				let t = createTask(node,opt);	
+				t.node_count = taskcount;
 				t.isDynamic = true;
 			}
 			updateNextStatus(node);
@@ -363,8 +523,28 @@ module.exports = function (RED) {
 			if (!opt.name) {
 				throw new Error(`Schedule name property missing`);
 			}
-			if (!opt.expression) {
-				throw new Error(`Schedule '${opt.name}' - expression property missing`);
+			if(!opt.expressionType || opt.expressionType === "cron"){//cron
+				if (!opt.expression) {
+					throw new Error(`Schedule '${opt.name}' - expression property missing`);
+				}	
+				if (!cronosjs.validate(opt.expression)) {
+					if(isDateSequence(opt.expression)){
+						opt.expressionType = "datesequence";	
+					} else {
+						throw new Error(`Schedule '${opt.name}' - expression '${opt.expression}' must be either a cron expression, a date or a CSV of dates`);
+					}
+				} else {
+					opt.expressionType = "cron";
+				}
+			} else if(opt.expressionType === "sunrise" || opt.expressionType === "sunset"){//sunrise/sunset
+				if (!opt.offset) {
+					opt.offset = 0;
+				}	
+				if (!opt.location) {
+					throw new Error(`Schedule '${opt.name}' - location property missing`);
+				}	
+			} else {
+				throw new Error(`Schedule '${opt.name}' - invalid schedule type '${opt.expressionType}'. Expected 'cron', 'sunrise' or 'sunset'`);
 			}
 			opt.payload = permitDefaults ? opt.payload || "payload" : opt.payload;
 			if (!opt.payload) {
@@ -378,15 +558,6 @@ module.exports = function (RED) {
 			let typeOK = okTypes.find( el => {return el == opt.type})
 			if (!typeOK) {
 				throw new Error(`Schedule '${opt.name}' - type property '${opt.type}' is not valid. Must be one of the following... ${okTypes.join(",")}`);
-			}
-			if (!cronosjs.validate(opt.expression)) {
-				if(isDateSequence(opt.expression)){
-					opt.expressionType = "datesequence";	
-				} else {
-					throw new Error(`Schedule '${opt.name}' - expression '${opt.expression}' must be either a cron expression, a date or a CSV of dates`);
-				}
-			} else {
-				opt.expressionType = "cron";
 			}
 			return true;
 		}
@@ -402,26 +573,32 @@ module.exports = function (RED) {
 			let cronOpts = node.timeZone ? { timezone: node.timeZone } : undefined;
 			let task;
 			if(opt.expressionType == "cron"){
-				let expression = cronosjs.CronosExpression.parse(opt.expression, cronOpts)
+				let expression = cronosjs.CronosExpression.parse(opt.expression, cronOpts);
 				task = new cronosjs.CronosTask(expression);
+			} else if(opt.expressionType === "sunrise" || opt.expressionType === "sunset") {
+				let ds = parseSunTime(opt,1); 
+				task = ds.task;
 			} else {
 				let ds = parseDateSequence(opt.expression);			
 				task = ds.task;
 			}
-			
 			task.name = ""+opt.name;
 			task.node_topic = opt.name
 			task.node_expression = opt.expression
 			task.node_payload = opt.payload
 			task.node_type = opt.type
 			task.node_count = 0;
+			task.node_location = opt.location;
+			task.node_expressionType = opt.expressionType;
+			task.node_offset = opt.offset;
+			task.node_opt = opt;
 			task.node_expressionType = opt.expressionType;
 			task.node_limit = opt.limit || 0;
 			task.stop();
 			task.on('run', (timestamp) => {
 				node.debug(`topic: ${task.node_topic}\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
 				node.status({ fill: "green", shape: "ring", text: "Running " + formatShortDateTimeWithTZ(timestamp, node.timeZone) });
-				if(task.node_limit && task.node_count >= task.node_limit){
+				if(isTaskFinished(task)){
 					process.nextTick(function(){
 						//using nextTick is a work around for an issue (#3) in cronosjs where the job restarts itself after this event handler has exited
 						task.stop();
@@ -429,8 +606,23 @@ module.exports = function (RED) {
 					})
 					return;
 				} 
-				task.node_count = task.node_count + 1;//++ stops at 2147483647
-				sendMsg(node, task, timestamp);
+				if( (task.node_expressionType === "sunrise"||task.node_expressionType === "sunset")){
+					updateTask(node,task.node_opt,null);
+					let t = getTask(node,task.name);
+					if(t){
+						t.node_count = t.node_count + 1;//++ stops at 2147483647
+						sendMsg(node, t, timestamp);	
+					}
+					// let opts = {};
+					// opts.location = task.node_location;
+					// opts.offset = task.node_offset;
+					// var ds = parseSunTime(opts,1);
+					// //testing task._sequence._dates = [new Date(Date.now() + 30000)] 
+					// task._sequence._dates = ds.dates;	
+				} else {
+					task.node_count = task.node_count + 1;//++ stops at 2147483647
+					sendMsg(node, task, timestamp);	
+				}
 			})
 			.on('ended', () => {
 				updateNextStatus(node);
@@ -498,13 +690,18 @@ module.exports = function (RED) {
 			}
 		}
 
+		function isTaskFinished(_task){
+			if(!_task) return true;
+			//return _task.isRunning ? (_task.node_limit ? _task.node_count < _task.node_limit: true) : false;
+			return _task.node_limit ? _task.node_count >= _task.node_limit : false;
+		}
 		function getNextDate(tasks) {
 			try {
 				let now = new Date();
 				if(!tasks || !tasks.length)
 					return null;
 				let runningTasks = tasks.filter(function(task){
-					let finished = task.node_limit ? task.node_count >= task.node_limit : false;
+					let finished = isTaskFinished(task);
 					return task.isRunning && (task._expression || task._sequence) && !finished;
 				})
 				if(!runningTasks || !runningTasks.length){
@@ -564,7 +761,7 @@ module.exports = function (RED) {
 					let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
 					switch (action) {
 						case "describe":
-							newMsg.payload.result = describeExpression(cmd.expression, cmd.timeZone);
+							newMsg.payload.result = describeExpression(cmd.expression, cmd.expressionType, cmd.timeZone);
 							node.send(newMsg);
 							break;
 						case "status":
@@ -647,25 +844,39 @@ module.exports = function (RED) {
 	});
 
 	RED.httpAdmin.post("/cronplus", RED.auth.needsPermission("cronplus.read"), function (req, res) {
-		var e = req.body.expression;
-		let tz = req.body.timeZone ? req.body.timeZone : undefined;
-		var opts = tz ? { timezone: tz } : undefined;
+		let timeZone = req.body.timeZone ? req.body.timeZone : undefined;
+		let expressionType = req.body.expressionType ? req.body.expressionType : undefined;
+		var opts = {expression: req.body.expression};
+		if(timeZone) opts.timezone = timeZone;
+		if(expressionType) {
+			opts.expressionType = expressionType;
+			if(opts.expressionType == "sunset" || opts.expressionType == "sunrise"){
+				opts.location = req.body.location || e;
+				opts.offset = req.body.offset;
+			}
+		}
+		console.log("/cronplus", opts);
 		try {
-			let isValidCron = cronosjs.validate(e);
 			let ds, next, nextDates, desc;
 			let exOk = false;
 			let dsOk = false;
 			let now = new Date();
 			let prettyNext = "Never";
-			if(isValidCron){
-				exOk = cronosjs.validate(e);
-			} else { 
-				ds = parseDateSequence(e);
+			if(expressionType == "sunrise" || expressionType == "sunset"){
+				ds = parseSunTime(opts);
 				dsOk = ds.isDateSequence;
-			} 
+			} else {
+				let isValidCron = cronosjs.validate(opts.expression);
+				if(isValidCron){
+					exOk = cronosjs.validate(opts.expression);
+				} else { 
+					ds = parseDateSequence(opts.expression);
+					dsOk = ds.isDateSequence;
+				} 
+			}
 			 
 			if (exOk) {
-				let ex = cronosjs.CronosExpression.parse(e, opts);	
+				let ex = cronosjs.CronosExpression.parse(opts.expression, opts);	
 				next = ex.nextDate(now);
 				if (next) {
 					let ms = next.valueOf() - now.valueOf();
@@ -676,7 +887,7 @@ module.exports = function (RED) {
 						node.debug(error);
 					}
 				}
-				desc = humanizeCron(e);
+				desc = humanizeCron(opts.expression);
 			} else if(dsOk) {
 				let ex = ds.task._sequence;
 				next = ex.nextDate(now);
@@ -692,17 +903,21 @@ module.exports = function (RED) {
 				}
 				let first = ex._dates[0]; 
 				let count = ex._dates.length;
-				if(count == 1){
-					desc	= "One time at " + formatShortDateTimeWithTZ(first,tz) ;
+				if(count === 1){
+					if(expressionType === "sunrise" || expressionType === "sunset"){
+						desc = "At " + formatShortDateTimeWithTZ(first,timeZone) ;
+					} else {
+						desc = "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
+					}
 				} else {
-					desc	= count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,tz) ;
+					desc = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
 				}
 			 
 			} else {
-				let r = { expression: e, description: "Invalid or unsupported expression" };
+				let r = { ...opts, description: "Invalid or unsupported expression" };
 				res.json(r);
 			}
-			let r = { expression: e, description: desc, next: next, prettyNext: prettyNext, nextDates: nextDates };
+			let r = { ...opts, description: desc, next: next, prettyNext: prettyNext, nextDates: nextDates };
 			res.json(r);
 
 		} catch (err) {

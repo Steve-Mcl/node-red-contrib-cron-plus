@@ -1,4 +1,138 @@
+
+
 <script type="text/javascript">
+    var map, mapPopup, selectedLocation, selectedLocationInput;
+
+    var filesadded="" //list of files already added 
+    function checkloadjscssfile(filename, filetype){
+        if (filesadded.indexOf("["+filename+"]")==-1){
+            loadjscssfile(filename, filetype)
+            filesadded+="["+filename+"]" //List of files added in the form "[filename1],[filename2],etc"
+        }
+    }
+
+    function loadjscssfile(filename, filetype){
+        if (filetype=="js"){ //if filename is a external JavaScript file
+            var fileref=document.createElement('script')
+            fileref.setAttribute("type","text/javascript")
+            fileref.setAttribute("src", filename)
+        }
+        else if (filetype=="css"){ //if filename is an external CSS file
+            var fileref=document.createElement("link")
+            fileref.setAttribute("rel", "stylesheet")
+            fileref.setAttribute("type", "text/css")
+            fileref.setAttribute("href", filename)
+        }
+        if (typeof fileref!="undefined")
+            document.getElementsByTagName("head")[0].appendChild(fileref)
+    }
+    
+    function safeFloat(value, def) {
+        if ((undefined === value) || (null === value)) {
+            return def || 0.0;
+        }
+        try {
+            value = parseFloat(value);
+        } catch (e) {
+            value = def || 0.0;
+        }
+        if (isNaN(value)) {
+            return def || 0.0;
+        }
+        return value;
+    }
+
+    function createMap(srcInput) {
+        if(!L){
+            $("#map").text("maps not loaded. Does your browser have internet access?");
+            return;
+        }
+        var lat, lon;
+        var latlon = srcInput.val();
+        if(latlon){
+            var arrLatlon = latlon.split(" ");
+            if(arrLatlon.length < 2)
+                arrLatlon = latlon.split(",");
+            if(arrLatlon.length >= 2){
+                lat = arrLatlon[0];
+                lon = arrLatlon[1];
+            }
+        }
+        console.log("createMap", lat, lon)
+        var zoom = 3;//by default, zoomed out
+        var showPopupOnOpen = false;
+        if (lat != undefined && lon != undefined) {
+            showPopupOnOpen = true;
+            zoom = 5;//if location is set, zoom in a bit
+        }
+        lat = safeFloat(lat, 50.0);
+        lon = safeFloat(lon, 0.0);
+        console.log("lat/lon", lat, lon)
+        selectedLocation = L.latLng(lat, lon);
+        console.log("selectedLocation", selectedLocation.lat, selectedLocation.lng)
+
+        // create leaflet map
+        map = L.map('map', {
+            zoomControl: true,
+            center: selectedLocation, //[selectedLocation.lat,selectedLocation.lng],
+            zoom: zoom
+        });
+        mapPopup = L.popup();
+
+        map.on('click', function (e) {
+            console.log(e);
+            showMapPopup(e.latlng.lat, e.latlng.lng, map);
+            selectedLocation = e.latlng
+            // $("#lng").val(e.latlng.lng);
+            // $("#lat").val(e.latlng.lat);
+        });
+
+
+        function showMapPopup(lat, lon, map) {
+            var content =
+                '<div><span>Lat:</span> <span>' + lat + '</span></div>' +
+                '<div><span>Lon:</span> <span>' + lon + '</span></div>'
+            mapPopup
+                .setLatLng([lat, lon])
+                .setContent(content)
+                .openOn(map);
+        }
+
+
+        // add a base layer
+        var tileUrl = "http://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png";
+        //var tileUrl = "http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
+        var layer = L.tileLayer(tileUrl, {});
+
+        layer.addTo(map);
+        // add cartodb layer with one sublayer
+        cartodb.createLayer(map, {
+            user_name: 'node-red',
+            type: 'namedmap',
+            options: {
+                named_map: {
+                    name: 'node-red@cronplus',
+                    params: {
+                        "color": "#5CA2D1"
+                    },
+                    layers: [{}]
+                }
+            }
+        })
+            .addTo(map)
+            .done(function (layer) {
+                layer.setInteraction(true);
+                if (showPopupOnOpen) {
+                    showMapPopup(selectedLocation.lat, selectedLocation.lng, map);
+                }
+
+                layer.on('featureClick', function (e, latlng, pos, data, layer) {
+                    console.log("click", latlng, data);
+                });
+            });
+
+    }
+
 
     function updateEditorLayout(){
         console.log("cronplus-updateEditorLayout")
@@ -36,8 +170,17 @@
                 validate:function(value) { 
                     if (value.length) {
                         for (var i = 0; i < value.length; i++) {
-                            if (!value[i].expression || !value[i].topic) {
+                            if(!value[i].topic){
                                 return false;
+                            }
+                            if (!value[i].expressionType || value[i].expressionType === "cron") {
+                                if (!value[i].expression) {
+                                    return false;
+                                }
+                            } else if(value[i].expressionType === "sunrise" || value[i].expressionType === "sunset") {
+                                if (!value[i].location) {
+                                    return false;
+                                }
                             }
                         }
                     }
@@ -50,6 +193,43 @@
             return this.name || "CRON+"
         },
         oneditprepare: function () {
+            debugger
+            $( "#mapDialog" ).dialog({
+                autoOpen: false,
+                height: 400,
+                width: 700,
+                modal: true,
+                buttons: {
+                    "OK": function(){
+                    if(selectedLocation && selectedLocationInput){
+                        selectedLocationInput.val(selectedLocation.lat + " " + selectedLocation.lng);
+                    }
+                    $( "#mapDialog" ).dialog( "close" );
+                    },
+                    Cancel: function() {
+                    $( "#mapDialog" ).dialog( "close" );
+                    }
+                },
+                show: {
+                    effect: "blind",
+                    duration: 1000
+                },
+                hide: {
+                    effect: "explode",
+                    duration: 1000
+                },
+                close: function( event, ui ) {
+                    console.log("destroying map")
+                    if(map) map.remove();
+                },
+                create: function() {
+                    //$("#dialog").append(footer);
+                }
+                });
+            //<!-- include cartodb.js library -->
+            checkloadjscssfile("http://libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css","css");
+            checkloadjscssfile("http://libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js","js");
+    
             var node = this;
             $( "#node-input-timeZone" ).autocomplete({
                 source: function( request, response ) {
@@ -123,7 +303,7 @@
                             '<div>' + desc + '</div>' +
                             '<pre  class="form-tip">' + text + '</pre></div>'
                 }
-                function initTooltip(selector){
+                function initTooltip(selector, type){
                     var pos = { my: "right top", at: "right+90 bottom+5", of: selector, collision: "flipfit" };
                     selector.off("mouseenter").tooltip({
                         show: { effect: "fade" },
@@ -147,11 +327,13 @@
                         console.log("initTooltip--focusin change keyup",e )
                         var $this = $(this);
                         var expression = $this.val();
+                        let $timeZone = $("#node-input-timeZone");
+                        var $expressionType = $this.closest("li").find(".node-input-option-expressionType");
+                        var $offset = $this.closest("li").find(".node-input-option-offset");
                         if(!expression){
                             $this.tooltip("close").tooltip("disable");
                             return;
                         }
-                        var title_html = 'Description of <span class="cron-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
                         $this.tooltip("option", "position", pos);
                         $this.tooltip("enable").tooltip("open");
                         $this.tooltip({ 
@@ -161,11 +343,28 @@
                             content: function (callback) {
                                 console.log("initTooltip-->content")
                                 expression = $this.val();
-                                let tz = $("#node-input-timeZone").val();
-                                let e = { expression: expression };
-                                if (tz) {
-                                    e.timeZone = tz;
+                                var expressionType = $expressionType.val();
+                                var offset = $offset.val();
+                                let timeZone = $timeZone.val();
+                                var title_html = 'Description of <span class="cron-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
+                                let e = { expressionType: expressionType };
+                                if (timeZone) e.timeZone = timeZone;
+                                if(expressionType == "sunset" || expressionType == "sunrise"){
+                                    title_html = '<b>' + expressionType + '</b> at <span class="cron-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
+                                    if(offset != undefined && offset != null && offset != "0" && offset != 0){
+                                        title_html += '<b>';
+                                        if(offset > 0) title_html += ' +'
+                                        title_html += offset + ' minute';
+                                        if(offset != "1" && offset != "-1") title_html += 's'
+                                        title_html += '</b>';
+                                    }
+                                    e.offset = offset;
+                                    e.location = expression;
+                                } else {
+                                    title_html = 'Description of <span class="cron-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
+                                    e.expression = expression;
                                 }
+
                                 $.ajax({
                                     url: 'cronplus',
                                     type: 'POST',
@@ -180,13 +379,13 @@
                                         nextInfo = "Next run...\n- " + data.prettyNext;
                                         if (data.nextDates && data.nextDates.length) {
                                             let map1;
-                                            if (tz) {
-                                                map1 = data.nextDates.map(x => {
-                                                    let fd = formatDateTimeWithTZ(x, tz);
+                                            if (timeZone) {
+                                                map1 = data.nextDates.map(function(x) {
+                                                    let fd = formatDateTimeWithTZ(x, timeZone);
                                                     return fd ? fd : undefined;
                                                 });
                                             } else {
-                                                map1 = data.nextDates.map(x => x = new Date(x).toString());
+                                                map1 = data.nextDates.map(function(x) {x = new Date(x).toString()});
                                             }
                                             nextInfo += "\n- at " + map1.join("\n- at ");
                                         }
@@ -222,37 +421,102 @@
                 var deleteButton = $('<a/>',{href:"#",class:"editor-button editor-button-small", style:"margin-top:7px; margin-left:5px;"}).appendTo(span);
                 $('<i/>',{class:"fa fa-remove"}).appendTo(deleteButton);
 
+                //generate a dropdown for trigger type
+                var expressionType = option.expressionType || "cron";
+                var expressionTypeField = $('<select/>',{class:"node-input-option-expressionType",type:"text",placeholder:"cron"}).css({"width":"15%","margin-left":"5px","margin-right":"5px"}).appendTo(div);
+                $('<option />', {value: "cron", text: "cron"}).appendTo(expressionTypeField);
+                $('<option />', {value: "sunrise", text: "sunrise"}).appendTo(expressionTypeField);
+                $('<option />', {value: "sunset", text: "sunset"}).appendTo(expressionTypeField);
+                expressionTypeField.val(expressionType);
+                expressionTypeField.prop("title", "Expression Type");   
+
+                //generate the name/topic field
                 var topicClass ="node-input-option-topic" + ((!option.topic) ? " input-error" : "");
-                var topicField = $('<input/>',{class:topicClass,type:"text",style:"margin-left:5px; width:calc(23% - 16px);", placeholder: 'name',value:option.topic}).appendTo(div);
-                var payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:7px; width:calc(37% - 16px);", placeholder: 'payload', value:option.payload}).appendTo(div);
+                var topicField = $('<input/>',{class:topicClass,type:"text",style:"margin-left:5px; width:calc(15% - 16px);", placeholder: 'name',value:option.topic}).appendTo(div);
+                
+                //generate the payload field
+                var payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:7px; width:calc(28% - 16px);", placeholder: 'payload', value:option.payload || ""}).appendTo(div);
                 payloadField.typedInput({default:option.type||'str',types:['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']});
 
+                //generate location 
+                var locationGroup = $('<div class="red-ui-typedInput-container" style="margin-left:7px; width: calc(25% - 16px);">' +
+                        '<button class="red-ui-typedInput-type-select" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
+                        '<div class="red-ui-typedInput-input-wrap" style="left: 22px; right: 0px;">' +
+                        '<input class="red-ui-typedInput-input node-input-option-location" type="text" value=""></div> </div>');                
+                var locationField = locationGroup.find("input");
+                var locationButton = locationGroup.find("button");
+                locationField.prop("title", "Location coordinates...");
+                locationButton.prop("title", "Show Map...");
+                if(!option.location){
+                    locationGroup.addClass("input-error");
+                } else {
+                    locationField.val(option.location);
+                }
+                locationGroup.appendTo(div);
+
+                locationButton.on( "click", function() {
+                    debugger
+                    selectedLocationInput = $(this).closest("li").find(".node-input-option-location");
+                    $( "#mapDialog" ).dialog( "open" );
+                    //var $latlon = $(this).parent().find("input");
+                    createMap(selectedLocationInput);  
+                       
+                });
+
+                //offset fields
+                var offsetField = $('<input/>',{class: "node-input-option-offset", type:"number", min:-1439, max:1439,style:"margin-left:7px; width:calc(15% - 16px);", value:option.offset || 0, placeholder: "offset"}).appendTo(div);
+                offsetField.prop("title", "Minutes Offset +/- 1439");   
+              
                 var expressionClass = "node-input-option-expression" + ((!option.expression) ? " input-error" : "");
                 var expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:7px; width:calc(37% - 16px);", placeholder: 'expression', value:option.expression}).appendTo(div);
                 expressionField.prop("title", "Expression...");
 
-                initTooltip(expressionField);
+                initTooltip(expressionField,"cron");
+                initTooltip(locationField,expressionType);
 
                 expressionField.keyup(function() {
-                    if ($(this).val() && $(this).hasClass('input-error')) {
-                        $(this).removeClass('input-error')
-                    }
-                    else {
-                        if (!$(this).val()) {
-                            $(this).addClass('input-error')
-                        }
+                    var f = $(this);
+                    if (f.val() && f.hasClass('input-error')) {
+                        f.removeClass('input-error')
+                    } else if (!f.val()) {
+                        f.addClass('input-error')
                     }
                 });
+                locationField.keyup(function() {
+                    var f = $(this);
+                    var fg = locationGroup;
+                    if (f.val() && fg.hasClass('input-error')) {
+                        fg.removeClass('input-error')
+                    } else if (!f.val()) {
+                        fg.addClass('input-error')
+                    }
+                });
+            
                 topicField.keyup(function() {
                     if ($(this).val() && $(this).hasClass('input-error')) {
                         $(this).removeClass('input-error')
-                    }
-                    else {
-                        if (!$(this).val()) {
-                            $(this).addClass('input-error')
-                        }
+                    } else if (!$(this).val()) {
+                        $(this).addClass('input-error')
                     }
                 });           
+
+                expressionTypeField.change(function(){
+                    var value = expressionTypeField.val();
+                    switch (value) {
+                        case "sunrise":
+                        case "sunset":
+                            expressionField.hide();
+                            locationGroup.show();
+                            offsetField.show();
+                            break;
+                        default: //cron
+                            expressionField.show();
+                            locationGroup.hide();
+                            offsetField.hide();                            
+                            break;
+                    }
+                });
+                expressionTypeField.change();                
 
                 deleteButton.click(function() {
                     container.css({"background":"#fee"});
@@ -288,10 +552,13 @@
             options.each(function(i) {
                 var option = $(this);
                 var o = {
+                    expressionType: option.find(".node-input-option-expressionType").val(),
                     topic: option.find(".node-input-option-topic").val(),
                     payload: option.find(".node-input-option-payload").typedInput('value'),
                     type: option.find(".node-input-option-payload").typedInput('type'),
-                    expression: option.find(".node-input-option-expression").val()
+                    expression: option.find(".node-input-option-expression").val(),
+                    location: option.find(".node-input-option-location").val(),
+                    offset: option.find(".node-input-option-offset").val()
                 };
                 if (option.find(".node-input-option-value").typedInput('type') === "num") {
                     o.payload = Number(o.value);
@@ -398,8 +665,19 @@
             border-top: 1px solid #f0f0f0;
             border-bottom: 1px solid #f0f0f0
         }
+        #map {
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
     </style>
     
+
+    <div id="mapDialog" style="display: none;" title="Choose location...">
+        <div id="map"></div>
+    </div>
+
+
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
         <input type="text" id="node-input-name" placeholder="Name">
@@ -415,8 +693,8 @@
     </div>  
 
     <div id="node-cronplus-tab-static-schedules" class="form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%">
-        <label for="node-input-width" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
-        <div id="node-input-option-container-div" style="box-sizing: border-box; border-radius: 5px; padding: 5px; border: 1px solid #ccc; overflow-y:scroll;display: inline-block; width: 100%; height: calc(100% - 28px); min-height: 150px;">
+        <label for="node-input-option-container-div" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
+        <div id="node-input-option-container-div" style="min-width: 350px; box-sizing: border-box; border-radius: 5px; padding: 5px; border: 1px solid #ccc; overflow-y:scroll;display: inline-block; width: 100%; height: calc(100% - 28px); min-height: 150px;">
             <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;"></ol>
         </div>
     </div> 
@@ -443,6 +721,10 @@
         <div style="padding-left: 15px">
             A table of schedules. 
         </div>
+        <h4>Schedules - Type</h4>
+        <div style="padding-left: 15px">
+            The type determines what type of schedule. Options are <code>cron</code>, <code>sunrise</code> or <code>sunset</code>
+        </div>
         <h4>Schedules - Name</h4>
         <div style="padding-left: 15px">
             The name is used to both identify the schedule and will be sent in <code>msg.topic</code> when the schedule triggers. This is to permit the user to determine which schedule has triggered.
@@ -451,10 +733,21 @@
         <div style="padding-left: 15px">
             The value to send in the payload when the schedule triggers. (NOTE: the property that the payload gets written to is determined by "output to").
         </div>        
+        <h4>Schedules - Location</h4>
+        <div style="padding-left: 15px">
+            <i>NOTE: Only displayed when the type is set to <b>sunrise</b> or <b>sunset</b></i><br>
+            The location field is expected to contain longitude and lattitude coordinates for the calculation of surise or sunset time.
+        </div>        
+        <h4>Schedules - Offset</h4>
+        <div style="padding-left: 15px">
+            <i>NOTE: Only displayed when the type is set to <b>sunrise</b> or <b>sunset</b></i><br>
+            The offset field can be used to add a positive or negative offset in minutes to the surise or sunset time.
+        </div>        
         <h4>Schedules - Expression</h4>
         <div style="padding-left: 15px">
+            <i>NOTE: Only displayed when the type is set to <b>cron</b></i><br>
             A CRON expression, a date, a comma seperated list of dates or an array of dates<br><br>
-            <p> Date or Date Sequnce Format...<br>
+            <p> Date or Date Sequence Format...<br>
                 When you wish to use a fixed date or sequnce of dates, the expression can be a string date, comma separated list of dates, an array of dates (The array can contain a mix of string, date objects and timestamps).
                 When specifying a string date, you can use timezone e.g. "2020-01-01 00:00 GMT+2".
                 You can even mix time zones e.g. "2020-01-01 00:00 GMT+2, 2020-01-01 00:00 GMT-7"
