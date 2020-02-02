@@ -388,7 +388,7 @@
                                                     return fd ? fd : undefined;
                                                 });
                                             } else {
-                                                map1 = data.nextDates.map(function(x) {x = new Date(x).toString()});
+                                                map1 = data.nextDates.map(function(x) {return (new Date(x)).toString()});
                                             }
                                             nextInfo += "\n- at " + map1.join("\n- at ");
                                         }
