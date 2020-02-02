@@ -11,3 +11,5 @@ docker-compose.yml
 temp
 test
 test.js
+
+package-lock.json
