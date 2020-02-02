@@ -760,6 +760,7 @@ module.exports = function (RED) {
 					if(node.outputs == 2){
 						node.send([null,msg]);
 					} else {
+						msg.commandResponse = true;
 						node.send(msg);
 					}
 				}
