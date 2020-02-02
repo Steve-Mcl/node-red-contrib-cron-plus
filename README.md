@@ -1,15 +1,16 @@
 node-red-contrib-cron-plus
 ============================
-_A flexible scheduler node for Node-RED (incl Timezone support)_
+_A flexible scheduler node for Node-RED (featuring full dynamic control, sunrise/sunset by location and Timezone support)_
 
 FEATURES
 --------
-* Schedule by CRON, date and date sequences
+* Schedule by CRON, date and date sequences, sunrise & sunset (with offset)
   * Human readable descriptions of your CRON expression are provided as you type.
 * Send timestamp, string, number, boolean, flow variable, global variable, JSON, Buffer or Env variable as the output.
 * Settable output variable (normally `msg.payload` but it is up to you)
+* Inject-like button to fire the node (available when only one schedule is added) 
 * Multiple schedules can be entered by the UI
-* Additional info about the triggered scedule is always send in `msg.cronplus`
+* Additional info about the triggered schedule is always send in the output message in `msg.cronplus`
 * Ability to add, remove, list, stop, start, pause schedules by a payload input permitting full flexability & dynamic control
 * Full demo flow provided in node-red editors menu > import > examples.
 * Optional timezone setting suppoting UTC and Region/Area (e.g. Europe/London)
@@ -21,7 +22,7 @@ Install
 
   Use the Manage Palette > Install option from the menu inside node-red
 
-* Harder__
+* Harder...
 
   Alternatively in your Node-RED user directory, typically ~/.node-red, run
 Run the following command in the root directory of your Node-RED install.
