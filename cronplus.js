@@ -247,7 +247,9 @@ module.exports = function (RED) {
 		node.options = config.options;
 		node.commandResponseMsgOutput = config.commandResponseMsgOutput || "output1";
 		node.outputs = config.commandResponseMsgOutput === "output2" ? 2 : 1;//1 output pins if throw or msg.error, 2 outputs if errors to go to seperate output pin
-	
+		function isObject(o){
+			return (typeof o === 'object' && o !== null);
+		}
 		const setProperty = function (msg, field, value) {
 			const set = (obj, path, val) => {
 				const keys = path.split('.');
@@ -292,8 +294,12 @@ module.exports = function (RED) {
 						pl = task.node_payload;
 					} else if (task.node_type === 'none') {
 						pl = "";
-					} else {
-						pl = RED.util.evaluateNodeProperty(task.node_payload, task.node_type, node, msg);
+					} else if(task.node_type === 'json' && isObject(task.node_payload)){
+						pl = task.node_payload;
+					} else if(task.node_type === 'bin' && isObject(task.node_payload)){
+						pl = task.node_payload;
+					} else {						
+						pl = RED.util.evaluateNodeProperty(task.node_payload, task.node_type, node, msg);	
 					}
 					setProperty(msg, node.outputField, pl);
 					node.send(msg);
