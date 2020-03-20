@@ -230,8 +230,9 @@
                 }
                 });
             //<!-- include cartodb.js library -->
-            checkloadjscssfile("http://libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css","css");
-            checkloadjscssfile("http://libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js","js");
+            let proto = location.protocol === 'https:' ? location.protocol : "http:"
+            checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css","css");
+            checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js","js");
     
             var node = this;
             $( "#node-input-timeZone" ).autocomplete({
