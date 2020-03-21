@@ -296,8 +296,8 @@ module.exports = function (RED) {
 						pl = "";
 					} else if(task.node_type === 'json' && isObject(task.node_payload)){
 						pl = task.node_payload;
-					} else if(task.node_type === 'bin' && isObject(task.node_payload)){
-						pl = task.node_payload;
+					} else if(task.node_type === 'bin' && Array.isArray(task.node_payload)){
+						pl = Buffer.from(task.node_payload);
 					} else {						
 						pl = RED.util.evaluateNodeProperty(task.node_payload, task.node_type, node, msg);	
 					}
