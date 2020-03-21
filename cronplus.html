@@ -41,12 +41,14 @@
         }
         return value;
     }
-
     function createMap(srcInput) {
-        if(!L){
-            $("#map").text("maps not loaded. Does your browser have internet access?");
+        if(!window.L || navigator.onLine === false){
+            $(".map-not-loaded").show();
+            $("#map").hide();
             return;
         }
+        $("#map").show();
+        $(".map-not-loaded").hide();
         var lat, lon;
         var latlon = srcInput.val();
         if(latlon){
@@ -68,16 +70,16 @@
         lat = safeFloat(lat, 50.0);
         lon = safeFloat(lon, 0.0);
         console.log("lat/lon", lat, lon)
-        selectedLocation = L.latLng(lat, lon);
+        selectedLocation = window.L.latLng(lat, lon);
         console.log("selectedLocation", selectedLocation.lat, selectedLocation.lng)
 
         // create leaflet map
-        map = L.map('map', {
+        map = window.L.map('map', {
             zoomControl: true,
             center: selectedLocation, //[selectedLocation.lat,selectedLocation.lng],
             zoom: zoom
         });
-        mapPopup = L.popup();
+        mapPopup = window.L.popup();
 
         map.on('click', function (e) {
             console.log(e);
@@ -103,7 +105,6 @@
         var tileUrl = "http://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png";
         //var tileUrl = "http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
         var layer = L.tileLayer(tileUrl, {});
-
         layer.addTo(map);
         // add cartodb layer with one sublayer
         cartodb.createLayer(map, {
@@ -196,7 +197,6 @@
             return this.name || "CRON+"
         },
         oneditprepare: function () {
-            debugger
             $( "#mapDialog" ).dialog({
                 autoOpen: false,
                 height: 400,
@@ -233,7 +233,7 @@
             let proto = location.protocol === 'https:' ? location.protocol : "http:"
             checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css","css");
             checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js","js");
-    
+ 
             var node = this;
             $( "#node-input-timeZone" ).autocomplete({
                 source: function( request, response ) {
@@ -459,10 +459,8 @@
                 locationGroup.appendTo(div);
 
                 locationButton.on( "click", function() {
-                    debugger
                     selectedLocationInput = $(this).closest("li").find(".node-input-option-location");
                     $( "#mapDialog" ).dialog( "open" );
-                    //var $latlon = $(this).parent().find("input");
                     createMap(selectedLocationInput);  
                        
                 });
@@ -672,14 +670,39 @@
             border-bottom: 1px solid #f0f0f0
         }
         #map {
+            /* height: 300px; */
+            /* width: 100%; */
             height: 100%;
             padding: 0;
             margin: 0;
+        }
+        .map-not-loaded {
+            padding: 2px 10px 2px 10px;
         }
     </style>
     
 
     <div id="mapDialog" style="display: none;" title="Choose location...">
+        <div class="map-not-loaded" >
+            <h3>No internet on this device?</h3>
+            <p>The interactive Map is loaded via CDN at client side (to minimise installation size) and therefore requires an internet connection. As you are seeing this message, it is likely this device does not have access to the internet.</p>
+            <h4>Alternative ways to get coordinates...</h4>
+            <ul> 
+                <li>Visit <a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer">www.latlong.net</a> (on another device if required) then enter the "Lat Long" value provided into the cronplus coordinates box</li>
+                <li>Visit google maps, MSN maps, almost any other maps website on another device to get GPS or longitude lattitude value</li>
+                <li>Try one of the many longitude lattitude apps avaiable in the app store on your mobile phone</li>
+                <li>Check your satnav device - it may show coordinates</li>
+                <li>Use a topographic map</li>
+                <li>Ask a friend</li>
+            </ul>
+            <h4>Accpeted formats...</h4> 
+            <ul>
+                <li>Decimal values. E.g.  <code>N 51.51000 W 0.13454</code> or <code>51.51000 -0.13454</code></li>
+                <li>Degrees, minutes and seconds. E.g <code>N 51°30'31" W 0°08'34"</code></li>
+                <li>GPS standard coordinates. E.g.  <code>N 51 30.525 W 0 08.569</code></li>
+            </ul>
+        
+        </div>
         <div id="map"></div>
     </div>
 
