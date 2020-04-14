@@ -5,15 +5,19 @@
 
     var map, mapPopup, selectedLocation, selectedLocationInput;
 
-    var filesadded="" //list of files already added 
-    function checkloadjscssfile(filename, filetype){
-        if (filesadded.indexOf("["+filename+"]")==-1){
-            loadjscssfile(filename, filetype)
-            filesadded+="["+filename+"]" //List of files added in the form "[filename1],[filename2],etc"
+    var filesadded=[] //list of files already added 
+    function checkloadjscssfile(filename, filetype, callback){
+        if (filesadded.indexOf(filename)===-1){
+            loadjscssfile(filename, filetype, function(){
+                filesadded.push(filename);
+                if(callback) callback();
+            })
+        } else {
+            if (callback) callback();
         }
     }
 
-    function loadjscssfile(filename, filetype){
+    function loadjscssfile(filename, filetype, callback){
         if (filetype=="js"){ //if filename is a external JavaScript file
             var fileref=document.createElement('script')
             fileref.setAttribute("type","text/javascript")
@@ -27,8 +31,12 @@
         }
         if (typeof fileref!="undefined")
             document.getElementsByTagName("head")[0].appendChild(fileref)
+
+        fileref.onload = function() {
+            if (callback) callback();
+        }
     }
-    
+  
     function safeFloat(value, def) {
         if ((undefined === value) || (null === value)) {
             return def || 0.0;
@@ -44,6 +52,7 @@
         return value;
     }
     function createMap(srcInput) {
+        $(".map-loading").hide();
         if(!window.L || navigator.onLine === false){
             $(".map-not-loaded").show();
             $("#map").hide();
@@ -54,9 +63,9 @@
         var lat, lon;
         var latlon = srcInput.val();
         if(latlon){
+            var splitChar = " ";
+            if(latlon.includes(",")) splitChar = ","
             var arrLatlon = latlon.split(" ");
-            if(arrLatlon.length < 2)
-                arrLatlon = latlon.split(",");
             if(arrLatlon.length >= 2){
                 lat = arrLatlon[0];
                 lon = arrLatlon[1];
@@ -201,27 +210,30 @@
         oneditprepare: function () {
             $( "#mapDialog" ).dialog({
                 autoOpen: false,
-                height: 400,
-                width: 700,
+                height: ($(document).height() < 600) ? 400 : $(document).height() - 200,
+                width: ($(document).width() < 800) ? 600 : $(document).width() - 200 ,
                 modal: true,
                 buttons: {
                     "OK": function(){
-                    if(selectedLocation && selectedLocationInput){
-                        selectedLocationInput.val(selectedLocation.lat + " " + selectedLocation.lng);
-                    }
-                    $( "#mapDialog" ).dialog( "close" );
+                        $( "#mapDialog" ).dialog( "close" );
+                        if(selectedLocation) {
+                            if(selectedLocationInput){
+                                selectedLocationInput.val(selectedLocation.lat + " " + selectedLocation.lng);
+                            }
+                            selectedLocationInput.focus();
+                        }
                     },
                     Cancel: function() {
-                    $( "#mapDialog" ).dialog( "close" );
+                        $( "#mapDialog" ).dialog( "close" );
                     }
                 },
                 show: {
                     effect: "blind",
-                    duration: 1000
+                    duration: 500
                 },
                 hide: {
                     effect: "explode",
-                    duration: 1000
+                    duration: 500
                 },
                 close: function( event, ui ) {
                     console.log("destroying map")
@@ -229,13 +241,11 @@
                 },
                 create: function() {
                     //$("#dialog").append(footer);
+                                //<!-- include cartodb.js library -->
                 }
-                });
-            //<!-- include cartodb.js library -->
-            let proto = location.protocol === 'https:' ? location.protocol : "http:"
-            checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css","css");
-            checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js","js");
- 
+            });
+
+
             var node = this;
             $( "#node-input-timeZone" ).autocomplete({
                 source: function( request, response ) {
@@ -448,7 +458,7 @@
                 var locationGroup = $('<div class="red-ui-typedInput-container" style="margin-left:7px; width: calc(25% - 16px);">' +
                         '<button class="red-ui-typedInput-type-select" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
                         '<div class="red-ui-typedInput-input-wrap" style="left: 22px; right: 0px;">' +
-                        '<input class="red-ui-typedInput-input node-input-option-location" type="text" value=""></div> </div>');                
+                        '<input class="red-ui-typedInput-input node-input-option-location" type="text" value="" placeholder="lat lng"></div> </div>');                
                 var locationField = locationGroup.find("input");
                 var locationButton = locationGroup.find("button");
                 locationField.prop("title", "Location coordinates...");
@@ -463,8 +473,30 @@
                 locationButton.on( "click", function() {
                     selectedLocationInput = $(this).closest("li").find(".node-input-option-location");
                     $( "#mapDialog" ).dialog( "open" );
-                    createMap(selectedLocationInput);  
-                       
+                    if(navigator.onLine === true){
+                        $(".map-not-loaded").show();
+                        $(".map-loading").hide();
+                        $("#map").hide();
+                        let proto = location.protocol === 'https:' ? location.protocol : "http:"
+                        checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css","css", function(){
+                            checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js","js", function(){
+                                createMap(selectedLocationInput);
+                            });
+                        });
+
+                        /* google maps - future possibility...
+                            https://jsfiddle.net/user2314737/8ndjuoyj/
+                            checkloadjscssfile("https://maps.googleapis.com/maps/api/js?v=3&amp;sensor=false","js", function(){
+                                createMap(selectedLocationInput);
+                            })
+                        */
+
+                    } else {
+                        $(".map-not-loaded").show();
+                        $(".map-loading").hide();
+                        $("#map").hide();
+                        return;
+                    }                      
                 });
 
                 //offset fields
@@ -683,10 +715,40 @@
         .map-not-loaded {
             padding: 2px 10px 2px 10px;
         }
+        .map-loading {
+            padding: 2px 10px 2px 10px;
+        }
+        .coordinates{
+            font-family: monospace;
+            background: #ffe;
+            padding-left: 5px;
+            padding-right: 5px;
+            border: 1px solid #ddd;
+        }
     </style>
     
 
     <div id="mapDialog" style="display: none;" title="Choose location...">
+        <div class="map-loading" >
+            <h3>Attempting to load map... <i class="fa fa-spinner fa-spin" style="font-size:24px"></i></h3>
+            <p>The interactive Map is loaded via CDN at client side (to minimise installation size) and therefore requires an internet connection. Please wait 1 moment.</p>
+            <h4>Alternative ways to get coordinates...</h4>
+            <ul> 
+                <li>Visit <a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer">www.latlong.net</a> (on another device if required) then copy the "Lat Long" value provided into the cronplus coordinates box</li>
+                <li>Visit google maps, MSN maps, almost any other maps website on another device to get GPS or longitude latitude value</li>
+                <li>Try one of the many longitude latitude apps avaiable in the app store on your mobile phone</li>
+                <li>Check your satnav device - it may show coordinates</li>
+                <li>Use a topographic map</li>
+                <li>Ask a friend</li>
+            </ul>
+            <h4>Accepted formats...</h4> 
+            <ul>
+                <li>Decimal Degrees E.g: <code class="coordinates">54.9992500,-1.4170300</code> or <code class="coordinates">54.9992500° N 1.4170300° W</code></li>
+                <li>Degrees Minutes Seconds E.g: <code class="coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
+                <li>Decimal Minutes E.g: <code class="coordinates">54° 59.955' , -1° 25.0218'</code></li>
+                <li>GPS E.g: <code class="coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="coordinates">54:59:57.3N 1:25:1.308W</code></li>
+            </ul>    
+        </div>
         <div class="map-not-loaded"  style="display:hidden" >
             <h3>No internet on this device?</h3>
             <p>The interactive Map is loaded via CDN at client side (to minimise installation size) and therefore requires an internet connection. As you are seeing this message, it is likely this device does not have access to the internet.</p>
@@ -775,7 +837,7 @@
         <h4>Schedules - Location</h4>
         <div style="padding-left: 15px">
             <i>NOTE: Only displayed when the type is set to <b>sunrise</b> or <b>sunset</b></i><br>
-            The location field is expected to contain longitude and lattitude coordinates for the calculation of surise or sunset time.
+            The location field is expected to contain longitude and latitude coordinates for the calculation of surise or sunset time.
         </div>        
         <h4>Schedules - Offset</h4>
         <div style="padding-left: 15px">
