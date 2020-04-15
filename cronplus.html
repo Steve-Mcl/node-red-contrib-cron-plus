@@ -231,6 +231,9 @@
                     effect: "blind",
                     duration: 500
                 },
+                open: function(event) {
+                    $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary');
+                },
                 hide: {
                     effect: "explode",
                     duration: 500
@@ -238,10 +241,6 @@
                 close: function( event, ui ) {
                     console.log("destroying map")
                     if(map) map.remove();
-                },
-                create: function() {
-                    //$("#dialog").append(footer);
-                                //<!-- include cartodb.js library -->
                 }
             });
 
@@ -846,7 +845,15 @@
         <h4>Schedules - Location</h4>
         <div style="padding-left: 15px">
             <i>NOTE: Only displayed when the type is set to <b>sunrise</b> or <b>sunset</b></i><br>
-            The location field is expected to contain longitude and latitude coordinates for the calculation of surise or sunset time.
+            The location field is expected to contain longitude and latitude coordinates for the calculation of surise or sunset time.<br>
+            Accepted formats...
+            <ul>
+                <li>Decimal Degrees E.g: <code class="coordinates">54.9992500,-1.4170300</code> or <code class="coordinates">54.9992500° N 1.4170300° W</code></li>
+                <li>Degrees Minutes Seconds E.g: <code class="coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
+                <li>Decimal Minutes E.g: <code class="coordinates">54° 59.955' , -1° 25.0218'</code></li>
+                <li>GPS E.g: <code class="coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="coordinates">54:59:57.3N 1:25:1.308W</code></li>
+            </ul>    
+
         </div>        
         <h4>Schedules - Offset</h4>
         <div style="padding-left: 15px">
@@ -920,24 +927,50 @@
         <dt><i>payload</i> <span class="property-type">object|Array</span></dt>
         <dd>It is possible to dynamically add, remove & control schedules by injecting a payload object into the node. The format of the payload object (or array of objects) depends on the operation. See below for details.</dd>
         <dd>
-            <p><b>Adding one (or more) schedules</b><br>Example...<br>
+            <p><b>Adding one (or more) schedules</b><br>
+                Example...<br>
                 <pre>[
   {
     "command": "add",
     "name": "every 6",
     "expression": "*/6 * * * * * *",
+    "expressionType": "cron",
     "payload": "hi every 6",
     "type": "str",
     "limit": 3 
+  },
+  {
+    "command": "add",
+    "name": "alarm1",
+    "expressionType": "sunrise",
+    "location": "54.999320540937035 -1.417407989501953",
+    "offset": "60",
+    "payload": "wake up!",
+    "type": "str",
+    "limit": null
   }
 ]</pre>
                 
                 <p><i>Details...</i><br>
+                    Adding a CRON expression
                     <ul>
                         <li>Multiple schedules can be added if the payload is an array of objects/li>
-                        <li>command: (string|required) The operation to perform</li>
+                        <li>command: (string|required) The operation to perform - in this case "add"</li>
                         <li>name: (string|required) This will be used as the topic when the schedule triggers</li>
-                        <li>expression: (string|required) A CRON expression, a date, a comma seperated list of dates or an array of dates</li>
+                        <li>expression: (string|optional) A CRON expression, a date, a comma seperated list of dates or an array of dates</li>
+                        <li>expressionType: (string|optional) specify the schedule type. (if omitted, "cron" is the default)</li>
+                        <li>payload: (any|optional) What to send when schedule triggers</li>
+                        <li>type: (string|optional) The payload type (e.g. 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
+                        <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
+                    </ul><br>
+                    Adding a sunrise / sunset schedule
+                    <ul>
+                        <li>Multiple schedules can be added if the payload is an array of objects/li>
+                        <li>command: (string|required) The operation to perform - in this case "add"</li>
+                        <li>name: (string|required) This will be used as the topic when the schedule triggers</li>
+                        <li>expressionType: (string|required) specify the schedule type.  Accepted values are sunrise and sunset</li>
+                        <li>location: (string|optional) longitude lattitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
+                        <li>offset: (number|optional) number of minutes to offset a sunrise or sunset</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
                         <li>type: (string|optional) The payload type (e.g. 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
                         <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
@@ -1008,10 +1041,19 @@
                 </p>
             </p>  
 
-            <p><b>Describe</b><br>Example...<br>
+            <p><b>Describe</b><br>
+                Example...<br>
                 <pre>{
     "command": "describe",
     "expression": "0 */5 * * * MON *",
+    "expressionType": "cron",
+    "timeZone": "Europe/London"
+}</pre>
+                Example2...<br>
+                <pre>{
+    "command": "describe",
+    "location": "54.9992500,-1.4170300",
+    "expressionType": "sunrise",
     "timeZone": "Europe/London"
 }</pre>
 
@@ -1040,10 +1082,52 @@
     <h3 id="undestanding-timezone">Understanding Timezone...</h3>
     <dl class="message-properties">
         <h4>Foreword</h4>
-        <p>Timezones are mind boggling should be percieved from your current point of view. Example, regardless of where your node-red runs, you can "fake it" by setting the Timezone entry to your own Timezone.
+        <p>Timezones should be percieved from your current point of view. For example, regardless of where your node-red runs, you can "fake it" by setting the Timezone entry to your own Timezone location where/when you expect the event to occur.
         </p>
 
-        <h4>Example 1</h4>
+        <h4><b>Example 1...</b></h4>
+        <p>Trigger a flow when the NYSE stock exchange starts and stops trading.
+        </p>
+
+        <h4 id="notes">NOTES</h4>
+        <ul>
+            <li>This example will work all year around but was written on 15th Apr with <code>GMT+1 / BST</code> and <code>GMT-4 / EDT</code> as a point of reference</li>
+            <li>Server is in London (GMT+1 / BST)</li>
+            <li>NYSE Stock exchange runs 09:30 ~ 16:00 Monday to Friday</li>
+        </ul>
+
+        <h4 id="details">DETAILS</h4>
+        <ul>
+            <li>NY time 09:30 (GMT-4 / EDT) - this is the time the market opens in New York</li>
+            <li>Server time 14:30 (GMT+1 / BST equivelant) - the start event will happen at this time in london</li>
+            <li>NY time 14:00 (GMT-4 / EDT) - this is the time the market closes in New York</li>
+            <li>Server time 21:00 (GMT+1 / BST equivelant) - the stop event will happen at this time in london</li>
+        </ul>
+
+        <h4 id="setup">SETUP</h4>
+        <ul>
+            <li>Enter <code>America/New_York</code> in the <code>Timezone</code> field</li>
+            <li>Add a new schedule...
+                <ul>
+                    <li>Field 1: Select &quot;cron&quot;</li>
+                    <li>Field 2: Enter &quot;stocks/nyse/trading&quot;</li>
+                    <li>Field 3: Select <code>bool</code> and then select <code>true</code> for payload</li>
+                    <li>Field 4: Enter the expression <code>0 30 9 * * 1-5</code></li>
+                </ul>
+            </li>
+            <li>Add a new schedule...
+                <ul>
+                    <li>Field 1: Select &quot;cron&quot;</li>
+                    <li>Field 2: Enter &quot;stocks/nyse/trading&quot;</li>
+                    <li>Field 3: Select <code>bool</code> and then select <code>false</code> for payload</li>
+                    <li>Field 4: Enter the expression <code>0 0 16 * * 1-5</code></li>
+                </ul>
+            </li>
+        </ul>  
+        
+        <p></p>         
+
+        <h4><b>Example 2...</b></h4>
         <p>Get an reminder (in Moscow) to call my wife 30 mins after the sun rises in Cairo.
         </p>
 
@@ -1084,47 +1168,6 @@
             </li>
         </ul>   
 
-        <p></p>         
-
-        <h4>Example 2</h4>
-        <p>Trigger a flow when the NYSE stock exchange starts and stops trading.
-        </p>
-
-        <h4 id="notes">NOTES</h4>
-        <ul>
-            <li>This example will work all year around but was written on 15th Apr with <code>GMT+1 / BST</code> and <code>GMT-4 / EDT</code> as a point of reference</li>
-            <li>Server is in London (GMT+1 / BST)</li>
-            <li>NYSE Stock exchange runs 09:30 ~ 16:00 Monday to Friday</li>
-        </ul>
-
-        <h4 id="details">DETAILS</h4>
-        <ul>
-            <li>NY time 09:30 (GMT-4 / EDT) - this is the time the market opens in New York</li>
-            <li>Server time 14:30 (GMT+1 / BST equivelant) - the start event will happen at this time in london</li>
-            <li>NY time 14:00 (GMT-4 / EDT) - this is the time the market closes in New York</li>
-            <li>Server time 21:00 (GMT+1 / BST equivelant) - the stop event will happen at this time in london</li>
-        </ul>
-
-        <h4 id="setup">SETUP</h4>
-        <ul>
-            <li>Enter <code>America/New_York</code> in the <code>Timezone</code> field</li>
-            <li>Add a new schedule...
-                <ul>
-                    <li>Field 1: Select &quot;cron&quot;</li>
-                    <li>Field 2: Enter &quot;stocks/nyse/trading&quot;</li>
-                    <li>Field 3: Select <code>bool</code> and then select <code>true</code> for payload</li>
-                    <li>Field 4: Enter the expression <code>0 30 9 * * 1-5</code></li>
-                </ul>
-            </li>
-            <li>Add a new schedule...
-                <ul>
-                    <li>Field 1: Select &quot;cron&quot;</li>
-                    <li>Field 2: Enter &quot;stocks/nyse/trading&quot;</li>
-                    <li>Field 3: Select <code>bool</code> and then select <code>false</code> for payload</li>
-                    <li>Field 4: Enter the expression <code>0 0 16 * * 1-5</code></li>
-                </ul>
-            </li>
-        </ul>  
     </dl>
     
 </script>
