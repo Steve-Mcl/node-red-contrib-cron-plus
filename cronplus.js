@@ -125,8 +125,8 @@ module.exports = function (RED) {
         node.outputField = config.outputField || "payload";
         node.timeZone = config.timeZone;
         node.options = config.options;
-        node.commandResponseMsgOutput = config.commandResponseMsgOutput || "output1";
-        node.outputs = config.commandResponseMsgOutput === "output2" ? 2 : 1;//1 output pins if throw or msg.error, 2 outputs if errors to go to seperate output pin
+        node.commandResponseMsgOutput = config.commandResponseMsgOutput || "output2";
+        node.outputs = config.commandResponseMsgOutput === "output1" ? 1 : 2;//1 output pins (all messages), 2 outputs (schedules out of pin1, command responses out of pin2)
         function isObject(o){
             return (typeof o === 'object' && o !== null);
         }

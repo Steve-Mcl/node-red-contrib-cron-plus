@@ -172,14 +172,14 @@
         icon: "timer.png",
         color: "#a6bbcf",
         inputs: 1,
-        outputs: 1,
+        outputs: 2,
         outputLabels: ["Output","Command Responses"],
         defaults: {
             name: { value: "" },
             outputField: { value: "payload" },
             timeZone: { value: "" },
-            commandResponseMsgOutput: { value: "output1" },
-            outputs: { value: 1 },
+            commandResponseMsgOutput: { value: "output2" },
+            outputs: { value: 2 },
             options: {
                 value:[{payload: '', topic : '', expression : ''}], 
                 validate:function(value) { 
@@ -789,7 +789,7 @@
     <div class="form-row">
         <label for="node-input-commandResponseMsgOutput"><i class="fa fa-dot-circle-o"></i><span style="font-stretch: condensed;"> Command Resp</span></label>
         <select style="width: 70%" id="node-input-commandResponseMsgOutput">
-          <option value="output1">Send to output 1 (default)</option>
+          <option value="output1">Send to output 1</option>
           <option value="output2">Send to seperate output</option>
         </select>
       </div>  
@@ -817,6 +817,13 @@
         <h4>Timezone (optional)</h4>
         <div style="padding-left: 15px">
             A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area (<a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">list</a>)
+        </div>    
+        <h4>Command Resp</h4>
+        <div style="padding-left: 15px">
+            <ul>
+                <li>Send to output 1 - all messages will be fired out of output 1 (schedules + command responses)</li>
+                <li>Send to seperate output - schedule messages will be fired out of output 1, command responses will be fired out of output 2</li>
+            </ul>
         </div>    
         <h4>Schedules</h4>
         <div style="padding-left: 15px">
