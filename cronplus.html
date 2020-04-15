@@ -817,6 +817,8 @@
         <h4>Timezone (optional)</h4>
         <div style="padding-left: 15px">
             A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area (<a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">list</a>)
+            <br>
+            TIP: Timezone should be percieved from your own perspective. See the <a href="#undestanding-timezone">Understanding Timezone</a> example below.
         </div>    
         <h4>Command Resp</h4>
         <div style="padding-left: 15px">
@@ -1023,7 +1025,6 @@
                 </p>
             </p>                
         </dd>
-
         <dd>GENERAL NOTES...<br>
         <ul>
             <li>Adding a schedule with the same name as an existing schedule will replace the existing one</li>
@@ -1034,6 +1035,96 @@
             <li>When a cron-plus node outputs a msg for a cron/sunrise/sunset scheduled event, <code>msg.scheduledEvent</code> will be <code>true</code> to indicate the message is due to a scheduled event and not a control response</li>
         </ul>
         </dd>
+    </dl>
+
+    <h3 id="undestanding-timezone">Understanding Timezone...</h3>
+    <dl class="message-properties">
+        <h4>Foreword</h4>
+        <p>Timezones are mind boggling should be percieved from your current point of view. Example, regardless of where your node-red runs, you can "fake it" by setting the Timezone entry to your own Timezone.
+        </p>
+
+        <h4>Example 1</h4>
+        <p>Get an reminder (in Moscow) to call my wife 30 mins after the sun rises in Cairo.
+        </p>
+
+        <h4 id="notes">NOTES</h4>
+        <ul>
+            <li>This example will work all year around but was written on 15th Apr as a point of reference</li>
+            <li>Server is in London (GMT+1 / BST)</li>
+            <li>My wife in on holiday in Cairo (GMT+2)
+                <ul>
+                    <li>sunrise is at 05:27 in Cairo on 15-Apr</li>
+                </ul>
+            </li>
+            <li>I am away on business in Moscow (GMT+3)
+                <ul>
+                    <li>I need an alert to call wife 30 mins after Cairo sunrise</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h4 id="details">DETAILS</h4>
+        <ul>
+            <li>Cairo sunrise time 05:27 (15-apr) - 30 mins later at 05:57, my wife expects a call.</li>
+            <li>Server time 04:57 (GMT+1 equivelant) - the event will happen at this time in london</li>
+            <li>Moscow time 06:57 (GMT+3 equivelant) - this is the time it will be in Moscow</li>
+        </ul>
+
+        <h4 id="setup">SETUP</h4>
+        <ul>
+            <li>Enter <code>Europe/Moscow</code> in the <code>Timezone</code> field</li>
+            <li>Add a new schedule...
+                <ul>
+                    <li>Field 1: Select &quot;sunrise&quot;</li>
+                    <li>Field 2: Enter &quot;sunrise-call-wife&quot; for name/topic</li>
+                    <li>Field 3: Enter &quot;call wife&quot; for payload</li>
+                    <li>Field 4: Enter the coordinates for sunrise location (Cairo) <code>30.04905845622014 31.229496002197262</code></li>
+                    <li>Field 5: Enter an offset of 30 (allow time to make a coffee)</li>
+                </ul>
+            </li>
+        </ul>   
+
+        <p></p>         
+
+        <h4>Example 2</h4>
+        <p>Trigger a flow when the NYSE stock exchange starts and stops trading.
+        </p>
+
+        <h4 id="notes">NOTES</h4>
+        <ul>
+            <li>This example will work all year around but was written on 15th Apr with <code>GMT+1 / BST</code> and <code>GMT-4 / EDT</code> as a point of reference</li>
+            <li>Server is in London (GMT+1 / BST)</li>
+            <li>NYSE Stock exchange runs 09:30 ~ 16:00 Monday to Friday</li>
+        </ul>
+
+        <h4 id="details">DETAILS</h4>
+        <ul>
+            <li>NY time 09:30 (GMT-4 / EDT) - this is the time the market opens in New York</li>
+            <li>Server time 14:30 (GMT+1 / BST equivelant) - the start event will happen at this time in london</li>
+            <li>NY time 14:00 (GMT-4 / EDT) - this is the time the market closes in New York</li>
+            <li>Server time 21:00 (GMT+1 / BST equivelant) - the stop event will happen at this time in london</li>
+        </ul>
+
+        <h4 id="setup">SETUP</h4>
+        <ul>
+            <li>Enter <code>America/New_York</code> in the <code>Timezone</code> field</li>
+            <li>Add a new schedule...
+                <ul>
+                    <li>Field 1: Select &quot;cron&quot;</li>
+                    <li>Field 2: Enter &quot;stocks/nyse/trading&quot;</li>
+                    <li>Field 3: Select <code>bool</code> and then select <code>true</code> for payload</li>
+                    <li>Field 4: Enter the expression <code>0 30 9 * * 1-5</code></li>
+                </ul>
+            </li>
+            <li>Add a new schedule...
+                <ul>
+                    <li>Field 1: Select &quot;cron&quot;</li>
+                    <li>Field 2: Enter &quot;stocks/nyse/trading&quot;</li>
+                    <li>Field 3: Select <code>bool</code> and then select <code>false</code> for payload</li>
+                    <li>Field 4: Enter the expression <code>0 0 16 * * 1-5</code></li>
+                </ul>
+            </li>
+        </ul>  
     </dl>
     
 </script>
