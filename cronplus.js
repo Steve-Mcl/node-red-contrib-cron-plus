@@ -243,17 +243,40 @@ module.exports = function (RED) {
                 }
         }
         
-        function describeExpression(expression, expressionType, timeZone){
+        function describeExpression(expression, expressionType, timeZone, offset){
             let now = new Date();
             let result = {description:undefined,nextDate:undefined,nextDescription:undefined};
             try {
                 let cronOpts = node.timeZone ? { timezone: timeZone } : undefined;
                 let ds = null;
-                try {
-                    ds = parseDateSequence(expression);
-                } catch (e) {
+                let dsOk = false;
+                let exOk = false;
+                if(expressionType == "sunrise" || expressionType == "sunset"){
+                    let opt = {
+                        expressionType: expressionType,
+                        location: expression,
+                        offset: offset
+                    }
+                    if(validateOpt(opt)){
+                        ds = parseSunTime(opt);
+                        dsOk = ds && ds.isDateSequence;
+                    }
+                } else {
+                    let isValidCron = cronosjs.validate(expression);
+                    if(isValidCron){
+                        exOk = isValidCron;
+                    } else { 
+                        ds = parseDateSequence(expression);
+                        dsOk = ds.isDateSequence;
+                    } 
+                    
                 }
-                if(ds && ds.isDateSequence){
+
+                // try {
+                //     ds = parseDateSequence(expression);
+                // } catch (e) {
+                // }
+                if(dsOk){
                     let task = ds.task;
                     let dates = ds.dates;
                     result.description = "Date sequence with " + dates.length +  " fixed dates";
@@ -263,15 +286,17 @@ module.exports = function (RED) {
                         let count = dates.length;
                         if(count == 1){
                             if(expressionType === "sunrise" || expressionType === "sunset"){
-                                result.description    = "At " + formatShortDateTimeWithTZ(first,timeZone) ;
+                                result.description = expressionType + " at " + formatShortDateTimeWithTZ(first,timeZone) ;
                             } else {
-                                result.description    = "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
+                                result.description = "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
                             }
                         } else {
-                            result.description    = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
+                            result.description = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
                         }
                     }
-                } else {
+                } 
+                
+                if(exOk){
                     let cronExpression = cronosjs.CronosExpression.parse(expression, cronOpts)
                     result.nextDate = cronExpression.nextDate();
                     result.description = humanizeCron(expression);    
@@ -666,7 +691,7 @@ module.exports = function (RED) {
                     let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
                     switch (action) {
                         case "describe":
-                            newMsg.payload.result = describeExpression(cmd.expression, cmd.expressionType, cmd.timeZone);
+                            newMsg.payload.result = describeExpression(cmd.location || cmd.expression, cmd.expressionType, cmd.timeZone);
                             sendCommandResponse(newMsg);
                             break;
                         case "status":
