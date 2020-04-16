@@ -224,7 +224,8 @@ module.exports = function (RED) {
             return o;
         }
         function getTaskStatus(node, task){
-            let h = describeExpression(task.node_expression, task.node_expressionType, node.timeZone)
+            let exp = (task.node_expressionType == "sunrise" || task.node_expressionType == "sunset") ? task.node_location : task.node_expression;
+            let h = describeExpression(exp, task.node_expressionType, node.timeZone)
             let nextDescription = null;
             let nextDate = null;
             let running = !isTaskFinished(task);
@@ -232,15 +233,29 @@ module.exports = function (RED) {
                 nextDescription = h.nextDescription;
                 nextDate = h.nextDate;
             }
-            return {
+            let tz = node.timeZone;
+            let localTZ = "";
+            try {
+                localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                if(!tz) tz = localTZ;
+            } catch (error) {                    
+            }
+
+            let r = {
                     type: task.isDynamic ? "dynamic" : "static",
                     isRunning: task.isRunning,
                     count: task.node_count,
                     limit: task.node_limit,
                     nextDescription: nextDescription,
                     nextDate: nextDate,
-                    description: h.description,
+                nextDateTZ: formatShortDateTimeWithTZ(nextDate, tz),
+                timeZone: tz,
+                serverTime: new Date(),
+                serverTimeZone: localTZ,
+                description: h.description
                 }
+            if(h.sun) r.sun = h.sun;
+            return r;
         }
         
         function describeExpression(expression, expressionType, timeZone, offset){
@@ -255,10 +270,26 @@ module.exports = function (RED) {
                     let opt = {
                         expressionType: expressionType,
                         location: expression,
-                        offset: offset
+                        offset: offset,
+                        name: "dummy"
                     }
                     if(validateOpt(opt)){
                         ds = parseSunTime(opt);
+                        opt.expressionType = "sunrise";
+                        let sunrise = parseSunTime(opt);
+                        let sunriseTime = sunrise.dates[0];
+                        opt.expressionType = "sunset";
+                        let sunset = parseSunTime(opt);
+                        let sunsetTime = sunset.dates[0];
+                        result.sun = {
+                            state: sunriseTime > sunsetTime ? "rise" : "set",
+                            nextSunrise: sunriseTime,
+                            nextSunset: sunsetTime,
+                            nextSunriseTZ: formatShortDateTimeWithTZ(sunriseTime, timeZone),
+                            nextSunsetTZ: formatShortDateTimeWithTZ(sunsetTime,timeZone),
+                            offset: opt.offset ? opt.offset : 0
+                        }
+
                         dsOk = ds && ds.isDateSequence;
                     }
                 } else {
