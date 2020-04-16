@@ -110,7 +110,6 @@ function parseSunTime(opt, count){
         dates.push(timeOffset);
         date.setDate(date.getDate() + 1);                    
     }
-    opt.expression = dates;
     return parseDateSequence(dates);
 }
 
@@ -552,7 +551,6 @@ module.exports = function (RED) {
             task.node_expressionType = opt.expressionType;
             task.node_offset = opt.offset;
             task.node_opt = opt;
-            task.node_expressionType = opt.expressionType;
             task.node_limit = opt.limit || 0;
             task.stop();
             task.on('run', (timestamp) => {
