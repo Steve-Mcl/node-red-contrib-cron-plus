@@ -224,7 +224,7 @@ module.exports = function (RED) {
         }
         function getTaskStatus(node, task){
             let exp = (task.node_expressionType == "sunrise" || task.node_expressionType == "sunset") ? task.node_location : task.node_expression;
-            let h = describeExpression(exp, task.node_expressionType, node.timeZone)
+            let h = describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset)
             let nextDescription = null;
             let nextDate = null;
             let running = !isTaskFinished(task);
@@ -721,7 +721,7 @@ module.exports = function (RED) {
                     switch (action) {
                         case "describe":
                             let exp = (cmd.expressionType == "sunrise" || cmd.expressionType == "sunset") ? cmd.location : cmd.expression;
-                            newMsg.payload.result = describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone);
+                            newMsg.payload.result = describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset);
                             sendCommandResponse(newMsg);
                             break;
                         case "status":
