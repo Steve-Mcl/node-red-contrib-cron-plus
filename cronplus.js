@@ -722,7 +722,8 @@ module.exports = function (RED) {
                     let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
                     switch (action) {
                         case "describe":
-                            newMsg.payload.result = describeExpression(cmd.location || cmd.expression, cmd.expressionType, cmd.timeZone);
+                            let exp = (cmd.expressionType == "sunrise" || cmd.expressionType == "sunset") ? cmd.location : cmd.expression;
+                            newMsg.payload.result = describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone);
                             sendCommandResponse(newMsg);
                             break;
                         case "status":
