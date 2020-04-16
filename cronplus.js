@@ -89,7 +89,9 @@ function parseDateSequence(expression){
     }
     return result;    
 }
-
+function isValidDate(d) {
+    return d instanceof Date && !isNaN(d);
+}
 function parseSunTime(opt, count){
     count = count || 1;
     //let coordParser = new coordHelper();
@@ -100,14 +102,18 @@ function parseSunTime(opt, count){
     date.setHours(0,0,0,0);
     var offset = opt.offset ? parseInt(opt.offset) : 0;
     var f = opt.expressionType == "sunrise" ? srss.getSunrise : srss.getSunset;
-    while(dates.length < count){
+    var cntr = 0;
+    while(dates.length < count && cntr < 365){
+        cntr++;
         let time = f(pos.lat, pos.lon, date);
-        let timeOffset = new Date(time.getTime() + offset*60000);
-        if(timeOffset.getTime() < Date.now()){
-            date.setDate(date.getDate() + 1);                    
-            continue;
+        if(isValidDate(time)){
+            let timeOffset = new Date(time.getTime() + offset*60000);
+            if(timeOffset.getTime() < Date.now()){
+                date.setDate(date.getDate() + 1);                    
+                continue;
+            } 
+            dates.push(timeOffset);          
         }
-        dates.push(timeOffset);
         date.setDate(date.getDate() + 1);                    
     }
     return parseDateSequence(dates);
@@ -241,18 +247,18 @@ module.exports = function (RED) {
             }
 
             let r = {
-                    type: task.isDynamic ? "dynamic" : "static",
-                    isRunning: task.isRunning,
-                    count: task.node_count,
-                    limit: task.node_limit,
-                    nextDescription: nextDescription,
-                    nextDate: nextDate,
+                type: task.isDynamic ? "dynamic" : "static",
+                isRunning: task.isRunning,
+                count: task.node_count,
+                limit: task.node_limit,
+                nextDescription: nextDescription,
+                nextDate: nextDate,
                 nextDateTZ: formatShortDateTimeWithTZ(nextDate, tz),
                 timeZone: tz,
                 serverTime: new Date(),
                 serverTimeZone: localTZ,
                 description: h.description
-                }
+            }
             if(h.sun) r.sun = h.sun;
             return r;
         }
@@ -281,7 +287,7 @@ module.exports = function (RED) {
                         let sunset = parseSunTime(opt);
                         let sunsetTime = sunset.dates[0];
                         result.sun = {
-                            state: sunriseTime > sunsetTime ? "rise" : "set",
+                            state: sunriseTime > sunsetTime ? "up" : "down",
                             nextSunrise: sunriseTime,
                             nextSunset: sunsetTime,
                             nextSunriseTZ: formatShortDateTimeWithTZ(sunriseTime, timeZone),
@@ -804,86 +810,91 @@ module.exports = function (RED) {
     });
 
     RED.httpAdmin.post("/cronplus", RED.auth.needsPermission("cronplus.read"), function (req, res) {
-        let timeZone = req.body.timeZone ? req.body.timeZone : undefined;
-        let expressionType = req.body.expressionType ? req.body.expressionType : undefined;
-        var opts = {expression: req.body.expression};
-        if(timeZone) opts.timezone = timeZone;
-        if(expressionType) {
-            opts.expressionType = expressionType;
-            if(opts.expressionType == "sunset" || opts.expressionType == "sunrise"){
-                opts.location = req.body.location || e;
-                opts.offset = req.body.offset;
-            }
-        }
-        console.log("/cronplus", opts);
-        try {
-            let ds, next, nextDates, desc;
-            let exOk = false;
-            let dsOk = false;
-            let now = new Date();
-            let prettyNext = "Never";
-            if(expressionType == "sunrise" || expressionType == "sunset"){
-                ds = parseSunTime(opts);
-                dsOk = ds.isDateSequence;
-            } else {
-                let isValidCron = cronosjs.validate(opts.expression);
-                if(isValidCron){
-                    exOk = cronosjs.validate(opts.expression);
-                } else { 
-                    ds = parseDateSequence(opts.expression);
-                    dsOk = ds.isDateSequence;
-                } 
-            }
-             
-            if (exOk) {
-                let ex = cronosjs.CronosExpression.parse(opts.expression, opts);    
-                next = ex.nextDate(now);
-                if (next) {
-                    let ms = next.valueOf() - now.valueOf();
-                    prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
-                    try {
-                        nextDates = ex.nextNDates(next, 5);
-                    } catch (error) {
-                        node.debug(error);
-                    }
-                }
-                desc = humanizeCron(opts.expression);
-            } else if(dsOk) {
-                let ex = ds.task._sequence;
-                next = ex.nextDate(now);
-                if (next) {
-                    let ms = next.valueOf() - now.valueOf();
-                    prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
-                    try {
-                        let futureDates = ex._dates.filter(d => d > next)
-                        nextDates = futureDates.slice(0,5);
-                    } catch (error) {
-                        node.debug(error);
-                    }
-                }
-                let first = ex._dates[0]; 
-                let count = ex._dates.length;
-                if(count === 1){
-                    if(expressionType === "sunrise" || expressionType === "sunset"){
-                        desc = "At " + formatShortDateTimeWithTZ(first,timeZone) ;
-                    } else {
-                        desc = "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
-                    }
-                } else {
-                    desc = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
-                }
-             
-            } else {
-                let r = { ...opts, description: "Invalid or unsupported expression" };
-                res.json(r);
-            }
-            let r = { ...opts, description: desc, next: next, prettyNext: prettyNext, nextDates: nextDates };
-            res.json(r);
+        console.log("/cronplus", req.body);
 
-        } catch (err) {
-            res.sendStatus(500);
-            console.error(err)
-        }
+        let operation = req.body.operation || "expression-tip";
+
+        if(operation == "expression-tip"){
+            let timeZone = req.body.timeZone ? req.body.timeZone : undefined;
+            let expressionType = req.body.expressionType ? req.body.expressionType : undefined;
+            var opts = {expression: req.body.expression};
+            if(timeZone) opts.timezone = timeZone;
+            if(expressionType) {
+                opts.expressionType = expressionType;
+                if(opts.expressionType == "sunset" || opts.expressionType == "sunrise"){
+                    opts.location = req.body.location || e;
+                    opts.offset = req.body.offset;
+                }
+            }
+            try {
+                let ds, next, nextDates, desc;
+                let exOk = false;
+                let dsOk = false;
+                let now = new Date();
+                let prettyNext = "Never";
+                if(expressionType == "sunrise" || expressionType == "sunset"){
+                    ds = parseSunTime(opts);
+                    dsOk = ds.isDateSequence;
+                } else {
+                    let isValidCron = cronosjs.validate(opts.expression);
+                    if(isValidCron){
+                        exOk = cronosjs.validate(opts.expression);
+                    } else { 
+                        ds = parseDateSequence(opts.expression);
+                        dsOk = ds.isDateSequence;
+                    } 
+                }
+                 
+                if (exOk) {
+                    let ex = cronosjs.CronosExpression.parse(opts.expression, opts);    
+                    next = ex.nextDate(now);
+                    if (next) {
+                        let ms = next.valueOf() - now.valueOf();
+                        prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
+                        try {
+                            nextDates = ex.nextNDates(next, 5);
+                        } catch (error) {
+                            node.debug(error);
+                        }
+                    }
+                    desc = humanizeCron(opts.expression);
+                } else if(dsOk) {
+                    let ex = ds.task._sequence;
+                    next = ex.nextDate(now);
+                    if (next) {
+                        let ms = next.valueOf() - now.valueOf();
+                        prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
+                        try {
+                            let futureDates = ex._dates.filter(d => d > next)
+                            nextDates = futureDates.slice(0,5);
+                        } catch (error) {
+                            node.debug(error);
+                        }
+                    }
+                    let first = ex._dates[0]; 
+                    let count = ex._dates.length;
+                    if(count === 1){
+                        if(expressionType === "sunrise" || expressionType === "sunset"){
+                            desc = "At " + formatShortDateTimeWithTZ(first,timeZone) ;
+                        } else {
+                            desc = "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
+                        }
+                    } else {
+                        desc = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
+                    }
+                 
+                } else {
+                    let r = { ...opts, description: "Invalid or unsupported expression" };
+                    res.json(r);
+                }
+                let r = { ...opts, description: desc, next: next, prettyNext: prettyNext, nextDates: nextDates };
+                res.json(r);
+    
+            } catch (err) {
+                res.sendStatus(500);
+                console.error(err)
+            }
+        }        
     });
 
     RED.httpAdmin.post("/cronplustz", RED.auth.needsPermission("cronplus.read"), function (req, res) {
