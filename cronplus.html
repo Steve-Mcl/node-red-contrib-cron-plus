@@ -742,7 +742,7 @@
             <ul> 
                 <li>Visit <a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer">www.latlong.net</a> (on another device if required) then copy the "Lat Long" value provided into the cronplus coordinates box</li>
                 <li>Visit google maps, MSN maps, almost any other maps website on another device to get GPS or longitude latitude value</li>
-                <li>Try one of the many longitude latitude apps avaiable in the app store on your mobile phone</li>
+                <li>Try one of the many longitude latitude apps available in the app store on your mobile phone</li>
                 <li>Check your satnav device - it may show coordinates</li>
                 <li>Use a topographic map</li>
                 <li>Ask a friend</li>
@@ -762,7 +762,7 @@
             <ul> 
                 <li>Visit <a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer">www.latlong.net</a> (on another device if required) then copy the "Lat Long" value provided into the cronplus coordinates box</li>
                 <li>Visit google maps, MSN maps, almost any other maps website on another device to get GPS or longitude latitude value</li>
-                <li>Try one of the many longitude latitude apps avaiable in the app store on your mobile phone</li>
+                <li>Try one of the many longitude latitude apps available in the app store on your mobile phone</li>
                 <li>Check your satnav device - it may show coordinates</li>
                 <li>Use a topographic map</li>
                 <li>Ask a friend</li>
@@ -796,7 +796,7 @@
         <label for="node-input-commandResponseMsgOutput"><i class="fa fa-dot-circle-o"></i><span style="font-stretch: condensed;"> Command Resp</span></label>
         <select style="width: 70%" id="node-input-commandResponseMsgOutput">
           <option value="output1">Send to output 1</option>
-          <option value="output2">Send to seperate output</option>
+          <option value="output2">Send to separate output</option>
         </select>
       </div>  
     <div id="node-cronplus-tab-static-schedules" class="form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%; min-height: 200px">
@@ -824,13 +824,13 @@
         <div style="padding-left: 15px">
             A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area (<a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">list</a>)
             <br>
-            TIP: Timezone should be percieved from your own perspective. See the <a href="#undestanding-timezone">Understanding Timezone</a> example below.
+            TIP: Timezone should be perceived from your own perspective. See the <a href="#undestanding-timezone">Understanding Timezone</a> example below.
         </div>    
         <h4>Command Resp</h4>
         <div style="padding-left: 15px">
             <ul>
                 <li>Send to output 1 - all messages will be fired out of output 1 (schedules + command responses)</li>
-                <li>Send to seperate output - schedule messages will be fired out of output 1, command responses will be fired out of output 2</li>
+                <li>Send to separate output - schedule messages will be fired out of output 1, command responses will be fired out of output 2</li>
             </ul>
         </div>    
         <h4>Schedules</h4>
@@ -852,7 +852,7 @@
         <h4>Schedules - Location</h4>
         <div style="padding-left: 15px">
             <i>NOTE: Only displayed when the type is set to <b>sunrise</b> or <b>sunset</b></i><br>
-            The location field is expected to contain longitude and latitude coordinates for the calculation of surise or sunset time.<br>
+            The location field is expected to contain longitude and latitude coordinates for the calculation of sunrise or sunset time.<br>
             Accepted formats...
             <ul>
                 <li>Decimal Degrees E.g: <code class="cron-plus-coordinates">54.9992500,-1.4170300</code> or <code class="cron-plus-coordinates">54.9992500° N 1.4170300° W</code></li>
@@ -865,14 +865,14 @@
         <h4>Schedules - Offset</h4>
         <div style="padding-left: 15px">
             <i>NOTE: Only displayed when the type is set to <b>sunrise</b> or <b>sunset</b></i><br>
-            The offset field can be used to add a positive or negative offset in minutes to the surise or sunset time.
+            The offset field can be used to add a positive or negative offset in minutes to the sunrise or sunset time.
         </div>        
         <h4>Schedules - Expression</h4>
         <div style="padding-left: 15px">
             <i>NOTE: Only displayed when the type is set to <b>cron</b></i><br>
-            A CRON expression, a date, a comma seperated list of dates or an array of dates<br><br>
+            A CRON expression, a date, a comma separated list of dates or an array of dates<br><br>
             <p> Date or Date Sequence Format...<br>
-                When you wish to use a fixed date or sequnce of dates, the expression can be a string date, comma separated list of dates, an array of dates (The array can contain a mix of string, date objects and timestamps).
+                When you wish to use a fixed date or sequence of dates, the expression can be a string date, comma separated list of dates, an array of dates (The array can contain a mix of string, date objects and timestamps).
                 When specifying a string date, you can use timezone e.g. "2020-01-01 00:00 GMT+2".
                 You can even mix time zones e.g. "2020-01-01 00:00 GMT+2, 2020-01-01 00:00 GMT-7"
             </p>
@@ -964,7 +964,7 @@
                         <li>Multiple schedules can be added if the payload is an array of objects/li>
                         <li>command: (string|required) The operation to perform - in this case "add"</li>
                         <li>name: (string|required) This will be used as the topic when the schedule triggers</li>
-                        <li>expression: (string|optional) A CRON expression, a date, a comma seperated list of dates or an array of dates</li>
+                        <li>expression: (string|optional) A CRON expression, a date, a comma separated list of dates or an array of dates</li>
                         <li>expressionType: (string|optional) specify the schedule type. (if omitted, "cron" is the default)</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
                         <li>type: (string|optional) The payload type (e.g. 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
@@ -976,7 +976,7 @@
                         <li>command: (string|required) The operation to perform - in this case "add"</li>
                         <li>name: (string|required) This will be used as the topic when the schedule triggers</li>
                         <li>expressionType: (string|required) specify the schedule type.  Accepted values are sunrise and sunset</li>
-                        <li>location: (string|optional) longitude lattitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
+                        <li>location: (string|optional) longitude latitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
                         <li>offset: (number|optional) number of minutes to offset a sunrise or sunset</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
                         <li>type: (string|optional) The payload type (e.g. 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
@@ -1043,7 +1043,7 @@
                         <li>remove-all will stop and remove all schedules. This option has no output</li>
                         <li>stop-all will stop all schedules and reset internal counters. This option has no output</li>
                         <li>pause-all will stop all schedules but will not reset internal counters. This option has no output</li>
-                        <li>start-all will (re)start all schedules. Any schedule that reached its limit will start from the begining. Paused schedules will resume. This option has no output</li>
+                        <li>start-all will (re)start all schedules. Any schedule that reached its limit will start from the beginning. Paused schedules will resume. This option has no output</li>
                     </ul>
                 </p>
             </p>  
@@ -1089,7 +1089,7 @@
     <h3 id="undestanding-timezone">Understanding Timezone...</h3>
     <dl class="message-properties">
         <h4>Foreword</h4>
-        <p>Timezones should be percieved from your current point of view. For example, regardless of where your node-red runs, you can "fake it" by setting the Timezone entry to your own Timezone location where/when you expect the event to occur.
+        <p>Timezone should be perceived from your current point of view. For example, regardless of where your node-red runs, you can "fake it" by setting the Timezone entry to your own Timezone location where/when you expect the event to occur.
         </p>
 
         <h4><b>Example 1...</b></h4>
@@ -1106,9 +1106,9 @@
         <h4 id="details">DETAILS</h4>
         <ul>
             <li>NY time 09:30 (GMT-4 / EDT) - this is the time the market opens in New York</li>
-            <li>Server time 14:30 (GMT+1 / BST equivelant) - the start event will happen at this time in london</li>
+            <li>Server time 14:30 (GMT+1 / BST equivalent) - the start event will happen at this time in london</li>
             <li>NY time 14:00 (GMT-4 / EDT) - this is the time the market closes in New York</li>
-            <li>Server time 21:00 (GMT+1 / BST equivelant) - the stop event will happen at this time in london</li>
+            <li>Server time 21:00 (GMT+1 / BST equivalent) - the stop event will happen at this time in london</li>
         </ul>
 
         <h4 id="setup">SETUP</h4>
@@ -1157,8 +1157,8 @@
         <h4 id="details">DETAILS</h4>
         <ul>
             <li>Cairo sunrise time 05:27 (15-apr) - 30 mins later at 05:57, my wife expects a call.</li>
-            <li>Server time 04:57 (GMT+1 equivelant) - the event will happen at this time in london</li>
-            <li>Moscow time 06:57 (GMT+3 equivelant) - this is the time it will be in Moscow</li>
+            <li>Server time 04:57 (GMT+1 equivalent) - the event will happen at this time in london</li>
+            <li>Moscow time 06:57 (GMT+3 equivalent) - this is the time it will be in Moscow</li>
         </ul>
 
         <h4 id="setup">SETUP</h4>
