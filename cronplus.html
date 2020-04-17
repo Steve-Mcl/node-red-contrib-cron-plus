@@ -52,14 +52,14 @@
         return value;
     }
     function createMap(srcInput) {
-        $(".map-loading").hide();
+        $(".cron-plus-map-loading").hide();
         if(!window.L || navigator.onLine === false){
-            $(".map-not-loaded").show();
-            $("#map").hide();
+            $(".cron-plus-map-not-loaded").show();
+            $("#cron-plus-map").hide();
             return;
         }
-        $("#map").show();
-        $(".map-not-loaded").hide();
+        $("#cron-plus-map").show();
+        $(".cron-plus-map-not-loaded").hide();
         var lat, lon;
         var latlon = srcInput.val();
         if(latlon){
@@ -85,7 +85,7 @@
         console.log("selectedLocation", selectedLocation.lat, selectedLocation.lng)
 
         // create leaflet map
-        map = window.L.map('map', {
+        map = window.L.map('cron-plus-map', {
             zoomControl: true,
             center: selectedLocation, //[selectedLocation.lat,selectedLocation.lng],
             zoom: zoom
@@ -208,14 +208,17 @@
             return this.name || "CRON+"
         },
         oneditprepare: function () {
-            $( "#mapDialog" ).dialog({
+            $( "#cron-plus-map-dialog" ).dialog({
+                classes: {
+                    "ui-dialog-content": "cron-plus-map-dialog-content"
+                },
                 autoOpen: false,
                 height: ($(document).height() < 600) ? 400 : $(document).height() - 200,
                 width: ($(document).width() < 800) ? 600 : $(document).width() - 200 ,
                 modal: true,
                 buttons: {
                     "OK": function(){
-                        $( "#mapDialog" ).dialog( "close" );
+                        $( "#cron-plus-map-dialog" ).dialog( "close" );
                         if(selectedLocation) {
                             if(selectedLocationInput){
                                 selectedLocationInput.val(selectedLocation.lat + " " + selectedLocation.lng);
@@ -224,7 +227,7 @@
                         }
                     },
                     Cancel: function() {
-                        $( "#mapDialog" ).dialog( "close" );
+                        $( "#cron-plus-map-dialog" ).dialog( "close" );
                     }
                 },
                 show: {
@@ -232,6 +235,7 @@
                     duration: 500
                 },
                 open: function(event) {
+                    $(this).css('padding', '0px 0px 0px 0px');
                     $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary');
                 },
                 hide: {
@@ -316,13 +320,13 @@
                 function buildExpresionTip(title, desc, text){
                     return '<div><p style="font-size: 12px; font-weight: bold">' + title + '</p>' +
                             '<div>' + desc + '</div>' +
-                            '<pre  class="form-tip">' + text + '</pre></div>'
+                            '<pre  class="cron-plus-form-tip">' + text + '</pre></div>'
                 }
                 function initTooltip(selector, type){
                     var pos = { my: "right top", at: "right+90 bottom+5", of: selector, collision: "flipfit" };
                     selector.off("mouseenter").tooltip({
                         show: { effect: "fade" },
-                        tooltipClass: "expression-tip",
+                        tooltipClass: "cron-plus-expression-tip",
                         position: pos,
                         content: function () { return buildExpresionTip("Expression...", "Getting description...","") } ,
                         disabled: true
@@ -361,11 +365,11 @@
                                 var expressionType = $expressionType.val();
                                 var offset = $offset.val();
                                 let timeZone = $timeZone.val();
-                                var title_html = 'Description of <span class="cron-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
+                                var title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
                                 let e = { expressionType: expressionType };
                                 if (timeZone) e.timeZone = timeZone;
                                 if(expressionType == "sunset" || expressionType == "sunrise"){
-                                    title_html = '<b>' + expressionType + '</b> at <span class="cron-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
+                                    title_html = '<b>' + expressionType + '</b> at <span class="cron-plus-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
                                     if(offset != undefined && offset != null && offset != "0" && offset != 0){
                                         title_html += '<b>';
                                         if(offset > 0) title_html += ' +'
@@ -376,7 +380,7 @@
                                     e.offset = offset;
                                     e.location = expression;
                                 } else {
-                                    title_html = 'Description of <span class="cron-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
+                                    title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
                                     e.expression = expression;
                                 }
 
@@ -471,11 +475,11 @@
 
                 locationButton.on( "click", function() {
                     selectedLocationInput = $(this).closest("li").find(".node-input-option-location");
-                    $( "#mapDialog" ).dialog( "open" );
+                    $( "#cron-plus-map-dialog" ).dialog( "open" );
                     if(navigator.onLine === true){
-                        $(".map-not-loaded").show();
-                        $(".map-loading").hide();
-                        $("#map").hide();
+                        $(".cron-plus-map-not-loaded").show();
+                        $(".cron-plus-map-loading").hide();
+                        $("#cron-plus-map").hide();
                         let proto = location.protocol === 'https:' ? location.protocol : "http:"
                         checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css","css", function(){
                             checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js","js", function(){
@@ -491,9 +495,9 @@
                         */
 
                     } else {
-                        $(".map-not-loaded").show();
-                        $(".map-loading").hide();
-                        $("#map").hide();
+                        $(".cron-plus-map-not-loaded").show();
+                        $(".cron-plus-map-loading").hide();
+                        $("#cron-plus-map").hide();
                         return;
                     }                      
                 });
@@ -660,7 +664,7 @@
 
 <script type="text/html" data-template-name="cronplus">
     <style>
-        .expression-tip {
+        .cron-plus-expression-tip {
             background: #ffe;
             width: 100%;
             max-width: 475px;
@@ -669,7 +673,7 @@
             overflow:auto;
             font-size: 11px;
             } 
-        .form-tip {
+        .cron-plus-form-tip {
             background: #ffe;
             padding: 6px 6px;
             vertical-align: middle;
@@ -679,20 +683,20 @@
             overflow: auto;
             word-break: keep-all;
         }
-        .form-tip > div {
+        .cron-plus-form-tip > div {
             white-space: pre-wrap;
         }
-        span .form-tip {
+        span .cron-plus-form-tip {
             border-radius: 2px;
             border: 1px solid #ddd;
             border-radius: 4px;
             display: inline-block;
         }
-        .form-tip-spacer {
+        .cron-plus-form-tip-spacer {
             display: inline-block;
             width: 100px
         }
-        .cron-expression {
+        .cron-plus-expression {
             font-family: monospace;
             padding-left: 5px;
             padding-right: 5px;
@@ -704,20 +708,23 @@
             border-top: 1px solid #f0f0f0;
             border-bottom: 1px solid #f0f0f0
         }
-        #map {
+        #cron-plus-map {
             /* height: 300px; */
             /* width: 100%; */
             height: 100%;
             padding: 0;
             margin: 0;
         }
-        .map-not-loaded {
+        .cron-plus-map-dialog-content{
+            padding: 0px 0px 0px 0px;
+        }
+        .cron-plus-map-not-loaded {
             padding: 2px 10px 2px 10px;
         }
-        .map-loading {
+        .cron-plus-map-loading {
             padding: 2px 10px 2px 10px;
         }
-        .coordinates{
+        .cron-plus-coordinates{
             font-family: monospace;
             background: #ffe;
             padding-left: 5px;
@@ -727,8 +734,8 @@
     </style>
     
 
-    <div id="mapDialog" style="display: none;" title="Choose location...">
-        <div class="map-loading" >
+    <div id="cron-plus-map-dialog" style="display: none;" title="Choose location...">
+        <div class="cron-plus-map-loading" >
             <h3>Attempting to load map... <i class="fa fa-spinner fa-spin" style="font-size:24px"></i></h3>
             <p>The interactive Map is loaded via CDN at client side (to minimise installation size) and therefore requires an internet connection. Please wait 1 moment.</p>
             <h4>Alternative ways to get coordinates...</h4>
@@ -742,13 +749,13 @@
             </ul>
             <h4>Accepted formats...</h4> 
             <ul>
-                <li>Decimal Degrees E.g: <code class="coordinates">54.9992500,-1.4170300</code> or <code class="coordinates">54.9992500° N 1.4170300° W</code></li>
-                <li>Degrees Minutes Seconds E.g: <code class="coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
-                <li>Decimal Minutes E.g: <code class="coordinates">54° 59.955' , -1° 25.0218'</code></li>
-                <li>GPS E.g: <code class="coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="coordinates">54:59:57.3N 1:25:1.308W</code></li>
+                <li>Decimal Degrees E.g: <code class="cron-plus-coordinates">54.9992500,-1.4170300</code> or <code class="cron-plus-coordinates">54.9992500° N 1.4170300° W</code></li>
+                <li>Degrees Minutes Seconds E.g: <code class="cron-plus-coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
+                <li>Decimal Minutes E.g: <code class="cron-plus-coordinates">54° 59.955' , -1° 25.0218'</code></li>
+                <li>GPS E.g: <code class="cron-plus-coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="cron-plus-coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="cron-plus-coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="cron-plus-coordinates">54:59:57.3N 1:25:1.308W</code></li>
             </ul>    
         </div>
-        <div class="map-not-loaded"  style="display:hidden" >
+        <div class="cron-plus-map-not-loaded"  style="display:hidden" >
             <h3>No internet on this device?</h3>
             <p>The interactive Map is loaded via CDN at client side (to minimise installation size) and therefore requires an internet connection. As you are seeing this message, it is likely this device does not have access to the internet.</p>
             <h4>Alternative ways to get coordinates...</h4>
@@ -762,13 +769,13 @@
             </ul>
             <h4>Accepted formats...</h4>
             <ul>
-                <li>Decimal Degrees E.g: <code class="coordinates">54.9992500,-1.4170300</code> or <code class="coordinates">54.9992500° N 1.4170300° W</code></li>
-                <li>Degrees Minutes Seconds E.g: <code class="coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
-                <li>Decimal Minutes E.g: <code class="coordinates">54° 59.955' , -1° 25.0218'</code></li>
-                <li>GPS E.g: <code class="coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="coordinates">54:59:57.3N 1:25:1.308W</code></li>
+                <li>Decimal Degrees E.g: <code class="cron-plus-coordinates">54.9992500,-1.4170300</code> or <code class="cron-plus-coordinates">54.9992500° N 1.4170300° W</code></li>
+                <li>Degrees Minutes Seconds E.g: <code class="cron-plus-coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
+                <li>Decimal Minutes E.g: <code class="cron-plus-coordinates">54° 59.955' , -1° 25.0218'</code></li>
+                <li>GPS E.g: <code class="cron-plus-coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="cron-plus-coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="cron-plus-coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="cron-plus-coordinates">54:59:57.3N 1:25:1.308W</code></li>
             </ul>
         </div>
-        <div id="map"></div>
+        <div id="cron-plus-map"></div>
     </div>
 
 
@@ -848,10 +855,10 @@
             The location field is expected to contain longitude and latitude coordinates for the calculation of surise or sunset time.<br>
             Accepted formats...
             <ul>
-                <li>Decimal Degrees E.g: <code class="coordinates">54.9992500,-1.4170300</code> or <code class="coordinates">54.9992500° N 1.4170300° W</code></li>
-                <li>Degrees Minutes Seconds E.g: <code class="coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
-                <li>Decimal Minutes E.g: <code class="coordinates">54° 59.955' , -1° 25.0218'</code></li>
-                <li>GPS E.g: <code class="coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="coordinates">54:59:57.3N 1:25:1.308W</code></li>
+                <li>Decimal Degrees E.g: <code class="cron-plus-coordinates">54.9992500,-1.4170300</code> or <code class="cron-plus-coordinates">54.9992500° N 1.4170300° W</code></li>
+                <li>Degrees Minutes Seconds E.g: <code class="cron-plus-coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
+                <li>Decimal Minutes E.g: <code class="cron-plus-coordinates">54° 59.955' , -1° 25.0218'</code></li>
+                <li>GPS E.g: <code class="cron-plus-coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="cron-plus-coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="cron-plus-coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="cron-plus-coordinates">54:59:57.3N 1:25:1.308W</code></li>
             </ul>    
 
         </div>        
@@ -1072,9 +1079,9 @@
             <li>Adding a schedule with the same name as an existing schedule will replace the existing one</li>
             <li>Adding a schedule with property <code>"limit":3</code> will cause that schedule to be stopped after the third trigger. It can be started again by injecting a payload of <code>{"command":"start" "name": "schedule name"}</code></li>
             <li>UI added tasks can be also be updated by using the name specified in the UI</li>
-            <li>When a cron-plus node is modified and deployed (or node-red is restarted), dynamic entries are discarded & must be injected again</li>
-            <li>When a cron-plus node outputs a msg in response to a command, <code>msg.commandResponse</code> will be <code>true</code> to indicate the message is in response to a command and not a scheduled event</li>
-            <li>When a cron-plus node outputs a msg for a cron/sunrise/sunset scheduled event, <code>msg.scheduledEvent</code> will be <code>true</code> to indicate the message is due to a scheduled event and not a control response</li>
+            <li>When a cron-plus-plus node is modified and deployed (or node-red is restarted), dynamic entries are discarded & must be injected again</li>
+            <li>When a cron-plus-plus node outputs a msg in response to a command, <code>msg.commandResponse</code> will be <code>true</code> to indicate the message is in response to a command and not a scheduled event</li>
+            <li>When a cron-plus-plus node outputs a msg for a cron/sunrise/sunset scheduled event, <code>msg.scheduledEvent</code> will be <code>true</code> to indicate the message is due to a scheduled event and not a control response</li>
         </ul>
         </dd>
     </dl>
