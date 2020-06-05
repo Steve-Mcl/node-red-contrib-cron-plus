@@ -66,6 +66,14 @@ copies or substantial portions of the Software.
         }
         return value;
     }
+    function showCronHelp(){
+        RED.sidebar.show("info"); 
+        $("#cron-plus-cron-format-info").get(0).scrollIntoView();
+    }
+    function showSolarHelp(){
+        RED.sidebar.show("info"); 
+        $("#cron-plus-solar-events-info").get(0).scrollIntoView();
+    }
     function createMap(srcInput) {
         $(".cron-plus-map-loading").hide();
         if(!window.L || navigator.onLine === false){
@@ -182,12 +190,269 @@ copies or substantial portions of the Software.
         } 
     }
 
+    function JSONtoTable(data, header, placeholder, options) {
+        console.log("JSONtoTable")
+        options = options || {};
+        if(!data || !data.length){
+            $('<div class="ui-dialog-title"/>' + (options.emptyMessage || 'no data') + '<div>').appendTo(placeholder);
+            return;
+        }
+        var table = $('<table/>');
+        if(options.width) table.width(options.width);
+        if(options.height) table.width(options.height);
+        if(options.class) table.addClass(options.class);
+        
+        //TH Loop
+        var rows = '<tr>';
+        $.each(header, function (header_key, header_value) {
+            rows += '<th>' + header_value.header + '</th>';
+        });
+        rows += '</tr>';
+        //TR loop
+        $.each(data, function (key, value) {
+            rows += '<tr>';
+            //TD loop
+            $.each(header, function (item_key, header_value) {
+                rows += '<td>' + value[header_value.key] + '</td>';
+            });
+            rows += '</tr>';
+        });
+ 
+        table.append(rows);
+        $(placeholder).append(table);
+    }
+
+    $.widget("custom.combobox", {
+        _create: function () {
+            var that = this;
+            this.input = this.element;
+            this.input.addClass("red-ui-typedInput-input");
+            this.elementDiv = this.input.wrap("<div>").parent().addClass('red-ui-typedInput-input-wrap');
+            this.uiSelect = this.elementDiv.wrap( "<div>" ).parent();
+            var attrStyle = this.element.attr('style');            
+            this.uiWidth = this.input.outerWidth();            
+            this.input.css("paddingLeft",5);
+            
+            var m;
+            if ((m = /width\s*:\s*(calc\s*\(.*\)|\d+(%|px))/i.exec(attrStyle)) !== null) {
+                this.input.css('width','calc(100% - 4px)');
+                this.uiSelect.width(m[1]);
+                this.uiWidth = null;
+            } else {
+                this.uiSelect.width(this.uiWidth);
+            }
+
+            ["Right","Left"].forEach(function(d) {
+                var m = that.element.css("margin"+d);
+                that.uiSelect.css("margin"+d,m);
+                that.input.css("margin"+d,1);
+            });
+
+            this.uiSelect.addClass("red-ui-typedInput-container");
+
+            // this.input.on('focus', function() {
+            //     that.uiSelect.addClass('red-ui-typedInput-focus');
+            // });
+            // this.input.on('blur', function() {
+            //     that.uiSelect.removeClass('red-ui-typedInput-focus');
+            // });
+            this.input.on('change', function() {
+                that.validate();
+            })
+
+            this.button = $('<button tabindex="0" class="red-ui-typedInput-option-trigger" style="display:inline-block"><span class="red-ui-typedInput-option-caret"><i class="red-ui-typedInput-icon fa fa-caret-down"></i></span></button>').appendTo(this.uiSelect);
+            this.buttonLabel = $('<span class="red-ui-typedInput-option-label"></span>').prependTo(this.button);
+            this.button.on("click", function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                that._showDropdownMenu();
+            }).on('keydown', function(evt) {
+                if (evt.keyCode === 40 /*down*/) {
+                    that._showDropdownMenu();
+                }
+                evt.stopPropagation();
+            }).on('blur', function() {
+                that.uiSelect.removeClass('red-ui-typedInput-focus');
+            }).on('focus', function() {
+                that.uiSelect.addClass('red-ui-typedInput-focus');
+            });
+            this.menu = this._createMenu(this.options.menu);
+        },
+        _createMenu: function(options) {
+            console.log("combobox -> _createMenu  options:", options)
+            var that = this;
+            this.disarmClick = false;
+            options = options || {};
+            var menu = $("<div>").addClass("red-ui-typedInput-options red-ui-editor-dialog");
+            var callback = options.callback;
+            var menuItems = options.menu || [];
+            menuItems.forEach(function(opt) {
+                if (typeof opt === 'string') {
+                    opt = {value:opt,label:opt};
+                }
+                var op = $('<a href="#"></a>').attr("value",opt.value).appendTo(menu);
+                if (opt.label) {
+                    op.text(opt.label);
+                }
+                if (opt.title) {
+                    op.prop('title', opt.title)
+                }
+                if (opt.icon) {
+                    if (opt.icon.indexOf("<") === 0) {
+                        $(opt.icon).prependTo(op);
+                    } else if (opt.icon.indexOf("/") !== -1) {
+                        $('<img>',{src:mapDeprecatedIcon(opt.icon),style:"margin-right: 4px; height: 18px;"}).prependTo(op);
+                    } else {
+                        $('<i>',{class:"red-ui-typedInput-icon "+opt.icon}).prependTo(op);
+                    }
+                } else {
+                    op.css({paddingLeft: "18px"});
+                }
+                if (!opt.icon && !opt.label) {
+                    op.text(opt.value);
+                }
+
+                op.on("click", function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if(callback){
+                        that.value(callback(opt.value));
+                    } else {
+                        that.value(opt.value)
+                    }
+                    that._hideMenu(menu);
+                });
+            });
+            menu.css({ display: "none" });
+            menu.appendTo(document.body);
+
+            menu.on('keydown', function(evt) {
+                if (evt.keyCode === 40/*down*/) {
+                    evt.preventDefault();
+                    $(this).children(":focus").next().trigger("focus");
+                } else if (evt.keyCode === 38/*up*/) {
+                    evt.preventDefault();
+                    $(this).children(":focus").prev().trigger("focus");
+                } else if (evt.keyCode === 27/*escape*/) {
+                    evt.preventDefault();
+                    that._hideMenu(menu);
+                }
+                evt.stopPropagation();
+            })
+            return menu;
+
+        },
+        _showDropdownMenu: function() {
+            if (this.menu) {
+                this.menu.css({
+                    minWidth:this.buttonLabel.width()
+                });
+                this._showMenu(this.menu,this.button);
+            }
+        },
+        _hideMenu: function(menu) {
+            $(document).off("mousedown.red-ui-typedInput-close-property-select");
+            menu.hide();
+            menu.css({
+                height: "auto"
+            });
+            this.input.trigger("focus");
+            //this.button.trigger("focus");
+
+        },
+        _showMenu: function(menu,relativeTo) {
+            if (this.disarmClick) {
+                this.disarmClick = false;
+                return
+            }
+            var that = this;
+            //var pos = relativeTo.offset();
+            //var height = relativeTo.height();
+            var pos = this.uiSelect.offset();
+            var height = this.uiSelect.height();
+            var menuHeight = menu.height();
+            var menuWidth = menu.width();
+            var top = (height+pos.top);
+            var left = pos.left;
+            if (left+menuWidth > $(window).width()) {
+                left -= (left+menuWidth)-$(window).width()+5;
+            }
+            if (top+menuHeight > $(window).height()) {
+                top -= (top+menuHeight)-$(window).height()+5;
+            }
+            if (top < 0) {
+                menu.height(menuHeight+top)
+                top = 0;
+            }
+            menu.css({
+                top: top+"px",
+                left: (left)+"px",
+            });
+            menu.slideDown(100);
+            this._delay(function() {
+                that.uiSelect.addClass('red-ui-typedInput-focus');
+                $(document).on("mousedown.red-ui-typedInput-close-property-select", function(event) {
+                    if(!$(event.target).closest(menu).length) {
+                        that._hideMenu(menu);
+                    }
+                    if ($(event.target).closest(relativeTo).length) {
+                        that.disarmClick = true;
+                        event.preventDefault();
+                    }
+                })
+            });
+        },
+        _destroy: function () {
+            if (this.menu) {
+                this.menu.remove();
+            }
+            this.button.remove();
+            this.element.unwrap();
+            this.element.unwrap();
+            this.input.removeClass("red-ui-typedInput-input");
+        },
+        value: function(value) {
+            var that = this;
+            if (!arguments.length) {
+                return that.input.val();
+            } else {
+                that.input.val(value);
+                that.validate();
+            }
+        },
+        validate: function() {
+            var result;
+            var value = this.value();
+            var val = this.options.validate;// || this.validate;
+            if (!val || typeof val !== 'function') {
+                result = true;
+            }  else {
+                result = val(value);
+            }
+            if (result) {
+                this.uiSelect.removeClass('input-error');
+            } else {
+                this.uiSelect.addClass('input-error');
+            }
+            return result;
+        },
+        show: function() {
+            this.uiSelect.show();
+        },
+        hide: function() {
+            this.uiSelect.hide();
+        }
+    });
+
+
+    // checkloadjscssfile("https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.js","js")
+
     RED.nodes.registerType('cronplus', {
         category: "input",
         icon: "timer.png",
         color: "#a6bbcf",
         inputs: 1,
-        outputs: 2,
+        outputs: 1,
         outputLabels: ["Output","Command Responses"],
         defaults: {
             name: { value: "" },
@@ -207,8 +472,12 @@ copies or substantial portions of the Software.
                                 if (!value[i].expression) {
                                     return false;
                                 }
-                            } else if(value[i].expressionType === "sunrise" || value[i].expressionType === "sunset") {
-                                if (!value[i].location) {
+                            } else if(value[i].expressionType === "solar" ) {
+                                if (value[i].solarType != "all" && value[i].solarType != "selected") {
+                                    console.warn("solarType is not 'all' or 'selected'")
+                                    return false;
+                                }
+                                if (value[i].solarType == "selected" && !value[i].solarEvents) {
                                     return false;
                                 }
                             }
@@ -223,6 +492,11 @@ copies or substantial portions of the Software.
             return this.name || "CRON+"
         },
         oneditprepare: function () {
+            var node = this;
+            node.commandResponseMsgOutput = node.commandResponseMsgOutput == "output2" ? "output2" : "output1";
+            node.outputs = node.commandResponseMsgOutput == "output2" ? 2 : 1;
+            $( "#node-input-commandResponseMsgOutput" ).val(node.commandResponseMsgOutput);
+
             $( "#cron-plus-map-dialog" ).dialog({
                 classes: {
                     "ui-dialog-content": "cron-plus-map-dialog-content"
@@ -263,18 +537,98 @@ copies or substantial portions of the Software.
                 }
             });
 
+            function drawDynamicSchedulesTable(nodeId, table, spinner, callback){
+                var $table = $( table );                           
+                var $spinner = $( spinner );                 
+                $table.hide();
+                $spinner.show();
+                $table.empty();
+                $.ajax({
+                    url: "cronplus/" + nodeId + "/getDynamic",
+                    // url: 'cronplus/tz',
+                    type: 'POST',
+                    datatype: 'json'
+                })
+                .done(function (response) {
+                    console.log("cronplus/" + nodeId + "/getDynamic => response:",response)
+                    var titles = [
+                        {"key":"item", "header":"Item"},
+                        {"key":"name", "header":"Name"},
+                        {"key":"topic", "header":"Topic"},
+                        {"key":"expressionType", "header":"Schedule Type"},
+                        {"key":"type", "header":"Payload Type"},
+                        {"key":"payload", "header":"Payload"},
+                        {"key":"details", "header":"Details"},
+                    ]          
+                    var tableData = response.map(function(e,i){
+                        e.item = i+1;
+                        if(e.type == "default") e.payload = "";
+                        e.details = "";
+                        if(e.expressionType == "solar"){
+                            if(e.solarType == "all") e.details += 'solarType:"' + e.solarType + '"<br>';
+                            if(e.solarType == "selected") e.details += 'solarEvents:"' + e.solarEvents + '"<br>';
+                            e.details += 'location:"' + e.location + '"<br>';
+                            e.details += 'offset:"' + e.offset + '"<br>';
+                        } else {
+                            e.details += 'expression:"' + e.expression + '"';
+                        }
+                        return e;
+                    });       
+                    JSONtoTable(tableData, titles, $table, { class:"cron-plus-table", width: "100%", emptyMessage: "No dynamic schedules!" });    
+                    $table.show();
+                    $spinner.hide();
+                    if(callback) callback();
+                })
+                .fail(function (jqXHR, textStatus, errorThrown) { 
+                    if(callback) callback(errorThrown); 
+                    console.error(jqXHR,textStatus,errorThrown);
+                });
+            }
+            
+            $( "#cron-plus-dynamic-nodes-dialog" ).dialog({
+                autoOpen: false,
+                height: Math.min(600, ($(document).height() < 600) ? 400 : $(document).height() - 200),
+                width: Math.min(1000, ($(document).width() < 800) ? 600 : $(document).width() -200),
+                modal: true,
+                buttons: {
+                    "Refresh": function() {
+                        var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id;
+                        drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader");
+                    },
+                    "Close": function(){
+                        $( "#cron-plus-dynamic-nodes-dialog" ).dialog( "close" );
+                    }
+                },
+                show: {
+                    effect: "fade",
+                    duration: 250
+                },
+                open: function(event) {
+                    $(this).css('padding', '0px 0px 0px 0px');
+                    $('.ui-dialog-buttonpane').find('button:contains("Close")').addClass('primary');
+                    var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id;
+                    drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader");
+                },
+                hide: {
+                    effect: "fade",
+                    duration: 250
+                }
+            });
 
-            var node = this;
-            $( "#node-input-timeZone" ).autocomplete({
-                source: function( request, response ) {
-                    var matcher = new RegExp( $.ui.autocomplete.escapeRegex(request.term), "i" );
-                    $.ajax({
-                        url: 'cronplustz',
-                        type: 'POST',
-                        datatype: 'json'
-                    })
-                    .done(function (data) { 
-                        response($.map(data, function(item){
+            $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id = node.id;
+            var tzData;
+            $.ajax({
+                url: "cronplus/0/tz",
+                // url: 'cronplus/tz',
+                type: 'POST',
+                datatype: 'json'
+            })
+            .done(function (data) { 
+                tzData = data;
+                $( "#node-input-timeZone" ).autocomplete({
+                    source: function( request, response ) {
+                        var matcher = new RegExp( $.ui.autocomplete.escapeRegex(request.term), "i" );
+                        response($.map(tzData, function(item){
                             if(item && item.tz){
                                 var label = (item.code ? item.code + ", " : "") + item.tz + " (UTC: " + item.UTCOffset + ", DST: " + item.UTCDSTOffset + ")";
                                 if ( label && ( !request.term || matcher.test(label) ) ) {
@@ -285,27 +639,30 @@ copies or substantial portions of the Software.
                                 }
                             }
                         }));
-                    })
-                    .fail(function (jqXHR, textStatus, errorThrown) { 
-                        console.error(jqXHR,textStatus,errorThrown)
-                    });
-                },
-                minLength: 2,
-                open: function() {
-                    $( this ).removeClass( "ui-corner-all" ).addClass( "ui-corner-top" );
-                },
-                close: function() {
-                    $( this ).removeClass( "ui-corner-top" ).addClass( "ui-corner-all" );
-                },
-                focus: function (event, ui) {
-                    event.preventDefault();
-                    $("#node-input-timeZone").val(ui.item.label);
-                },
-                select: function (event, ui) {
-                    event.preventDefault();
-                    this.value = ui.item.value.tz;
-                }
+                    },
+                    minLength: 1,
+                    open: function() {
+                        $( this ).removeClass( "ui-corner-all" ).addClass( "ui-corner-top" );
+                    },
+                    close: function() {
+                        $( this ).removeClass( "ui-corner-top" ).addClass( "ui-corner-all" );
+                    },
+                    focus: function (event, ui) {
+                        event.preventDefault();
+                        $("#node-input-timeZone").val(ui.item.label);
+                    },
+                    select: function (event, ui) {
+                        event.preventDefault();
+                        this.value = ui.item.value.tz;
+                    }
+                });
+                        
+            })
+            .fail(function (jqXHR, textStatus, errorThrown) { 
+                console.error(jqXHR,textStatus,errorThrown)
             });
+
+                
 
             var formatDateTimeWithTZ = function (date, tz) {
                 if (!date) {
@@ -330,20 +687,90 @@ copies or substantial portions of the Software.
                 }
                 return datestring;
             }
-           
-            function generateOption(i, option) {
-                function buildExpresionTip(title, desc, text){
-                    return '<div><p style="font-size: 12px; font-weight: bold">' + title + '</p>' +
-                            '<div>' + desc + '</div>' +
+            var makeSolarChoice = function(value, label, tooltip){
+                return { 
+                    label: label, 
+                    value: value || label, 
+                    title: tooltip,
+                    multiple: true
+                }
+            }
+        
+            var solarChoices = [
+                makeSolarChoice("nightEnd", "night end / astronomical dawn", "night ends, astronomical twilight starts (-18°)"), //needed? same as astronomicalDawn
+                // makeSolarChoice("astronomicalDawn", "astronomical dawn", "night ends, astronomical twilight starts (-18°)"), 
+                makeSolarChoice("nauticalDawn", "nautical dawn", "astronomical twilight ends, nautical twilight starts (-12°)"),
+                makeSolarChoice("civilDawn", "civil dawn / golden hour", "nautical twilight ends, civil twilight and golden hour starts (-6°)"),
+                // makeSolarChoice("morningGoldenHourStart", "golden hour starts", "when the sun is 6 degrees below the horizon (-6°)"), //needed? same as civilDawn
+                makeSolarChoice("sunrise", "sunrise", "top edge of the sun appears on the horizon (-0.833°)"),
+                makeSolarChoice("sunriseEnd", "sunrise end", "bottom edge of the sun touches the horizon (-0.3°)"),
+                makeSolarChoice("morningGoldenHourEnd", "morning golden hour ends", "when the sun is 6 degrees above the horizon (6°)"),
+                makeSolarChoice("solarNoon", "solar noon", "sun is at its highest position"),
+                makeSolarChoice("eveningGoldenHourStart", "evening golden hour start","when the sun is 6 degrees above the horizon (6°)"),
+                makeSolarChoice("sunsetStart", "sunset start", "bottom edge of the sun touches the horizon (-0.3°)"),
+                makeSolarChoice("sunset", "sunset", "civil twilight starts, sun disappears below the horizon (0.833°)"),
+                // makeSolarChoice("eveningGoldenHourEnd", "evening golden hour end","golden hour ends (-6°)"), //needed? same as civilDusk
+                makeSolarChoice("civilDusk", "civil dusk / golden hour end", "civil twilight and golden hour ends, nautical twilight starts (-6°)"),
+                makeSolarChoice("nauticalDusk", "nautical dusk", "nautical twilight ends, astronomical twilight starts (-12°)"),
+                // makeSolarChoice("astronomicalDusk", "astronomical dusk", "astronomical twilight ends, night starts (-18°)"),
+                makeSolarChoice("nightStart", "astronomical dusk / night start", "astronomical twilight ends, night starts (-18°)"),  //needed? same as astronomicalDusk              
+                makeSolarChoice("nadir", "solar midnight", "when the sun is closest to nadir and the night is equidistant from dusk and dawn"),
+            ];
+                
+            /** 
+             * Apply defaults to the cron schedule object
+             * @param {integer} optionIndex An index number to use for defaults
+             * @param {object} option The option object to update
+            */         
+            function applyOptionDefaults(optionIndex, option) {
+                if(option.expressionType == ""){
+                    option.expressionType = "cron";//if empty, default to cron
+                } else if (["cron","solar"].indexOf(option.expressionType) < 0){
+                    //if expressionType is not cron or solar - it may be sunrise or sunset
+                    if(option.expressionType == "sunrise"){
+                        option.solarEvents = option.solarEvents || "sunrise";
+                        option.expressionType = "solar";
+                    } else if(option.expressionType == "sunset"){
+                        option.solarEvents = option.solarEvents || "sunset";
+                        option.expressionType = "solar";
+                    } else {
+                        option.expressionType = "cron";
+                    }   
+                }
+                option.name = option.name || "schedule" + (optionIndex+1);
+                option.topic = option.topic || option.name;
+                if (!option.expression) option.expression = "0 * * * * * *"
+                if (!option.solarType) option.solarType =  option.solarEvents ? "selected" : "all";
+                if (!option.solarEvents) option.solarEvents = "sunrise,sunset";
+                if (!option.location) option.location = "";
+            }
+
+            /** 
+             * Generate an option row on the UI
+             * @param {integer} optionIndex the index number of this schedule
+             * @param {object} option The option object to present
+            */             
+            function generateOption(optionIndex, option) {
+                applyOptionDefaults(optionIndex, option);
+                function buildExpressionTip(title, desc, text, type){
+                    var helpFuncHtml = '';
+                    if(type === "" || type === "cron" || type === "solar" ){
+                        var helpFunc = type == "solar" ? "showSolarHelp" : "showCronHelp";
+                        helpFuncHtml = '<span style="float: right"><button class="cron-plus-info-button" click="'+helpFunc+'();">help <i class="fa fa-external-link"></i></button></span>';
+                    }
+                    return '<div style="min-height:190px"><span style="font-size: 12px; font-weight: bold">' + title + '</span>' + helpFuncHtml +
+                            '<hr><div>' + desc + '</div>' +
                             '<pre  class="cron-plus-form-tip">' + text + '</pre></div>'
                 }
-                function initTooltip(selector, type){
-                    var pos = { my: "right top", at: "right+90 bottom+5", of: selector, collision: "flipfit" };
+                function initTooltip(selector, type, pos){                    
                     selector.off("mouseenter").tooltip({
                         show: { effect: "fade" },
                         tooltipClass: "cron-plus-expression-tip",
                         position: pos,
-                        content: function () { return buildExpresionTip("Expression...", "Getting description...","") } ,
+                        content: function () { 
+                            debugger
+                            return buildExpressionTip("Expression...", "Getting description...","",type) 
+                        } ,
                         disabled: true
                     }).off('focusout').off('mouseleave').mouseleave(function(e){
                         console.log("initTooltip--mouseleave")
@@ -351,11 +778,23 @@ copies or substantial portions of the Software.
                             console.log("initTooltip--mouseleave selector:is(':focus')")
                             e.preventDefault();
                             e.stopImmediatePropagation();
-                            selector.tooltip('open');
+                            //selector.tooltip('open');
                             return false;
                         }
-                    }).on("blur", function () {
-                        console.log("initTooltip-->on-blur")
+                    }).on("blur", function (e) {
+                        console.log("initTooltip-->on-blur.  relatedTarget:", e.relatedTarget)
+                        if(e.relatedTarget && e.relatedTarget.className == "cron-plus-info-button"){
+                            console.log('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-info-button"');
+                            if(type == "cron")
+                                showCronHelp();
+                            else if(type == "solar")
+                                showSolarHelp();
+                            $(this).focus();
+                            // e.preventDefault();
+                            // e.stopImmediatePropagation();
+                            // //selector.tooltip('open');
+                            return false;
+                        }
                         $(this).tooltip("close").tooltip("disable");
                     }).on("focusin change keyup", function (e) {
                         console.log("initTooltip--focusin change keyup",e )
@@ -364,10 +803,12 @@ copies or substantial portions of the Software.
                         let $timeZone = $("#node-input-timeZone");
                         var $expressionType = $this.closest("li").find(".node-input-option-expressionType");
                         var $offset = $this.closest("li").find(".node-input-option-offset");
+                        var $solarEvents = $this.closest("li").find(".node-input-option-solarEvents");
                         if(!expression){
                             $this.tooltip("close").tooltip("disable");
                             return;
                         }
+                        
                         $this.tooltip("option", "position", pos);
                         $this.tooltip("enable").tooltip("open");
                         $this.tooltip({ 
@@ -377,14 +818,16 @@ copies or substantial portions of the Software.
                             content: function (callback) {
                                 console.log("initTooltip-->content")
                                 expression = $this.val();
+                                var solarType = $solarEvents.typedInput("type");
+                                var solarEvents = $solarEvents.typedInput("value");
                                 var expressionType = $expressionType.val();
                                 var offset = $offset.val();
                                 let timeZone = $timeZone.val();
                                 var title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
                                 let e = { expressionType: expressionType };
                                 if (timeZone) e.timeZone = timeZone;
-                                if(expressionType == "sunset" || expressionType == "sunrise"){
-                                    title_html = '<b>' + expressionType + '</b> at <span class="cron-plus-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
+                                if (expressionType == "solar"){
+                                    title_html = '<b>solar events</b> at <span class="cron-plus-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
                                     if(offset != undefined && offset != null && offset != "0" && offset != 0){
                                         title_html += '<b>';
                                         if(offset > 0) title_html += ' +'
@@ -394,34 +837,41 @@ copies or substantial portions of the Software.
                                     }
                                     e.offset = offset;
                                     e.location = expression;
+                                    e.solarType = solarType;
+                                    e.solarEvents = solarEvents;
                                 } else {
                                     title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
                                     e.expression = expression;
                                 }
 
                                 $.ajax({
-                                    url: 'cronplus',
+                                    url: "cronplus/0/expressionTip",
+                                    // url: 'cronplus',
                                     type: 'POST',
                                     data: e,
                                     datatype: 'json'
                                 })
                                 .done(function (data) {
+                                    
                                     console.log("initTooltip-->Ajax done, data...",data)
                                     let nextInfo = "";
                                     let desc = data.description;
                                     if (data.prettyNext) {
-                                        nextInfo = "Next run...\n- " + data.prettyNext;
+                                        nextInfo = "Next event: " + data.prettyNext;
                                         if (data.nextDates && data.nextDates.length) {
-                                            let map1;
-                                            if (timeZone) {
-                                                map1 = data.nextDates.map(function(x) {
-                                                    let fd = formatDateTimeWithTZ(x, timeZone);
-                                                    return fd ? fd : undefined;
-                                                });
-                                            } else {
-                                                map1 = data.nextDates.map(function(x) {return (new Date(x)).toString()});
+                                            nextInfo = nextInfo + " then..."
+                                            var makeTR = function(x){
+                                                var v = x, s = '<i class="fa fa-clock-o"></i>';
+                                                if(typeof x === "object" && x.timeOffset){
+                                                    v = x.timeOffset;
+                                                    s = x.event || "unknown";
+                                                }
+                                                let fd = formatDateTimeWithTZ(v, timeZone);
+                                                v = fd ? fd : undefined;
+                                                return "<tr><td>" + s + "</td><td>" + v + "</td></tr>"
                                             }
-                                            nextInfo += "\n- at " + map1.join("\n- at ");
+                                            var map1 = data.nextDates.map(makeTR);
+                                            nextInfo += "<table class=>" + map1.join("\n") + "</table>"; 
                                         }
                                     }
                                     var okcontent = function(){
@@ -429,14 +879,16 @@ copies or substantial portions of the Software.
                                             console.log("initTooltip-->callback-->setTimeout--> option-->position");
                                             $this.tooltip("option", "position", pos);
                                             $this.tooltip("enable").tooltip("open");
-                                        },100)
-                                        return buildExpresionTip(title_html, desc, nextInfo);
+                                            $this.tooltip("option", "position", pos);
+                                        },200)
+                                        return buildExpressionTip(title_html, desc, nextInfo, expressionType);
                                     } 
                                     callback(okcontent);
+                                    $this.tooltip("option", "position", pos);
                                 })
                                 .fail(function (jqXHR, textStatus, errorThrown) {
                                     console.error(jqXHR, textStatus, errorThrown)
-                                    var errcontent = buildExpresionTip("Error...", "Cannot get description from node-red","");
+                                    var errcontent = buildExpressionTip("Error...", "Cannot get description from node-red","", expressionType);
                                     callback(errcontent);
                                 });
                             } 
@@ -444,38 +896,120 @@ copies or substantial portions of the Software.
                     });
                 }
                 
-                var container = $('<li/>',{style:"background: #fff; margin:0; padding:8px 0px 0px; border-bottom: 1px solid #ccc;"});
+                
+                var container, nameField, topicField, payloadField;
+                var expressionTypeField, expressionField, solarEventsField, locationGroup, offsetField
+                //build options row
+                container = $('<li/>',{style:"background: #fff; margin:0; padding:5px 0px 0px; border-bottom: 1px solid #ccc;"});
                 var row = $('<div/>').appendTo(container);
-                var row2 = $('<div/>',{style:"padding-top:5px; padding-left:175px;"}).appendTo(container);
+                var rowM = $('<div/>',{style:"padding-top:5px; padding-left:120px;"}).appendTo(container);
+                var row2 = $('<div/>').appendTo(container);
                 var row3 = $('<div/>',{style:"padding-top:5px; padding-left:120px;"}).appendTo(container);
                 
                 var div = row.append( '<div/>' )
 
                 var span = $('<span/>',{style:"float:right; margin-right:5px;"}).appendTo(div);
-                var deleteButton = $('<a/>',{href:"#",class:"editor-button editor-button-small", style:"margin-top:7px; margin-left:5px;"}).appendTo(span);
+                var deleteButton = $('<a/>',{href:"#",class:"editor-button editor-button-small", style:"margin-top:27px; margin-left:5px;"}).appendTo(span);
                 $('<i/>',{class:"fa fa-remove"}).appendTo(deleteButton);
+
+
+                //generate the name field
+                var nameClass ="node-input-option-name" + ((!option.name) ? " input-error" : "");
+                nameField = $('<input/>',{class:nameClass,type:"text",style:"margin-left:0px; width:calc(25% - 16px);", placeholder: 'name', title: "name", value:option.name}).appendTo(div);
+
+                //generate the topic field
+                var topicClass ="node-input-option-topic" + ((!option.topic) ? " input-error" : "");
+                topicField = $('<input/>',{class:topicClass,type:"text",style:"margin-left:5px; width:calc(32% - 16px);", placeholder: 'topic', title: "topic", value:option.topic}).appendTo(div);
+                
+                //generate the payload field
+                payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:5px; width:calc(43% - 25px);", placeholder: 'payload', value:option.payload || ""}).appendTo(div);
+                payloadField.typedInput({default:option.type||'default',types:[{
+                                    icon: "fa fa-envelope",
+                                    value:"default",
+                                    label:"Default Payload",
+                                    hasValue: false 
+                                },'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']});
 
                 //generate a dropdown for trigger type
                 var expressionType = option.expressionType || "cron";
-                var expressionTypeField = $('<select/>',{class:"node-input-option-expressionType",type:"text",placeholder:"cron"}).css({"width":"15%","margin-left":"5px","margin-right":"5px"}).appendTo(div);
+                expressionTypeField = $('<select/>',{class:"node-input-option-expressionType",type:"text",placeholder:"cron"}).css({"width":"calc(25% - 16px)","margin-right":"5px"}).appendTo(row2);
                 $('<option />', {value: "cron", text: "cron"}).appendTo(expressionTypeField);
-                $('<option />', {value: "sunrise", text: "sunrise"}).appendTo(expressionTypeField);
-                $('<option />', {value: "sunset", text: "sunset"}).appendTo(expressionTypeField);
+                $('<option />', {value: "solar", text: "solar events"}).appendTo(expressionTypeField);
                 expressionTypeField.val(expressionType);
                 expressionTypeField.prop("title", "Expression Type");   
 
-                //generate the name/topic field
-                var topicClass ="node-input-option-topic" + ((!option.topic) ? " input-error" : "");
-                var topicField = $('<input/>',{class:topicClass,type:"text",style:"margin-left:5px; width:calc(15% - 16px);", placeholder: 'name',value:option.topic}).appendTo(div);
+
+                //generate a combo for cron expression
+                var expression = option.expression == null ? "0 * * * * * *" : option.expression;
+                var expressionClass = "node-input-option-expression" + ((!expression) ? " input-error" : "");
+                var expressionMenuData = [
+                        { label: "Every Second (* * * * * *)", value: "* * * * * *" },
+                        { label: "Every minute (0 * * * * *)", value: "0 * * * * *" },
+                        { label: "Every 10 minutes (0 */10 * * * *)", value: "0 */10 * * * *" },
+                        { label: "Every 20 minutes, at 9:00 AM and 5:00 PM (0 */20 9,17 * * *)", value: "0 */20 9,17 * * *" },
+                        { label: "At 15, 30, and 45 minutes past the hour (0 15,30,45 * * * *)", value: "0 15,30,45 * * * *" },
+                        { label: "Every day at noon - 12pm (0 0 12 * * *)", value: "0 0 12 * * *" },
+                        { label: "At 02:00 AM, on day 29 of February (leap years) (0 0 2 29 FEB * 2020/4)", value: "0 0 2 29 FEB * 2020/4" },
+                        { label: "At 07:00 AM, on the first Monday of the month (0 0 7 * * MON#1 *)", value: "0 0 7 * * MON#1 *" },
+                        { label: "Every day at noon in January, March and December (0 0 12 * JAN,MAR,DEC *)", value: "0 0 12 * JAN,MAR,DEC *" },
+                        { label: "Every minute, on the first weekday of the month (* * 1W * *)", value: "* * 1W * *" },
+                        { label: "Every minute, on the third Tuesday of the month (* * * * Tue#3)", value: "* * * * Tue#3" },
+                        { label: "At 12:00 PM, on the last Monday of the month</option (0 12 * * MONL)", value: "0 12 * * MONL" },
+                    ]
+
+                expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:0px; width:calc(75% - 36px);", placeholder: '* * * * * * *', list: "cron-expression-example-list",title:"cron expression", value:option.expression}).appendTo(row2);
+                expressionField.appendTo(row2);
                 
-                //generate the payload field
-                var payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:7px; width:calc(28% - 16px);", placeholder: 'payload', value:option.payload || ""}).appendTo(div);
-                payloadField.typedInput({default:option.type||'str',types:['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']});
+                expressionField.combobox({
+                    menu: {
+                        menu: expressionMenuData,
+                        options: {},
+                        // callback: function(e){
+                        //     console.log("expressionField.combobox callback",e)
+                        // }
+                    },
+                    validate: function(value){
+                        return (!!value) && value.length >= 9 ;//better validation required?
+                    }
+                })
+                
+                //debugger
+                expressionField.combobox("instance").button.prop("title", "Expression examples...");
+                expressionField.combobox("value", option.expression || "");
+                
+
+                //generate the solar events field
+                solarEventsField = $('<input/>',{class:"node-input-option-solarEvents",type:"text",style:"margin-left:0px; width:calc(32% - 16px);", placeholder: 'select solar events', value: option.solarEvents || ""}).appendTo(row2);
+                solarEventsField.typedInput({
+                    default:"all",
+                    types: [                    
+                        {
+                            value:"selected",
+                            label:"Selected Solar Events", 
+                            title: "Selected Solar Events", 
+                            icon:"fa fa-list",
+                            showLabel:false,
+                            multiple:true,
+                            options:solarChoices,
+                            default: ["sunrise","sunset"]
+                        },
+                        {
+                            value:"all",
+                            label:"All Solar Events",
+                            title: "All Solar Events",
+                            icon: "fa fa-sun-o",
+                            hasValue: false,
+                            showLabel:true 
+                        }
+                    ]
+                })
+                solarEventsField.typedInput("type", option.solarType || "all");
+                solarEventsField.typedInput("value", option.solarEvents || "");//added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
 
                 //generate location 
-                var locationGroup = $('<div class="red-ui-typedInput-container" style="margin-left:7px; width: calc(25% - 16px);">' +
-                        '<button class="red-ui-typedInput-type-select" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
-                        '<div class="red-ui-typedInput-input-wrap" style="left: 22px; right: 0px;">' +
+                locationGroup = $('<div class="red-ui-typedInput-container" style="margin-left:5px; width: calc(28% - 16px);">' +
+                        '<button class="red-ui-typedInput-type-select" style="width:25px" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
+                        '<div class="red-ui-typedInput-input-wrap" style="left: 25px; right: 0px;">' +
                         '<input class="red-ui-typedInput-input node-input-option-location" type="text" value="" placeholder="lat lng"></div> </div>');                
                 var locationField = locationGroup.find("input");
                 var locationButton = locationGroup.find("button");
@@ -486,7 +1020,7 @@ copies or substantial portions of the Software.
                 } else {
                     locationField.val(option.location);
                 }
-                locationGroup.appendTo(div);
+                locationGroup.appendTo(row2);
 
                 locationButton.on( "click", function() {
                     selectedLocationInput = $(this).closest("li").find(".node-input-option-location");
@@ -518,24 +1052,13 @@ copies or substantial portions of the Software.
                 });
 
                 //offset fields
-                var offsetField = $('<input/>',{class: "node-input-option-offset", type:"number", min:-1439, max:1439,style:"margin-left:7px; width:calc(15% - 16px);", value:option.offset || 0, placeholder: "offset"}).appendTo(div);
-                offsetField.prop("title", "Minutes Offset +/- 1439");   
-              
-                var expressionClass = "node-input-option-expression" + ((!option.expression) ? " input-error" : "");
-                var expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:7px; width:calc(37% - 16px);", placeholder: 'expression', value:option.expression}).appendTo(div);
-                expressionField.prop("title", "Expression...");
+                offsetField = $('<input/>',{class: "node-input-option-offset", type:"number", min:-1439, max:1439,style:"margin-left:7px; width:calc(15% - 16px);", value:option.offset || 0, placeholder: "offset"}).appendTo(row2);
+                offsetField.prop("title", "Minutes Offset +/- 1439");  
+                
+                //init tooltips
+                initTooltip(locationField,"solar", { my: "right top", at: "right bottom+5", of: offsetField, collision: "flipfit" });
+                initTooltip(expressionField,"cron", { my: "right top", at: "right bottom+5", of: expressionField, collision: "flipfit" });
 
-                initTooltip(expressionField,"cron");
-                initTooltip(locationField,expressionType);
-
-                expressionField.keyup(function() {
-                    var f = $(this);
-                    if (f.val() && f.hasClass('input-error')) {
-                        f.removeClass('input-error')
-                    } else if (!f.val()) {
-                        f.addClass('input-error')
-                    }
-                });
                 locationField.keyup(function() {
                     var f = $(this);
                     var fg = locationGroup;
@@ -552,25 +1075,7 @@ copies or substantial portions of the Software.
                     } else if (!$(this).val()) {
                         $(this).addClass('input-error')
                     }
-                });           
-
-                expressionTypeField.change(function(){
-                    var value = expressionTypeField.val();
-                    switch (value) {
-                        case "sunrise":
-                        case "sunset":
-                            expressionField.hide();
-                            locationGroup.show();
-                            offsetField.show();
-                            break;
-                        default: //cron
-                            expressionField.show();
-                            locationGroup.hide();
-                            offsetField.hide();                            
-                            break;
-                    }
-                });
-                expressionTypeField.change();                
+                });                      
 
                 deleteButton.click(function() {
                     container.css({"background":"#fee"});
@@ -578,18 +1083,44 @@ copies or substantial portions of the Software.
                         $(this).remove();
                     });
                 });
-
+                
+                expressionTypeField.change(function(){
+                    var value = expressionTypeField.val();
+                    switch (value) {
+                        case "solar":
+                            locationGroup.show();
+                            offsetField.show();
+                            expressionField.combobox("hide");
+                            solarEventsField.typedInput("show");
+                            break;
+                        default: //cron
+                            expressionField.combobox("show");
+                            locationGroup.hide();
+                            offsetField.hide();                            
+                            solarEventsField.typedInput("hide");
+                            break;
+                    }
+                });
+                expressionTypeField.change();
                 $("#node-input-option-container").append(container);
             }
 
             $("#node-input-add-option").click(function() {
-                generateOption($("#node-input-option-container").children().length+1, {});
+                generateOption($("#node-input-option-container").children().length, {});
                 $("#node-input-option-container-div").scrollTop($("#node-input-option-container-div").get(0).scrollHeight);
+            });
+
+            $("#node-input-show-dynamic").click(function() {
+                $( "#cron-plus-dynamic-nodes-dialog" ).dialog( "open" );
             });
 
             for (var i=0; i<this.options.length; i++) {
                 var option = this.options[i];
-                generateOption(i+1,option);
+                try {
+                    generateOption(i,option);
+                } catch (error) {
+                    console.warn("generateOption caused an error: ", option, error)
+                }
             }
 
             $( "#node-input-option-container" ).sortable({
@@ -601,20 +1132,24 @@ copies or substantial portions of the Software.
         },
         oneditsave: function () {
             var node = this;
-            var ctrlOutput = $("#node-input-commandResponseMsgOutput").val();
-            node.outputs = ctrlOutput === "output2" ? 2 : 1;
+            var node_id = node.id;
+            node.commandResponseMsgOutput = $("#node-input-commandResponseMsgOutput").val() || "output1";
+            node.outputs = node.commandResponseMsgOutput === "output2" ? 2 : 1;
             var options = $("#node-input-option-container").children();
             node.options = [];
             options.each(function(i) {
                 var option = $(this);
                 var o = {
                     expressionType: option.find(".node-input-option-expressionType").val(),
+                    name: option.find(".node-input-option-name").val(),
                     topic: option.find(".node-input-option-topic").val(),
                     payload: option.find(".node-input-option-payload").typedInput('value'),
                     type: option.find(".node-input-option-payload").typedInput('type'),
                     expression: option.find(".node-input-option-expression").val(),
                     location: option.find(".node-input-option-location").val(),
-                    offset: option.find(".node-input-option-offset").val()
+                    offset: option.find(".node-input-option-offset").val(),
+                    solarType : option.find(".node-input-option-solarEvents").typedInput("type") || "all",
+                    solarEvents : option.find(".node-input-option-solarEvents").typedInput("value")
                 };
                 if (option.find(".node-input-option-value").typedInput('type') === "num") {
                     o.payload = Number(o.value);
@@ -648,9 +1183,8 @@ copies or substantial portions of the Software.
                     label = label.substring(0, 50) + "...";
                 }
                 label = label.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                
                 $.ajax({
-                    url: "cronplus/" + node.id,
+                    url: "cronplusinject/" + node.id,
                     type: "POST",
                     success: function (resp) {
                         RED.notify(node._("inject.success", { label: label }), { type: "success", id: "inject" });
@@ -679,15 +1213,35 @@ copies or substantial portions of the Software.
 
 <script type="text/html" data-template-name="cronplus">
     <style>
+        table.cron-plus-table {
+            border: solid 1px #DDEEEE;
+            border-collapse: collapse;
+            border-spacing: 0;
+            font: normal 13px Arial, sans-serif;
+        }
+        table.cron-plus-table th {
+            background-color: #000;
+            border: solid 1px #DDEEEE;
+            color: #fff;
+            padding: 10px;
+            text-align: left;
+
+        }
+        table.cron-plus-table td {
+            border: solid 1px #DDEEEE;
+            color: #333;
+            padding: 10px;
+            text-shadow: 1px 1px 1px #fff;
+        }        
         .cron-plus-expression-tip {
             background: #ffe;
             width: 100%;
-            max-width: 475px;
-            <!-- min-height: 350px; -->
-            max-height: 460px;
+            max-width: 500px;
+            /* <!-- min-height: 350px; --> */
+            max-height: 300px;
             overflow:auto;
-            font-size: 11px;
-            } 
+            font-size: 10px;
+        }
         .cron-plus-form-tip {
             background: #ffe;
             padding: 6px 6px;
@@ -746,8 +1300,32 @@ copies or substantial portions of the Software.
             padding-right: 5px;
             border: 1px solid #ddd;
         }
-    </style>
-    
+        pre .cron-plus-code {
+            white-space: pre;
+            font-size: 9px
+        }
+        .cron-plus-info-button {
+            background: none!important;
+            border: none!important;
+            padding: 0!important;
+            cursor: pointer!important;
+        }
+        .cron-plus-solar-events-table {
+            font-size: smaller;
+            padding: 0px !important;
+            margin: 0px !important;
+            width: 100%;
+            overflow-wrap: break-word;
+            border: 1px solid;
+        }
+        .cron-plus-solar-events-table tr td {
+            border: 1px dotted;
+        }
+        .cron-plus-solar-events-table tr th {
+            text-align: left;
+            border: 1px dotted;
+        }
+    </style>  
 
     <div id="cron-plus-map-dialog" style="display: none;" title="Choose location...">
         <div class="cron-plus-map-loading" >
@@ -793,6 +1371,13 @@ copies or substantial portions of the Software.
         <div id="cron-plus-map"></div>
     </div>
 
+    <div id="cron-plus-dynamic-nodes-dialog" style="display: none;" title="Dynamic schedules...">
+        <div id="cron-plus-dynamic-nodes-table-placeholder"  style="display: flex;align-items: center;justify-content: center;">
+        </div>
+        <div id="cron-plus-dynamic-nodes-loader" style="position: absolute;  left: 46%;  top: 46%;">
+            <i class="fa fa-spinner fa-spin" style="font-size:48px"></i>
+        </div>
+    </div>
 
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
@@ -816,12 +1401,13 @@ copies or substantial portions of the Software.
       </div>  
     <div id="node-cronplus-tab-static-schedules" class="form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%; min-height: 200px">
         <label for="node-input-option-container-div" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
-        <div id="node-input-option-container-div" style="min-width: 350px; box-sizing: border-box; border-radius: 5px; padding: 5px; border: 1px solid #ccc; overflow-y:scroll;display: inline-block; width: 100%; height: calc(100% - 28px); min-height: 150px;">
+        <div id="node-input-option-container-div" style="min-width: 300px; box-sizing: border-box; border-radius: 5px; padding: 5px; border: 1px solid #ccc; overflow-y:scroll;display: inline-block; width: 100%; height: calc(100% - 28px); min-height: 150px;">
             <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;"></ol>
         </div>
     </div> 
     <div class="form-row">
         <a href="#" class="editor-button editor-button-small" id="node-input-add-option" style="margin-top: 4px;"><i class="fa fa-plus"></i> <span>option</span></a>
+        <a href="#" class="editor-button editor-button-small" id="node-input-show-dynamic" style="margin-top: 4px;"><i class="fa fa-table"></i> <span>view dynamic schedules</span></a>
     </div>
 </div>
 
@@ -839,7 +1425,7 @@ copies or substantial portions of the Software.
         <div style="padding-left: 15px">
             A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area (<a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">list</a>)
             <br>
-            TIP: Timezone should be perceived from your own perspective. See the <a href="#undestanding-timezone">Understanding Timezone</a> example below.
+            TIP: Timezone should be perceived from your own perspective. See the <a href="#understanding-timezone">Understanding Timezone</a> example below.
         </div>    
         <h4>Command Resp</h4>
         <div style="padding-left: 15px">
@@ -854,7 +1440,7 @@ copies or substantial portions of the Software.
         </div>
         <h4>Schedules - Type</h4>
         <div style="padding-left: 15px">
-            The type determines what type of schedule. Options are <code>cron</code>, <code>sunrise</code> or <code>sunset</code>
+            The type determines what type of schedule. Options are <code>cron</code> or <code>solar events</code>
         </div>
         <h4>Schedules - Name</h4>
         <div style="padding-left: 15px">
@@ -863,23 +1449,49 @@ copies or substantial portions of the Software.
         <h4>Schedules - Payload</h4>
         <div style="padding-left: 15px">
             The value to send in the payload when the schedule triggers. (NOTE: the property that the payload gets written to is determined by "output to").
-        </div>        
+        </div>     
+        <h4 id="cron-plus-solar-events-info">Schedules - Solar Events</h4>
+        <div style="padding-left: 15px">
+            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
+            The Solar Events field permits you to chose which solar events you want a schedule to fire upon.<br>
+            Solar Events...
+            <table class="cron-plus-solar-events-table">
+                <tr><th>Event ID</th><th>Event</th><th>Information</th></tr>
+                <tr><td>nightEnd</td><td>night end / astronomical dawn</td><td>night ends, astronomical twilight starts (-18°)</td></tr>
+                <!-- <tr><td>astronomicalDawn</td><td>astronomical dawn</td><td>night ends, astronomical twilight starts (-18°)")</td></tr> -->
+                <tr><td>nauticalDawn</td><td>nautical dawn</td><td>astronomical twilight ends, nautical twilight starts (-12°)</td></tr>
+                <tr><td>civilDawn</td><td>civil dawn / golden hour</td><td>nautical twilight ends, civil twilight and golden hour starts (-6°)</td></tr>
+                <!-- <tr><td>morningGoldenHourStart</td><td>golden hour starts</td><td>when the sun is 6 degrees below the horizon (-6°)")</td></tr> -->
+                <tr><td>sunrise</td><td>sunrise</td><td>top edge of the sun appears on the horizon (-0.833°)</td></tr>
+                <tr><td>sunriseEnd</td><td>sunrise end</td><td>bottom edge of the sun touches the horizon (-0.3°)</td></tr>
+                <tr><td>morningGoldenHourEnd</td><td>morning golden hour ends</td><td>when the sun is 6 degrees above the horizon (6°)</td></tr>
+                <tr><td>solarNoon</td><td>solar noon</td><td>sun is at its highest position</td></tr>
+                <tr><td>eveningGoldenHourStart</td><td>evening golden hour start</td><td>when the sun is 6 degrees above the horizon (6°)")</td></tr>
+                <tr><td>sunsetStart</td><td>sunset start</td><td>bottom edge of the sun touches the horizon (-0.3°)</td></tr>
+                <tr><td>sunset</td><td>sunset</td><td>civil twilight starts, sun disappears below the horizon (0.833°)</td></tr>
+                <!-- <tr><td>eveningGoldenHourEnd</td><td>evening golden hour end</td><td>golden hour ends (-6°)")</td></tr> -->
+                <tr><td>civilDusk</td><td>civil dusk / golden hour end</td><td>civil twilight and golden hour ends, nautical twilight starts (-6°)</td></tr>
+                <tr><td>nauticalDusk</td><td>nautical dusk</td><td>nautical twilight ends, astronomical twilight starts (-12°)</td></tr>
+                <!-- <tr><td>astronomicalDusk</td><td>astronomical dusk</td><td>astronomical twilight ends, night starts (-18°)</td></tr> -->
+                <tr><td>nightStart</td><td>astronomical dusk / night start</td><td>astronomical twilight ends, night starts (-18°)</td></tr>
+                <tr><td>nadir</td><td>solar midnight</td><td>when the sun is closest to nadir and the night is equidistant from dusk and dawn</td></tr>
+            </table>
+        </div>
         <h4>Schedules - Location</h4>
         <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>sunrise</b> or <b>sunset</b></i><br>
-            The location field is expected to contain longitude and latitude coordinates for the calculation of sunrise or sunset time.<br>
+            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
+            The location field is expected to contain longitude and latitude coordinates for the calculation of solar events.<br>
             Accepted formats...
             <ul>
                 <li>Decimal Degrees E.g: <code class="cron-plus-coordinates">54.9992500,-1.4170300</code> or <code class="cron-plus-coordinates">54.9992500° N 1.4170300° W</code></li>
                 <li>Degrees Minutes Seconds E.g: <code class="cron-plus-coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
                 <li>Decimal Minutes E.g: <code class="cron-plus-coordinates">54° 59.955' , -1° 25.0218'</code></li>
                 <li>GPS E.g: <code class="cron-plus-coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="cron-plus-coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="cron-plus-coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="cron-plus-coordinates">54:59:57.3N 1:25:1.308W</code></li>
-            </ul>    
-
+            </ul>
         </div>        
         <h4>Schedules - Offset</h4>
         <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>sunrise</b> or <b>sunset</b></i><br>
+            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
             The offset field can be used to add a positive or negative offset in minutes to the sunrise or sunset time.
         </div>        
         <h4>Schedules - Expression</h4>
@@ -891,20 +1503,16 @@ copies or substantial portions of the Software.
                 When specifying a string date, you can use timezone e.g. "2020-01-01 00:00 GMT+2".
                 You can even mix time zones e.g. "2020-01-01 00:00 GMT+2, 2020-01-01 00:00 GMT-7"
             </p>
-            <p>CRON Format...</p>
-            <pre style="white-space: pre">
-    s  m  h  md m  wd y
-    |  |  |  |  |  |  |
-    *  *  *  *  *  *  *    Field              Allowed values    Special symbols
-    |  |  |  |  |  |  |    -----------------  ---------------   ---------------
-    `--|--|--|--|--|--|->  Second (optional)  0-59              * / , -
-       `--|--|--|--|--|->  Minute             0-59              * / , -
-          `--|--|--|--|->  Hour               0-23              * / , -
-             `--|--|--|->  Day of Month       1-31              * / , - ? L W
-                `--|--|->  Month              1-12 or JAN-DEC   * / , -
-                   `--|->  Day of Week        0-7 or SUN-SAT    * / , - ? L #
-                      `->  Year (optional)    1970-2099         * / , -
-            </pre>
+            <p id="cron-plus-cron-format-info">CRON Format...</p>
+            <pre style="white-space: pre; padding: 0px; font-size: smaller;"> * * * * * * *    Field              Allowed values    Special symbols
+ | | | | | | |    -----------------  ---------------   ---------------
+ `-|-|-|-|-|-|->  Second (optional)  0-59              * / , -
+   `-|-|-|-|-|->  Minute             0-59              * / , -
+     `-|-|-|-|->  Hour               0-23              * / , -
+       `-|-|-|->  Day of Month       1-31              * / , - ? L W
+         `-|-|->  Month              1-12 or JAN-DEC   * / , -
+           `-|->  Day of Week        0-7 or SUN-SAT    * / , - ? L #
+             `->  Year (optional)    1970-2099         * / , -</pre>
             <p>Notes...</p>
             <ul>
                 <li><code>*</code> Asterisks indicate that the cron expression matches for all values of the field. For example, "*" in the minute field means every minute</li>
@@ -924,7 +1532,7 @@ copies or substantial portions of the Software.
                 <li><code>0 */20 1 * * *</code> Every 20 minutes, between 01:00 AM and 01:59 AM</li>
                 <li><code>0 15,30,45 * * * *</code> At 15, 30, and 45 minutes past the hour</li>
                 <li><code>0 0 12 * * *</code> Every day at noon - 12pm</li>
-                <li><code>0 0 2 29 FEB * 2020-2040</code> At 02:00 AM, on day 29 of the month, only in February, every 4 years, 2020 through 2040</li>
+                <li><code>0 0 2 29 FEB * 2020/4</code> At 02:00 AM, on day 29 of February (leap years)</li>
                 <li><code>0 0 7 * * MON#1 *</code> At 07:00 AM, on the first Monday of the month</li>
                 <li><code>0 0 12 * JAN,FEB,MAR,APR *</code> Every day at noon in January, February, March and April</li>
                 <li><code>* * 1W * *</code> Every minute, on the first weekday of the month</li>
@@ -951,23 +1559,24 @@ copies or substantial portions of the Software.
         <dd>
             <p><b>Adding one (or more) schedules</b><br>
                 Example...<br>
-                <pre>[
+                <pre class="cron-plus-code">[
   {
     "command": "add",
     "name": "every 6",
     "expression": "*/6 * * * * * *",
     "expressionType": "cron",
-    "payload": "hi every 6",
-    "type": "str",
+    "type": "default",
     "limit": 3 
   },
   {
     "command": "add",
     "name": "alarm1",
-    "expressionType": "sunrise",
+    "expressionType": "solar",
+    "solarType": "selected",
+    "solarEvents": "morningGoldenHourStart,sunriseStart,eveningGoldenHourStart,sunsetStart",
     "location": "54.999320540937035 -1.417407989501953",
-    "offset": "60",
-    "payload": "wake up!",
+    "offset": "-60",
+    "payload": "In 60 mins, it will be a great time to take photographs",
     "type": "str",
     "limit": null
   }
@@ -976,25 +1585,29 @@ copies or substantial portions of the Software.
                 <p><i>Details...</i><br>
                     Adding a CRON expression
                     <ul>
-                        <li>Multiple schedules can be added if the payload is an array of objects/li>
+                        <li>Multiple schedules can be added if the payload is an array of objects</li>
                         <li>command: (string|required) The operation to perform - in this case "add"</li>
-                        <li>name: (string|required) This will be used as the topic when the schedule triggers</li>
+                        <li>name: (string|required) This will identify schedule</li>
+                        <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
                         <li>expression: (string|optional) A CRON expression, a date, a comma separated list of dates or an array of dates</li>
                         <li>expressionType: (string|optional) specify the schedule type. (if omitted, "cron" is the default)</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
-                        <li>type: (string|optional) The payload type (e.g. 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
+                        <li>type: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
                         <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
                     </ul><br>
-                    Adding a sunrise / sunset schedule
+                    Adding a solar event schedule
                     <ul>
-                        <li>Multiple schedules can be added if the payload is an array of objects/li>
+                        <li>Multiple schedules can be added if the payload is an array of objects</li>
                         <li>command: (string|required) The operation to perform - in this case "add"</li>
-                        <li>name: (string|required) This will be used as the topic when the schedule triggers</li>
-                        <li>expressionType: (string|required) specify the schedule type.  Accepted values are sunrise and sunset</li>
-                        <li>location: (string|optional) longitude latitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
+                        <li>name: (string|required) This will identify schedule</li>
+                        <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
+                        <li>expressionType: (string|required) specify the schedule type. Set to "solar" for solar events</li>
+                        <li>solarType: (string|required) specify the events to fire.  Accepted values are "all" or "selected"</li>
+                        <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected". Accepted values are listed under <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">see above</a> </li>
+                        <li>location: (string|required) longitude latitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
                         <li>offset: (number|optional) number of minutes to offset a sunrise or sunset</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
-                        <li>type: (string|optional) The payload type (e.g. 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
+                        <li>type: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
                         <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
                     </ul>
                 </p>
@@ -1006,15 +1619,16 @@ copies or substantial portions of the Software.
             </p>
 
             <p><b>Removing, stopping, pausing, starting, a schedule</b><br>Example...<br>
-                <pre>{
-    "command": "*see details below*",
-    "name": "every 6",
+                <pre class="cron-plus-code">{
+  "command": "*see details below*",
+  "name": "every 6",
 }</pre>
                 <p><i>Details...</i><br>
                     <ul>
                         <li>command: (string|required) The operation to perform - this can be one of the following...
                             <ul>
                                 <li>"status"</li>
+                                <li>"export"</li>
                                 <li>"remove"</li>
                                 <li>"stop"</li>
                                 <li>"pause"</li>
@@ -1027,6 +1641,7 @@ copies or substantial portions of the Software.
                 <p><i>Notes...</i><br>
                     <ul>
                         <li>status returns an object with the config and status of the named schedule</li>
+                        <li>export returns an object with the config of the named schedule</li>
                         <li>remove will stop and remove the schedule. This option has no output.</li>
                         <li>stop will stop the schedule specified by <code>name</code> and reset its internal counter. This option has no output.</li>
                         <li>pause will stop the schedule specified by <code>name</code> but will not reset its internal counter. This option has no output.</li>
@@ -1035,7 +1650,7 @@ copies or substantial portions of the Software.
                 </p>
             </p>                
 
-            <p><b>Status all, remove all, stop all, pause all, start all...</b><br>Example...<br>
+            <p><b>Status all, export all, remove all, stop all, pause all, start all...</b><br>Example...<br>
                 <pre>{
     "command": "*see details below*"
 }</pre>
@@ -1044,6 +1659,9 @@ copies or substantial portions of the Software.
                         <li>command: (string|required) The operation to perform - this can be one of the following...
                             <ul>
                                 <li>"status-all"</li>
+                                <li>"export-all"</li>
+                                <li>"export-all-dynamic"</li>
+                                <li>"export-all-static"</li>
                                 <li>"remove-all"</li>
                                 <li>"stop-all"</li>
                                 <li>"pause-all"</li>
@@ -1054,31 +1672,55 @@ copies or substantial portions of the Software.
                 </p>
                 <p><i>Notes...</i><br>
                     <ul>
-                        <li>status-all returns an array of all schedules (both those added in the UI and those added dynamically)</li>
+                        <li>status-all returns all schedules in an array of objects containing the config and status (both those added in the UI and those added dynamically)</li>
+                        <li>export-all returns all schedules in an array of objects containing the config (both those added in the UI and those added dynamically)</li>
+                        <li>export-all returns all schedules in an array of objects containing the config (both those added in the UI and those added dynamically)</li>
+                        <li>export-all-dynamic same as export-all but only dynamically added schedules are exported</li>
+                        <li>export-all-static same as export-all but only statically added schedules are exported</li>
                         <li>remove-all will stop and remove all schedules. This option has no output</li>
                         <li>stop-all will stop all schedules and reset internal counters. This option has no output</li>
                         <li>pause-all will stop all schedules but will not reset internal counters. This option has no output</li>
                         <li>start-all will (re)start all schedules. Any schedule that reached its limit will start from the beginning. Paused schedules will resume. This option has no output</li>
                     </ul>
                 </p>
+                <p><i>Examples...</i><br>
+                    Example : cmd payload to export all dynamically added schedules...<br>
+                    <pre class="cron-plus-code">{
+  "command": "export-all-dynamic"
+}</pre>                    
+                    Example : cmd payload to pause all schedules...<br>
+                    <pre class="cron-plus-code">{
+  "command": "pause-all"
+}</pre> 
+                </p>
             </p>  
 
             <p><b>Describe</b><br>
-                Example...<br>
-                <pre>{
-    "command": "describe",
-    "expression": "0 */5 * * * MON *",
-    "expressionType": "cron",
-    "timeZone": "Europe/London"
+                Example : cmd payload to describe a cron expression...<br>
+                <pre class="cron-plus-code">{
+  "command": "describe",
+  "expressionType": "cron",
+  "expression": "0 */5 * * * MON *",
+  "timeZone": "Europe/London"
 }</pre>
-                Example2...<br>
-                <pre>{
-    "command": "describe",
-    "location": "54.9992500,-1.4170300",
-    "expressionType": "sunrise",
-    "timeZone": "Europe/London"
+                Example : cmd payload to get all solar event times + solar state at this time...<br>
+<pre class="cron-plus-code">{
+  "command": "describe",
+  "expressionType": "solar",
+  "location": "54.9992500,-1.4170300",
+  "solarType": "all",
+  "timeZone": "Europe/London"
 }</pre>
-
+                Example : cmd payload to get 4 solar event times + solar for a specific point in time...<br>
+    <pre class="cron-plus-code">{
+  "command": "describe",
+  "expressionType": "solar",
+  "time": "2020-03-22 18:40",
+  "location": "54.9992500,-1.4170300",
+  "solarType": "selected",
+  "solarEvents": "civilDawn,sunrise,sunset,civilDusk",
+  "timeZone": "Europe/London"
+}</pre>
                 <p><i>Details...</i><br>
                     Returns an object in payload containing human readable info for the given expression.
                     <ul>
@@ -1090,18 +1732,18 @@ copies or substantial portions of the Software.
             </p>                
         </dd>
         <dd>GENERAL NOTES...<br>
-        <ul>
-            <li>Adding a schedule with the same name as an existing schedule will replace the existing one</li>
-            <li>Adding a schedule with property <code>"limit":3</code> will cause that schedule to be stopped after the third trigger. It can be started again by injecting a payload of <code>{"command":"start" "name": "schedule name"}</code></li>
-            <li>UI added tasks can be also be updated by using the name specified in the UI</li>
-            <li>When a cron-plus-plus node is modified and deployed (or node-red is restarted), dynamic entries are discarded & must be injected again</li>
-            <li>When a cron-plus-plus node outputs a msg in response to a command, <code>msg.commandResponse</code> will be <code>true</code> to indicate the message is in response to a command and not a scheduled event</li>
-            <li>When a cron-plus-plus node outputs a msg for a cron/sunrise/sunset scheduled event, <code>msg.scheduledEvent</code> will be <code>true</code> to indicate the message is due to a scheduled event and not a control response</li>
-        </ul>
+            <ul>
+                <li>Adding a schedule with the same name as an existing schedule will replace the existing one</li>
+                <li>Adding a schedule with property <code>"limit":3</code> will cause that schedule to be stopped after the third trigger. It can be started again by injecting a payload of <code>{"command":"start" "name": "schedule name"}</code></li>
+                <li>UI added tasks can be also be updated by using the name specified in the UI</li>
+                <li>When a cron-plus-plus node is modified and deployed (or node-red is restarted), dynamic entries are discarded & must be injected again</li>
+                <li>When a cron-plus-plus node outputs a msg in response to a command, <code>msg.commandResponse</code> will be <code>true</code> to indicate the message is in response to a command and not a scheduled event</li>
+                <li>When a cron-plus-plus node outputs a msg for a cron/solar event, <code>msg.scheduledEvent</code> will be <code>true</code> to indicate the message is due to a scheduled event and not a control response</li>
+            </ul>
         </dd>
     </dl>
 
-    <h3 id="undestanding-timezone">Understanding Timezone...</h3>
+    <h3 id="understanding-timezone">Understanding Timezone...</h3>
     <dl class="message-properties">
         <h4>Foreword</h4>
         <p>Timezone should be perceived from your current point of view. For example, regardless of where your node-red runs, you can "fake it" by setting the Timezone entry to your own Timezone location where/when you expect the event to occur.
@@ -1122,7 +1764,7 @@ copies or substantial portions of the Software.
         <ul>
             <li>NY time 09:30 (GMT-4 / EDT) - this is the time the market opens in New York</li>
             <li>Server time 14:30 (GMT+1 / BST equivalent) - the start event will happen at this time in london</li>
-            <li>NY time 14:00 (GMT-4 / EDT) - this is the time the market closes in New York</li>
+            <li>NY time 16:00 (GMT-4 / EDT) - this is the time the market closes in New York</li>
             <li>Server time 21:00 (GMT+1 / BST equivalent) - the stop event will happen at this time in london</li>
         </ul>
 
@@ -1131,18 +1773,20 @@ copies or substantial portions of the Software.
             <li>Enter <code>America/New_York</code> in the <code>Timezone</code> field</li>
             <li>Add a new schedule...
                 <ul>
-                    <li>Field 1: Select &quot;cron&quot;</li>
-                    <li>Field 2: Enter &quot;stocks/nyse/trading&quot;</li>
-                    <li>Field 3: Select <code>bool</code> and then select <code>true</code> for payload</li>
-                    <li>Field 4: Enter the expression <code>0 30 9 * * 1-5</code></li>
+                    <li>Field 1 (name)      : Enter &quot;NYSEOPEN &quot;</li>
+                    <li>Field 2 (topic)     : Enter &quot;nyse/open&quot;</li>
+                    <li>Field 3 (payload)   : Select default</li>
+                    <li>Field 4 (type)      : Select &quot;cron&quot;</li>
+                    <li>Field 5 (expression): Enter the expression <code>0 30 9 * * 1-5</code></li>                    
                 </ul>
             </li>
             <li>Add a new schedule...
                 <ul>
-                    <li>Field 1: Select &quot;cron&quot;</li>
-                    <li>Field 2: Enter &quot;stocks/nyse/trading&quot;</li>
-                    <li>Field 3: Select <code>bool</code> and then select <code>false</code> for payload</li>
-                    <li>Field 4: Enter the expression <code>0 0 16 * * 1-5</code></li>
+                    <li>Field 1 (name)      : Enter &quot;NYSECLOSE &quot;</li>
+                    <li>Field 2 (topic)     : Enter &quot;nyse/close&quot;</li>
+                    <li>Field 3 (payload)   : Select default</li>
+                    <li>Field 4 (type)      : Select &quot;cron&quot;</li>
+                    <li>Field 5 (expression): Enter the expression <code>0 0 16 * * 1-5</code></li>
                 </ul>
             </li>
         </ul>  
@@ -1150,8 +1794,7 @@ copies or substantial portions of the Software.
         <p></p>         
 
         <h4><b>Example 2...</b></h4>
-        <p>Get an reminder (in Moscow) to call my wife 30 mins after the sun rises in Cairo.
-        </p>
+        <p>Get an reminder (in Moscow) to call my wife 30 mins after the sun rises in Cairo.</p>
 
         <h4 id="notes">NOTES</h4>
         <ul>
@@ -1181,11 +1824,13 @@ copies or substantial portions of the Software.
             <li>Enter <code>Europe/Moscow</code> in the <code>Timezone</code> field</li>
             <li>Add a new schedule...
                 <ul>
-                    <li>Field 1: Select &quot;sunrise&quot;</li>
-                    <li>Field 2: Enter &quot;sunrise-call-wife&quot; for name/topic</li>
-                    <li>Field 3: Enter &quot;call wife&quot; for payload</li>
-                    <li>Field 4: Enter the coordinates for sunrise location (Cairo) <code>30.04905845622014 31.229496002197262</code></li>
-                    <li>Field 5: Enter an offset of 30 (allow time to make a coffee)</li>
+                    <li>Field 1 (name)    : Enter &quot;call reminder&quot;</li>
+                    <li>Field 2 (topic)   : Enter &quot;call/wife&quot;</li>
+                    <li>Field 3 (payload) : Select default</li>
+                    <li>Field 4 (type)    : Select &quot;solar events&quot;</li>
+                    <li>Field 5 (Events)  : Select &quot;sunrise&quot;</li>
+                    <li>Field 6 (location): Enter the coordinates for sunrise location (Cairo) <code>30.04905845622014 31.229496002197262</code></li>
+                    <li>Field 7 (offset)  : Enter an offset of 30 (allow her time to make a coffee)</li>
                 </ul>
             </li>
         </ul>   

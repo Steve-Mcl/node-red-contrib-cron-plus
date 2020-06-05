@@ -14,12 +14,36 @@ The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 */
 
-
 const parser = require('cronstrue');
 const cronosjs = require("cronosjs");
 const prettyMs = require('pretty-ms');
-const srss = require('sunrise-sunset-js');
 const coordParser = require("coord-parser");
+const SunCalc = require('suncalc2');
+
+SunCalc.addTime(-18,"nightEnd","nightStart");
+SunCalc.addTime(-6,"civilDawn","civilDusk");
+SunCalc.addTime(6,"morningGoldenHourEnd","eveningGoldenHourStart");
+
+const PERMITTED_SOLAR_EVENTS = [
+    "nightEnd",
+    // "astronomicalDawn",
+    "nauticalDawn",
+    "civilDawn",
+    // "morningGoldenHourStart",
+    "sunrise",
+    "sunriseEnd",
+    "morningGoldenHourEnd",
+    "solarNoon",
+    "eveningGoldenHourStart",
+    "sunsetStart",
+    "sunset",
+    // "eveningGoldenHourEnd",
+    "civilDusk",
+    "nauticalDusk",
+    // "astronomicalDusk",
+    "nightStart",
+    "nadir"
+]
 
 /**
  * Humanize a cron express
@@ -33,6 +57,202 @@ var humanizeCron = function (expression) {
     } catch (error) {
         return `Cannot parse expression '${expression}'`
     }
+}
+
+/**
+ * Validate a shcedule options. Returns true if OK otherwise throws an apporpriate error
+ * @param {object} opt the options object to validate
+ * @param {boolean} permitDefaults allow certain items to be a default (missing value)
+ * @returns {boolean}
+ */
+function validateOpt(opt, permitDefaults=true) {
+    if (!opt) {
+        throw new Error(`Schedule options are undefined`);
+    }
+    if (!opt.name) {
+        throw new Error(`Schedule name property missing`);
+    }
+    if(!opt.expressionType || opt.expressionType === "cron" || opt.expressionType === "datesequence"){//cron
+        if (!opt.expression) {
+            throw new Error(`Schedule '${opt.name}' - expression property missing`);
+        }    
+        let valid = false;
+        try {
+            valid = cronosjs.validate(opt.expression);    
+            if(valid)
+                opt.expressionType = "cron";
+        } catch (error) {
+            node.debug(error);
+        }
+        try {
+            if(!valid){
+                valid = isDateSequence(opt.expression)
+                if(valid)
+                    opt.expressionType = "datesequence";
+            }    
+        } catch (error) {
+            node.debug(error);
+        }
+
+        if(!valid){
+            throw new Error(`Schedule '${opt.name}' - expression '${opt.expression}' must be either a cron expression, a date, an a array of dates or a CSV of dates`);
+        }                    
+
+    } else if(opt.expressionType === "solar") {
+        if (!opt.offset) {
+            opt.offset = 0;
+        }    
+        if (!opt.location) {
+            throw new Error(`Schedule '${opt.name}' - location property missing`);
+        }    
+        if(opt.solarType !== "selected" && opt.solarType !== "all"){
+            throw new Error(`Schedule '${opt.name}' - solarType property invalid or mising. Must be either "all" or "selected"`);
+        }
+        if(opt.solarType == "selected"){                    
+            if (!opt.solarEvents) {
+                throw new Error(`Schedule '${opt.name}' - solarEvents property missing`);
+            }   
+
+            var solarEvents; 
+            if(typeof opt.solarEvents === "string"){
+                solarEvents = opt.solarEvents.split(",");
+            } else if(Array.isArray(opt.solarEvents)){
+                solarEvents = opt.solarEvents;
+            } else {
+                throw new Error(`Schedule '${opt.name}' - solarEvents property is invalid`);
+            }
+            if(!solarEvents.length){
+                throw new Error(`Schedule '${opt.name}' - solarEvents property is empty`);
+            }
+            for (let index = 0; index < solarEvents.length; index++) {
+                const element = solarEvents[index].trim();
+                if(!PERMITTED_SOLAR_EVENTS.includes(element)){
+                    throw new Error(`Schedule '${opt.name}' - solarEvents entry '${element}' is invalid`);
+                }                    
+            }
+        }
+    } else {
+        throw new Error(`Schedule '${opt.name}' - invalid schedule type '${opt.expressionType}'. Expected expressionType to be 'cron' or 'solar'`);
+    }
+    opt.payload = permitDefaults ? opt.payload || "payload" : opt.payload;
+    if (!opt.payload) {
+        throw new Error(`Schedule '${opt.name}' - payload property missing`);
+    }
+    opt.type = permitDefaults ? opt.type || "date" : opt.type;
+    if (!opt.type) {
+        throw new Error(`Schedule '${opt.name}' - type property missing`);
+    }
+    let okTypes = ['default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']
+    let typeOK = okTypes.find( el => {return el == opt.type})
+    if (!typeOK) {
+        throw new Error(`Schedule '${opt.name}' - type property '${opt.type}' is not valid. Must be one of the following... ${okTypes.join(",")}`);
+    }
+    return true;
+}
+
+/**
+ * Returns an object describing the parameters.
+ * @param {string} expression The expressions or coordinates to use
+ * @param {string} expressionType The expression type ("cron" | "solar")
+ * @param {string} timeZone An optional timezone to use
+ * @param {number} offset An optional offset to apply
+ * @param {string} solarType Specifies either "all" or "selected" - related to solarEvents property
+ * @param {string} solarEvents a CSV of solar events to be included
+ * @param {date} time Optional time to use (defaults to Date.now() if excluded)
+ */
+function _describeExpression(expression, expressionType, timeZone, offset, solarType, solarEvents, time, opts){
+    let now = time ? new Date(time) : new Date();
+    opts = opts || {};
+    let result = {description:undefined,nextDate:undefined,nextDescription:undefined, prettyNext: "Never"};
+    let cronOpts = timeZone ? { timezone: timeZone } : undefined;
+    let ds = null;
+    let dsOk = false;
+    let exOk = false;
+    //let now = new Date();
+
+    if(solarType == "all"){
+        solarEvents = PERMITTED_SOLAR_EVENTS.join(",")
+    }
+
+    if(expressionType == "solar"){
+        let opt = {
+            expressionType: expressionType,
+            location: expression,
+            offset: offset || 0,
+            name: "dummy",
+            solarType: solarType,
+            solarEvents: solarEvents
+        }
+        
+        if(validateOpt(opt)){
+            let pos = coordParser(opt.location);
+            let offset = isNumber(opt.offset) ? parseInt(opt.offset) : 0;
+            let nowOffset =  new Date(now.getTime() + offset*60000)
+            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset)
+            if(opts.includeSolarStateOffset && offset != 0){
+                let ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0)
+                result.solarStateOffset = ssOffset.solarState;
+            }
+            result.offset = offset;
+            result.now = now;
+            result.nowOffset = nowOffset;
+            ds = parseDateSequence(result.eventTimes.map((event)=>event.timeOffset))
+            dsOk = ds && ds.isDateSequence;
+        }
+    } else {
+        let isValidCron = cronosjs.validate(expression);
+        if(isValidCron){
+            exOk = isValidCron;
+        } else { 
+            ds = parseDateSequence(expression);
+            dsOk = ds.isDateSequence;
+        } 
+    }
+
+    if(dsOk){
+        let task = ds.task;
+        let dates = ds.dates;
+        result.description = "Date sequence with fixed dates";
+        if(task && task._sequence && dates){
+            if (result.nextEventTimeOffset) {
+                let ms = result.nextEventTimeOffset.valueOf() - now.valueOf();
+                result.prettyNext = (result.nextEvent ? result.nextEvent + " " : "") +  `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
+            }            
+            let first = dates[0]; 
+            // let nextEvent = result.eventTimes[0].event; 
+            let count = dates.length;
+            if(expressionType === "solar"){
+                if(solarType === "all"){
+                    result.description = "All Solar Events"; 
+                } else {
+                    result.description = "Solar Events: '" + solarEvents.split(",").join(", ") + "'"; 
+                }
+            } else {
+                if(count == 1){
+                    result.description = "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
+                } else {
+                    result.description = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
+                }
+            }            
+        }
+    } 
+    
+    if(exOk){
+        let ex = cronosjs.CronosExpression.parse(expression, cronOpts)
+        let next = ex.nextDate();
+        if (next) {
+            let ms = next.valueOf() - now.valueOf();
+            result.prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
+            try {
+                result.nextDates = ex.nextNDates(now, 5);
+            } catch (error) {
+                console.debug(error);
+            }
+        }
+        result.description = humanizeCron(expression);
+        result.nextDate = next;
+    }
+    return result;
 }
 
 /**
@@ -67,18 +287,79 @@ function formatShortDateTimeWithTZ(date, tz) {
         
     return datestring;
 }
+
+/**
+ * Determine if a variable is a number
+ * @param {string|number} n The string or number to test
+ * @returns {boolean}
+ */
 function isNumber(n) {
     return !isNaN(parseFloat(n)) && isFinite(n);
 }
+
+/**
+ * Determine if a variable is a valid object
+ * NOTE: Arrays are also objects - be sure to use Arra.isArray if you need to know the diference
+ * @param {*} o The variable to test
+ * @returns {boolean}
+ */
+function isObject(o){
+    return (typeof o === 'object' && o !== null);
+}
+
+/**
+ * Determine if a variable is a valid date
+ * @param {*} d The variable to test
+ * @returns {boolean}
+ */
+function isValidDateObject(d) {
+    return d instanceof Date && !isNaN(d);
+}
+
+/**
+ * Determine if a variable is a cron like string
+ * @param {string} expression The variable to test
+ * @returns {boolean}
+ */
 function isCronLike(expression){
-    if(expression.includes("*")){
-        return true;
-    }
+    if(typeof expression !== "string") return false;
+    if(expression.includes("*")) return true;
     let cleaned = expression.replace(/\s\s+/g, ' ');
     let spaces = cleaned.split(" ");
     return spaces.length >= 4 && spaces.length <= 6 ; 
 }
 
+/** 
+ * Apply defaults to the cron schedule object
+ * @param {integer} optionIndex An index number to use for defaults
+ * @param {object} option The option object to update
+*/         
+function applyOptionDefaults(option, optionIndex) {
+    if(isObject(option) == false){
+        return;//no point in continuing
+    }
+    optionIndex = optionIndex == null ? 0 : optionIndex;
+    if (option.expressionType == "") {
+        option.expressionType = "cron";//if empty, default to cron
+    } else if (["cron", "solar"].indexOf(option.expressionType) < 0) {
+        //if expressionType is not cron or solar - it might be sunrise or sunset from an older version
+        if (option.expressionType == "sunrise") {
+            option.solarEvents = option.solarEvents || "sunrise";
+            option.expressionType = "solar";
+        } else if (option.expressionType == "sunset") {
+            option.solarEvents = option.solarEvents || "sunset";
+            option.expressionType = "solar";
+        } else {
+            option.expressionType = "cron";
+        }
+    }
+    option.name = option.name || "schedule" + (optionIndex + 1);
+    option.topic = option.topic || option.name;
+    if (option.expressionType == "cron" && !option.expression) option.expression = "0 * * * * * *";
+    if (!option.solarType) option.solarType =  option.solarEvents ? "selected" : "all";
+    if (!option.solarEvents) option.solarEvents = "sunrise,sunset";
+    if (!option.location) option.location = "";
+}
 function parseDateSequence(expression){
     let result = {isDateSequence: false, expression: expression};
     let dates = expression;
@@ -106,34 +387,265 @@ function parseDateSequence(expression){
     }
     return result;    
 }
-function isValidDate(d) {
-    return d instanceof Date && !isNaN(d);
-}
-function parseSunTime(opt, count){
-    count = count || 1;
-    //let coordParser = new coordHelper();
+
+function parseSolarTimes(opt){
     let pos = coordParser(opt.location || "0.0,0.0" );
-    //let pos = {lat: 54.123 , lon: -1.4123};
-    let dates = []; 
-    var date = new Date();
-    date.setHours(0,0,0,0);
-    var offset = opt.offset ? parseInt(opt.offset) : 0;
-    var f = opt.expressionType == "sunrise" ? srss.getSunrise : srss.getSunset;
-    var cntr = 0;
-    while(dates.length < count && cntr < 365){
-        cntr++;
-        let time = f(pos.lat, pos.lon, date);
-        if(isValidDate(time)){
-            let timeOffset = new Date(time.getTime() + offset*60000);
-            if(timeOffset.getTime() < Date.now()){
-                date.setDate(date.getDate() + 1);                    
-                continue;
-            } 
-            dates.push(timeOffset);          
-        }
-        date.setDate(date.getDate() + 1);                    
+    let offset = opt.offset ? parseInt(opt.offset) : 0;
+    let date = opt.date ? new Date(opt.date) : new Date();
+    let events = opt.solarType == "all" ? PERMITTED_SOLAR_EVENTS : opt.solarEvents;
+    let result = getSolarTimes(pos.lat,pos.lon,0,events,date,offset)
+    let task = parseDateSequence(result.eventTimes.map((o) => o.timeOffset));
+    task.solarEventTimes = result;
+    return task;
+}
+
+function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offset = 0){
+    // performance.mark('Start');
+    var solarEventsPast=[...PERMITTED_SOLAR_EVENTS];
+    var solarEventsFuture=[...PERMITTED_SOLAR_EVENTS];
+    var solarEventsArr=[];
+
+    //get list of usable solar events into solarEventsArr
+    var solarEventsArrTemp=[];
+    if(typeof solarEvents === "string"){
+        solarEventsArrTemp = solarEvents.split(",");
+    } else if(Array.isArray(solarEvents)) {
+        solarEventsArrTemp = [...solarEvents];
+    } else {
+        throw new Error("solarEvents must be a CSV or Array");
     }
-    return parseDateSequence(dates);
+    for (let index = 0; index < solarEventsArrTemp.length; index++) {
+        var se = solarEventsArrTemp[index].trim();
+        if(PERMITTED_SOLAR_EVENTS.includes(se)){
+            solarEventsArr.push(se);
+        } 
+    }
+
+    offset = isNumber(offset) ? parseInt(offset) : 0;
+    elevation = isNumber(elevation) ? parseInt(elevation) : 0;//not used for now
+    startDate = startDate ? new Date(startDate) : new Date();
+
+    var scanDate = new Date(startDate.toDateString()) //new Date(startDate); //scanDate = new Date(startDate.toDateString())
+    scanDate.setDate(scanDate.getDate() + 1)//fwd one day to catch times behind of scan day
+    var loopMonitor = 0;
+    var result = [];
+
+    // performance.mark('initEnd')
+    // performance.measure('Start to Now', 'Start', 'initEnd')
+    // performance.mark('FirstScanStart');
+
+    //first scan backwards to get prior solar events
+    while (loopMonitor < 3 && solarEventsPast.length) {
+        loopMonitor++;
+        let timesIteration1 = SunCalc.getTimes(scanDate, lat, lng);
+        // timesIteration1 = new SolarCalc(scanDate,lat,lng);
+
+        for (let index = 0; index < solarEventsPast.length; index++) {
+            const se = solarEventsPast[index];
+            let seTime = timesIteration1[se]; 
+            let seTimeOffset = new Date(seTime.getTime() + offset*60000);
+            if (isValidDateObject(seTimeOffset) && seTimeOffset <= startDate) {
+                result.push({ event: se, time: seTime, timeOffset: seTimeOffset });
+                solarEventsPast.splice(index, 1);//remove that item
+                index--;
+            }
+        }
+        scanDate.setDate(scanDate.getDate() - 1);
+    }
+
+    scanDate = new Date(startDate.toDateString())
+    scanDate.setDate(scanDate.getDate() - 1)//back one day to catch times ahead of current day
+    loopMonitor = 0;
+    //now scan forwards to get future events
+    while (loopMonitor < 183 && solarEventsFuture.length) {
+        loopMonitor++;
+        let timesIteration2 = SunCalc.getTimes(scanDate, lat, lng);
+        // timesIteration2 = new SolarCalc(scanDate,lat,lng);
+        for (let index = 0; index < solarEventsFuture.length; index++) {
+            const se = solarEventsFuture[index];
+            let seTime = timesIteration2[se];
+            let seTimeOffset = new Date(seTime.getTime() + offset*60000)
+            if (isValidDateObject(seTimeOffset) && seTimeOffset > startDate) {
+                result.push({ event: se, time: seTime, timeOffset: seTimeOffset });
+                solarEventsFuture.splice(index, 1);//remove that item
+                index--;
+            }
+        }
+        scanDate.setDate(scanDate.getDate() + 1);
+    }
+    // performance.mark('SecondScanEnd');
+    // performance.measure('FirstScanEnd to SecondScanEnd', 'FirstScanEnd', 'SecondScanEnd');
+
+    //sort the results to get a timeline
+    var sorted = result.sort((a,b) => {
+        if(a.time < b.time){
+            return -1;
+        }else if(a.time > b.time){
+            return 1;
+        }else{
+            return 0;
+        }
+    });
+
+    //now scan through sorted solar events to determine day/night/twilight etc
+    var state = "", solarState = {};
+    for (let index = 0; index < sorted.length; index++) {
+        const event = sorted[index];
+        if(event.time < startDate){
+            switch(event.event){
+                case "nightEnd":
+                    state = "Astronomical Twilight";//todo: i18n
+                    updateSolarState(solarState,state,"rise",false,false,true,false,false,false,false);
+                    break;
+                // case "astronomicalDawn":
+                //     state = "Astronomical Twilight";//todo: i18n
+                //     updateSolarState(solarState,state,"rise",false,false,true,false,false,false,false);
+                //     break;                    
+                case "nauticalDawn":
+                    state = "Nautical Twilight";
+                    updateSolarState(solarState,state,"rise",false,false,false,true,false,false,false);
+                    break;
+                case "civilDawn":
+                    state = "Civil Twilight";
+                    updateSolarState(solarState,state,"rise",false,false,false,false,true,true,false);
+                    break;
+                // case "morningGoldenHourStart":
+                //     updateSolarState(solarState,null,"rise",false,false,false,false,true,true,false);
+                //     break;                    
+                case "sunrise":
+                    state = "Civil Twilight";
+                    updateSolarState(solarState,state,"rise",false,false,false,false,true,true,false);
+                    break;
+                case "sunriseEnd":
+                    state = "Day";
+                    updateSolarState(solarState,state,"rise",true,false,false,false,false,true,false);
+                    break;
+                case "morningGoldenHourEnd":
+                    state = "Day";
+                    updateSolarState(solarState,state,"rise",true,false,false,false,false,false,false);
+                    break;
+                case "solarNoon":
+                    updateSolarState(solarState,null,"fall");
+                    break;
+                case "eveningGoldenHourStart":
+                    state = "Day";
+                    updateSolarState(solarState,state,"fall",true,false,false,false,false,false,true);
+                    break;
+                case "sunsetStart":
+                    state = "Day";
+                    updateSolarState(solarState,state,"fall",true,false,false,false,false,false,true);
+                    break;
+                case "sunset":
+                    state = "Civil Twilight";
+                    updateSolarState(solarState,state,"fall",false,false,false,false,true,false,true);
+                    break;
+                // case "eveningGoldenHourEnd":
+                //     state = "Nautical Twilight";
+                //     updateSolarState(solarState,state,"fall",false,false,false,false,true,false,false);
+                //     break;
+                case "civilDusk":
+                    state = "Nautical Twilight";
+                    updateSolarState(solarState,state,"fall",false,false,false,true,false,false,false);
+                    break;
+                case "nauticalDusk":
+                    state = "Astronomical Twilight";
+                    updateSolarState(solarState,state,"fall",false,false,true,false,false,false,false);
+                    break;
+                // case "astronomicalDusk":
+                case "night":
+                case "nightStart":
+                    state = "Night";
+                    updateSolarState(solarState,state,"fall",false,true,false,false,false,false,false);
+                    break;
+                case "nadir":
+                    updateSolarState(solarState,null,"rise");
+                    break;
+            }
+        } else {
+            break;
+        }
+        
+    }
+    //update final states
+    updateSolarState(solarState);//only sending `stateObject` makes updateSolarState() compute dawn/dusk etc
+    
+    //now filter to only events of interest
+    var futureEvents = sorted.filter( (e) => e.timeOffset >= startDate );
+    var wantedFutureEvents = [];
+    for (let index = 0; index < futureEvents.length; index++) {
+        const fe = futureEvents[index];
+        if(solarEventsArr.includes(fe.event)){
+            wantedFutureEvents.push(fe);
+        }
+    }
+    var nextType = wantedFutureEvents[0].event
+    var nextTime = wantedFutureEvents[0].time
+    var nextTimeOffset = wantedFutureEvents[0].timeOffset
+    // performance.mark('End')
+    // performance.measure('SecondScanEnd to End', 'SecondScanEnd', 'End')
+    // performance.measure('Start to End', 'Start', 'End')
+
+    return {
+        solarState: solarState,
+        nextEvent: nextType,
+        nextEventTime: nextTime,
+        nextEventTimeOffset: nextTimeOffset,
+        eventTimes: wantedFutureEvents,
+        //allTimes: sorted,
+        //eventTimesByType: resultCategories
+    }
+
+
+    function updateSolarState(stateObject, state, direction, day, night,
+                            astrologicalTwilight, nauticalTwilight, civilTwilight,
+                            morningGoldenHour, eveningGoldenHour) {
+        if(arguments.length > 1){
+            if(state) stateObject.state = state;
+            stateObject.direction = direction;
+            if(arguments.length > 3){
+                stateObject.day = day;
+                stateObject.night = night;
+                stateObject.astrologicalTwilight = astrologicalTwilight;
+                stateObject.nauticalTwilight = nauticalTwilight;
+                stateObject.civilTwilight = civilTwilight;
+                stateObject.goldenHour = morningGoldenHour || eveningGoldenHour
+                stateObject.twilight = stateObject.astrologicalTwilight || stateObject.nauticalTwilight || stateObject.civilTwilight;
+            }
+            return;
+        }
+        stateObject.morningTwilight = stateObject.direction == "rise" && stateObject.twilight;
+        stateObject.eveningTwilight = stateObject.direction == "fall" && stateObject.twilight;
+        stateObject.dawn =  stateObject.direction == "rise" && stateObject.civilTwilight;
+        stateObject.dusk =  stateObject.direction == "fall" && stateObject.civilTwilight;
+        stateObject.morningGoldenHour =  stateObject.direction == "rise" && stateObject.goldenHour;
+        stateObject.eveningGoldenHour =  stateObject.direction == "fall" && stateObject.goldenHour;              
+    }
+}
+
+function exportTask(task, includeStatus) {
+    var o = {
+        topic: task.node_topic || task.name,
+        name: task.name || task.node_topic,
+        payload: task.node_payload,
+        type: task.node_type,
+        limit: task.node_limit || null,
+        expressionType: task.node_expressionType,
+
+    }
+    if(o.expressionType === "solar"){
+        o.solarType = task.node_solarType;
+        o.solarEvents = task.node_solarEvents;
+        o.location = task.node_location;
+        o.offset = task.node_offset;
+    } else {
+        o.expression = task.node_expression;
+    }
+    if(includeStatus){
+        o.isDynamic = task.isDynamic === true;
+        o.modified = task.node_modified === true;
+    }
+
+    return o;
 }
 
 module.exports = function (RED) {
@@ -142,16 +654,14 @@ module.exports = function (RED) {
         var node = this;
         node.name = config.name;
         node.payload = config.payload;
-        node.payloadType = config.payloadType || "date";
+        node.payloadType = config.payloadType || "default";
         node.crontab = config.crontab;
         node.outputField = config.outputField || "payload";
         node.timeZone = config.timeZone;
         node.options = config.options;
-        node.commandResponseMsgOutput = config.commandResponseMsgOutput || "output2";
-        node.outputs = config.commandResponseMsgOutput === "output1" ? 1 : 2;//1 output pins (all messages), 2 outputs (schedules out of pin1, command responses out of pin2)
-        function isObject(o){
-            return (typeof o === 'object' && o !== null);
-        }
+        node.commandResponseMsgOutput = config.commandResponseMsgOutput || "output1";
+        node.outputs = config.commandResponseMsgOutput === "output2" ? 2 : 1;//1 output pins (all messages), 2 outputs (schedules out of pin1, command responses out of pin2)
+
         const setProperty = function (msg, field, value) {
             const set = (obj, path, val) => {
                 const keys = path.split('.');
@@ -179,13 +689,19 @@ module.exports = function (RED) {
             }
         }
 
-        const sendMsg = (node, task, crontimestamp) => {
+        const sendMsg = (node, task, crontimestamp, manualTrigger) => {
             msg = {cronplus: {}};
             msg.topic = task.node_topic;
             msg.cronplus.triggerTimestamp = crontimestamp;
-            msg.cronplus.status = getTaskStatus(node, task);
+            let se = task.node_expressionType == "solar" ? task.node_solarEventTimes.nextEvent : "";
+            msg.cronplus.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
+            let se2 = task.node_expressionType == "solar" ? task.node_solarEventTimes.nextEvent : "";
+
+            if(se) msg.cronplus.status.solarEvent = se;
+            if(se) msg.cronplus.status.solarEvent2 = se2;
             msg.cronplus.config = exportTask(task);
-            msg.scheduledEvent = true;
+            if(manualTrigger) msg.manualTrigger = true;
+            msg.scheduledEvent = !msg.manualTrigger;
             node.status({ fill: "green", shape: "ring", text: "Job started" });
             try {
                 if (task.node_type !== 'flow' && task.node_type !== 'global') {
@@ -200,6 +716,9 @@ module.exports = function (RED) {
                         pl = task.node_payload;
                     } else if(task.node_type === 'bin' && Array.isArray(task.node_payload)){
                         pl = Buffer.from(task.node_payload);
+                    } else if(task.node_type === 'default'){
+                        pl = msg.cronplus;
+                        delete msg.cronplus; //To delete or not?
                     } else {                        
                         pl = RED.util.evaluateNodeProperty(task.node_payload, task.node_type, node, msg);    
                     }
@@ -229,31 +748,18 @@ module.exports = function (RED) {
             return task;
         }
 
-        function exportTask(task) {
-            var o = {
-                name: task.name || task.node_topic,
-                payload: task.node_payload,
-                type: task.node_type,
-                limit: task.node_limit || null,
-                expressionType: task.node_expressionType
-            }
-            if(o.expressionType == "sunrise" || o.expressionType == "sunset"){
-                o.location = task.node_location;
-                o.offset = task.node_offset;
-            } else {
-                o.expression = task.node_expression;
-            }
-            return o;
-        }
-        function getTaskStatus(node, task){
-            let exp = (task.node_expressionType == "sunrise" || task.node_expressionType == "sunset") ? task.node_location : task.node_expression;
-            let h = describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset)
+        function getTaskStatus(node, task, opts){
+            opts = opts || {};
+            let sol = task.node_expressionType === "solar";
+            let exp = sol ? task.node_location : task.node_expression;
+            let h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts)
             let nextDescription = null;
             let nextDate = null;
             let running = !isTaskFinished(task);
             if(running){
-                nextDescription = h.nextDescription;
-                nextDate = h.nextDate;
+                //nextDescription = h.nextDescription;
+                nextDescription = h.prettyNext;
+                nextDate = sol ? h.nextEventTimeOffset : h.nextDate;
             }
             let tz = node.timeZone;
             let localTZ = "";
@@ -265,104 +771,26 @@ module.exports = function (RED) {
 
             let r = {
                 type: task.isDynamic ? "dynamic" : "static",
-                isRunning: task.isRunning,
+                modified: task.modified ? true : false,
+                isRunning: running && task.isRunning,
                 count: task.node_count,
                 limit: task.node_limit,
                 nextDescription: nextDescription,
-                nextDate: nextDate,
-                nextDateTZ: formatShortDateTimeWithTZ(nextDate, tz),
+                nextDate: running ? nextDate : null,
+                nextDateTZ: running ? formatShortDateTimeWithTZ(nextDate, tz) : null,
                 timeZone: tz,
                 serverTime: new Date(),
                 serverTimeZone: localTZ,
                 description: h.description
             }
-            if(h.sun) r.sun = h.sun;
+            if(sol) {
+                r.solarState = h.solarState;
+                r.solarTimes = running ? h.eventTimes : null;
+                r.nextDescription = running ? nextDescription : null;//r.solarTimes && (r.solarTimes[0].event + " " + r.nextDescription);
+            }
             return r;
         }
         
-        function describeExpression(expression, expressionType, timeZone, offset){
-            let now = new Date();
-            let result = {description:undefined,nextDate:undefined,nextDescription:undefined};
-            try {
-                let cronOpts = node.timeZone ? { timezone: timeZone } : undefined;
-                let ds = null;
-                let dsOk = false;
-                let exOk = false;
-                if(expressionType == "sunrise" || expressionType == "sunset"){
-                    let opt = {
-                        expressionType: expressionType,
-                        location: expression,
-                        offset: offset,
-                        name: "dummy"
-                    }
-                    if(validateOpt(opt)){
-                        ds = parseSunTime(opt);
-                        opt.expressionType = "sunrise";
-                        let sunrise = parseSunTime(opt);
-                        let sunriseTime = sunrise.dates[0];
-                        opt.expressionType = "sunset";
-                        let sunset = parseSunTime(opt);
-                        let sunsetTime = sunset.dates[0];
-                        result.sun = {
-                            state: sunriseTime > sunsetTime ? "up" : "down",
-                            nextSunrise: sunriseTime,
-                            nextSunset: sunsetTime,
-                            nextSunriseTZ: formatShortDateTimeWithTZ(sunriseTime, timeZone),
-                            nextSunsetTZ: formatShortDateTimeWithTZ(sunsetTime,timeZone),
-                            offset: opt.offset ? opt.offset : 0
-                        }
-
-                        dsOk = ds && ds.isDateSequence;
-                    }
-                } else {
-                    let isValidCron = cronosjs.validate(expression);
-                    if(isValidCron){
-                        exOk = isValidCron;
-                    } else { 
-                        ds = parseDateSequence(expression);
-                        dsOk = ds.isDateSequence;
-                    } 
-                    
-                }
-
-                // try {
-                //     ds = parseDateSequence(expression);
-                // } catch (e) {
-                // }
-                if(dsOk){
-                    let task = ds.task;
-                    let dates = ds.dates;
-                    result.description = "Date sequence with " + dates.length +  " fixed dates";
-                    if(task && task._sequence && dates){
-                        result.nextDate = task._sequence.nextDate(now);
-                        let first = dates[0]; 
-                        let count = dates.length;
-                        if(count == 1){
-                            if(expressionType === "sunrise" || expressionType === "sunset"){
-                                result.description = expressionType + " at " + formatShortDateTimeWithTZ(first,timeZone) ;
-                            } else {
-                                result.description = "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
-                            }
-                        } else {
-                            result.description = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
-                        }
-                    }
-                } 
-                
-                if(exOk){
-                    let cronExpression = cronosjs.CronosExpression.parse(expression, cronOpts)
-                    result.nextDate = cronExpression.nextDate();
-                    result.description = humanizeCron(expression);    
-                }
-                if(result.nextDate){
-                    let ms = result.nextDate.valueOf() - now.valueOf();
-                    result.nextDescription = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
-                }
-            } catch (error) {
-                node.debug(error);
-            }
-            return result;
-        }
         function stopTask(node,name,resetCounter){
             let task = getTask(node,name);
             if(task){
@@ -461,15 +889,20 @@ module.exports = function (RED) {
             for (let index = 0; index < options.length; index++) {
                 let opt = options[index];
                 let task = getTask(node,opt.name);
-                let taskcount = 0;
+                let isDynamic = !task || task.isDynamic;
+                let isStatic = task && task.isStatic;
+                let opCount = 0, modified = false;
                 if(task){
-                    taskcount  = task.node_count || 0; 
+                    if(!isStatic) modified = true;
+                    opCount  = task.node_count || 0; 
                     deleteTask(node,opt.name);
                 }
-                let t = createTask(node,opt);    
+                let taskCount = node.tasks ? node.tasks.length : 0;
+                let t = createTask(node, opt, taskCount, isStatic);    
                 if(t){
-                    t.node_count = taskcount;
-                    t.isDynamic = true;
+                    if(modified) t.node_modified = true;
+                    t.node_count = opCount;
+                    t.isDynamic = isDynamic;
                 }
             }
             updateNextStatus(node);
@@ -485,66 +918,9 @@ module.exports = function (RED) {
             return false;
         }
 
-        function validateOpt(opt, permitDefaults=true) {
-            if (!opt) {
-                throw new Error(`Schedule options are undefined`);
-            }
-            if (!opt.name) {
-                throw new Error(`Schedule name property missing`);
-            }
-            if(!opt.expressionType || opt.expressionType === "cron" || opt.expressionType === "datesequence"){//cron
-                if (!opt.expression) {
-                    throw new Error(`Schedule '${opt.name}' - expression property missing`);
-                }    
-                let valid = false;
-                try {
-                    valid = cronosjs.validate(opt.expression);    
-                    if(valid)
-                        opt.expressionType = "cron";
-                } catch (error) {
-                    node.debug(error);
-                }
-                try {
-                    if(!valid){
-                        valid = isDateSequence(opt.expression)
-                        if(valid)
-                            opt.expressionType = "datesequence";
-                    }    
-                } catch (error) {
-                    node.debug(error);
-                }
-
-                if(!valid){
-                    throw new Error(`Schedule '${opt.name}' - expression '${opt.expression}' must be either a cron expression, a date, an a array of dates or a CSV of dates`);
-                }                    
-    
-            } else if(opt.expressionType === "sunrise" || opt.expressionType === "sunset"){//sunrise/sunset
-                if (!opt.offset) {
-                    opt.offset = 0;
-                }    
-                if (!opt.location) {
-                    throw new Error(`Schedule '${opt.name}' - location property missing`);
-                }    
-            } else {
-                throw new Error(`Schedule '${opt.name}' - invalid schedule type '${opt.expressionType}'. Expected 'cron', 'sunrise' or 'sunset'`);
-            }
-            opt.payload = permitDefaults ? opt.payload || "payload" : opt.payload;
-            if (!opt.payload) {
-                throw new Error(`Schedule '${opt.name}' - payload property missing`);
-            }
-            opt.type = permitDefaults ? opt.type || "date" : opt.type;
-            if (!opt.type) {
-                throw new Error(`Schedule '${opt.name}' - type property missing`);
-            }
-            let okTypes = ['flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']
-            let typeOK = okTypes.find( el => {return el == opt.type})
-            if (!typeOK) {
-                throw new Error(`Schedule '${opt.name}' - type property '${opt.type}' is not valid. Must be one of the following... ${okTypes.join(",")}`);
-            }
-            return true;
-        }
-
-        function createTask(node,opt) {
+        
+        function createTask(node, opt, index, static) {
+            applyOptionDefaults(opt, index);
             try {
                 validateOpt(opt);                    
             } catch (error) {
@@ -557,20 +933,26 @@ module.exports = function (RED) {
             if(opt.expressionType == "cron"){
                 let expression = cronosjs.CronosExpression.parse(opt.expression, cronOpts);
                 task = new cronosjs.CronosTask(expression);
-            } else if(opt.expressionType === "sunrise" || opt.expressionType === "sunset") {
-                let ds = parseSunTime(opt,1); 
+            } else if(opt.expressionType === "solar") {
+                let ds = parseSolarTimes(opt); 
                 task = ds.task;
+                task.node_solarEventTimes = ds.solarEventTimes;
             } else {
                 let ds = parseDateSequence(opt.expression);            
                 task = ds.task;
             }
+            task.isDynamic = !static;
+            task.isStatic = static;
             task.name = ""+opt.name;
-            task.node_topic = opt.name
-            task.node_expression = opt.expression
-            task.node_payload = opt.payload
-            task.node_type = opt.type
+            // task.node_index = index;
+            task.node_topic = opt.topic;
+            task.node_expression = opt.expression;
+            task.node_payload = opt.payload;
+            task.node_type = opt.type;
             task.node_count = 0;
             task.node_location = opt.location;
+            task.node_solarType = opt.solarType;
+            task.node_solarEvents = opt.solarEvents;
             task.node_expressionType = opt.expressionType;
             task.node_offset = opt.offset;
             task.node_opt = opt;
@@ -581,23 +963,31 @@ module.exports = function (RED) {
                 node.status({ fill: "green", shape: "ring", text: "Running " + formatShortDateTimeWithTZ(timestamp, node.timeZone) });
                 if(isTaskFinished(task)){
                     process.nextTick(function(){
+                        if( (task.node_expressionType === "solar") ){
+                            updateTask(node,task.node_opt,null);   
+                        } 
                         //using nextTick is a work around for an issue (#3) in cronosjs where the job restarts itself after this event handler has exited
                         task.stop();
                         updateNextStatus(node);
                     })
                     return;
                 } 
-                if( (task.node_expressionType === "sunrise"||task.node_expressionType === "sunset")){
-                    updateTask(node,task.node_opt,null);
-                    let t = getTask(node,task.name);
-                    if(t){
-                        t.node_count = t.node_count + 1;//++ stops at 2147483647
-                        sendMsg(node, t, timestamp);    
-                    }    
-                } else {
-                    task.node_count = task.node_count + 1;//++ stops at 2147483647
-                    sendMsg(node, task, timestamp);    
-                }
+                // if( (task.node_expressionType === "solar")){
+                //     updateTask(node,task.node_opt,null);
+                //     let t = getTask(node,task.name);
+                //     if(t){
+                //         t.node_count = t.node_count + 1;//++ stops at 2147483647
+                //         sendMsg(node, t, timestamp);    
+                //     }    
+                // } else {
+                //     task.node_count = task.node_count + 1;//++ stops at 2147483647
+                //     sendMsg(node, task, timestamp);    
+                // }
+                task.node_count = task.node_count + 1;//++ stops at 2147483647
+                sendMsg(node, task, timestamp);    
+                // if( (task.node_expressionType === "solar") ){
+                //     updateTask(node,task.node_opt,null);   
+                // } 
             })
             .on('ended', () => {
                 updateNextStatus(node);
@@ -628,7 +1018,7 @@ module.exports = function (RED) {
             for(var iOpt = 0; iOpt < node.options.length; iOpt++){
                 let opt = node.options[iOpt];
                 opt.name = opt.name || opt.topic;
-                createTask(node,opt);
+                createTask(node, opt, iOpt, true);
             }
 
             updateNextStatus(node);
@@ -717,7 +1107,7 @@ module.exports = function (RED) {
 
             //is this an button press?...
             if(!msg.payload && !msg.topic){//TODO: better method of differenciating between bad input and button press
-                sendMsg(node, node.tasks[0], Date.now());
+                sendMsg(node, node.tasks[0], Date.now(), true);
                 return;
             }
             if(typeof msg.payload != "object"){
@@ -743,37 +1133,74 @@ module.exports = function (RED) {
                     let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
                     switch (action) {
                         case "describe":
-                            let exp = (cmd.expressionType == "sunrise" || cmd.expressionType == "sunset") ? cmd.location : cmd.expression;
-                            newMsg.payload.result = describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset);
+                            let exp = (cmd.expressionType === "solar") ? cmd.location : cmd.expression;
+                            applyOptionDefaults(cmd);
+                            newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, {includeSolarStateOffset:true});
                             sendCommandResponse(newMsg);
                             break;
                         case "status":
-                        case "export":
-                            let task = getTask(node,cmd.name);
-                            if(task){
-                                newMsg.payload.result.config = exportTask(task);
-                                newMsg.payload.result.status = getTaskStatus(node, task);
-                            } else {
-                                newMsg.error = `${cmd.name} not found`;
+                            {
+                                let task = getTask(node,cmd.name);
+                                if(task){
+                                    newMsg.payload.result.config = exportTask(task, true);
+                                    newMsg.payload.result.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
+                                } else {
+                                    newMsg.error = `${cmd.name} not found`;
+                                }
+                                sendCommandResponse(newMsg);
                             }
-                            sendCommandResponse(newMsg);
                             break;
+                        case "export":
+                            {
+                                let task = getTask(node,cmd.name);
+                                if(task){
+                                    newMsg.payload.result = exportTask(task, false);
+                                } else {
+                                    newMsg.error = `${cmd.name} not found`;
+                                }
+                                sendCommandResponse(newMsg);
+                            }
+                            break;                            
                         case "list-all":
                         case "status-all":
-                        case "export-all":
-                            let results = [];
-                            if(node.tasks){
-                                for (let index = 0; index < node.tasks.length; index++) {
-                                    const task = node.tasks[index];
-                                    let result = {};
-                                    result.config = exportTask(task);
-                                    result.status = getTaskStatus(node, task);
-                                    results.push(result);    
+                            {    
+                                let results = [];
+                                if(node.tasks){
+                                    for (let index = 0; index < node.tasks.length; index++) {
+                                        const task = node.tasks[index];
+                                        let result = {};
+                                        result.config = exportTask(task, true);
+                                        result.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
+                                        results.push(result);    
+                                    }
                                 }
+                                newMsg.payload.result = results;
+                                sendCommandResponse(newMsg);
                             }
-                            newMsg.payload.result = results;
-                            sendCommandResponse(newMsg);
                             break;
+                        case "export-all":
+                        case "export-all-dynamic":
+                        case "export-all-static":
+                            {
+                                let results = [];
+                                let dynamicOnly = action === "export-all-dynamic";
+                                let staticOnly = action === "export-all-static";
+                                if(node.tasks){
+                                    for (let index = 0; index < node.tasks.length; index++) {
+                                        const task = node.tasks[index];
+                                        if(dynamicOnly) {
+                                            if(task.isDynamic) results.push(exportTask(task, false));    
+                                        } else if(staticOnly){
+                                            if(!task.isDynamic) results.push(exportTask(task, false));    
+                                        } else {
+                                            results.push(exportTask(task, false));    
+                                        }
+                                    }
+                                }
+                                newMsg.payload.result = results;
+                                sendCommandResponse(newMsg);
+                            }
+                            break;                            
                         case "add":
                         case "update":
                             updateTask(node,cmd,msg);
@@ -811,7 +1238,7 @@ module.exports = function (RED) {
     }
     RED.nodes.registerType("cronplus", CronPlus);
 
-    RED.httpAdmin.post("/cronplus/:id", RED.auth.needsPermission("cronplus.write"), function (req, res) {
+    RED.httpAdmin.post("/cronplusinject/:id", RED.auth.needsPermission("cronplus.write"), function (req, res) {
         var node = RED.nodes.getNode(req.params.id);
         if (node != null) {
             try {
@@ -826,102 +1253,83 @@ module.exports = function (RED) {
         }
     });
 
-    RED.httpAdmin.post("/cronplus", RED.auth.needsPermission("cronplus.read"), function (req, res) {
-        console.log("/cronplus", req.body);
-
-        let operation = req.body.operation || "expression-tip";
-
-        if(operation == "expression-tip"){
-            let timeZone = req.body.timeZone ? req.body.timeZone : undefined;
-            let expressionType = req.body.expressionType ? req.body.expressionType : undefined;
-            var opts = {expression: req.body.expression};
-            if(timeZone) opts.timezone = timeZone;
-            if(expressionType) {
-                opts.expressionType = expressionType;
-                if(opts.expressionType == "sunset" || opts.expressionType == "sunrise"){
-                    opts.location = req.body.location || e;
-                    opts.offset = req.body.offset;
-                }
-            }
-            try {
-                let ds, next, nextDates, desc;
-                let exOk = false;
-                let dsOk = false;
-                let now = new Date();
-                let prettyNext = "Never";
-                if(expressionType == "sunrise" || expressionType == "sunset"){
-                    ds = parseSunTime(opts);
-                    dsOk = ds.isDateSequence;
-                } else {
-                    let isValidCron = cronosjs.validate(opts.expression);
-                    if(isValidCron){
-                        exOk = cronosjs.validate(opts.expression);
-                    } else { 
-                        ds = parseDateSequence(opts.expression);
-                        dsOk = ds.isDateSequence;
-                    } 
-                }
-                 
-                if (exOk) {
-                    let ex = cronosjs.CronosExpression.parse(opts.expression, opts);    
-                    next = ex.nextDate(now);
-                    if (next) {
-                        let ms = next.valueOf() - now.valueOf();
-                        prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
-                        try {
-                            nextDates = ex.nextNDates(next, 5);
-                        } catch (error) {
-                            node.debug(error);
-                        }
-                    }
-                    desc = humanizeCron(opts.expression);
-                } else if(dsOk) {
-                    let ex = ds.task._sequence;
-                    next = ex.nextDate(now);
-                    if (next) {
-                        let ms = next.valueOf() - now.valueOf();
-                        prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
-                        try {
-                            let futureDates = ex._dates.filter(d => d > next)
-                            nextDates = futureDates.slice(0,5);
-                        } catch (error) {
-                            node.debug(error);
-                        }
-                    }
-                    let first = ex._dates[0]; 
-                    let count = ex._dates.length;
-                    if(count === 1){
-                        if(expressionType === "sunrise" || expressionType === "sunset"){
-                            desc = "At " + formatShortDateTimeWithTZ(first,timeZone) ;
-                        } else {
-                            desc = "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
-                        }
-                    } else {
-                        desc = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
-                    }
-                 
-                } else {
-                    let r = { ...opts, description: "Invalid or unsupported expression" };
-                    res.json(r);
-                }
-                let r = { ...opts, description: desc, next: next, prettyNext: prettyNext, nextDates: nextDates };
-                res.json(r);
-    
-            } catch (err) {
-                res.sendStatus(500);
-                console.error(err)
-            }
-        }        
-    });
-
-    RED.httpAdmin.post("/cronplustz", RED.auth.needsPermission("cronplus.read"), function (req, res) {
+    RED.httpAdmin.post("/cronplus/:id/:operation", RED.auth.needsPermission("cronplus.read"), function (req, res) {
+        console.log("/cronplus", req.body);       
         try {
-            res.json(timeZones);
+            let operation = req.params.operation; 
+            if(operation == "expressionTip"){
+                let timeZone = req.body.timeZone ? req.body.timeZone : undefined;
+                let expressionType = req.body.expressionType ? req.body.expressionType : undefined;
+                var opts = {expression: req.body.expression};
+                if(timeZone) opts.timezone = timeZone;
+                if(expressionType) {
+                    opts.expressionType = expressionType;
+                    if(opts.expressionType === "solar"){
+                        opts.solarType = req.body.solarType || "";
+                        opts.solarEvents = req.body.solarEvents || "";
+                        opts.location = req.body.location || "";
+                        opts.offset = req.body.offset || 0;
+                    }
+                }
+                let exp = (opts.expressionType === "solar") ? opts.location : opts.expression;
+                let h = _describeExpression(exp, opts.expressionType, opts.timeZone, opts.offset, opts.solarType, opts.solarEvents, null)
+                let r = null;
+                if(opts.expressionType == "solar"){
+                    let times = h.eventTimes && h.eventTimes.slice(1); 
+                    r = { 
+                        ...opts, 
+                        // description: desc, 
+                        description: h.description, 
+                        // next: next,
+                        next: h.nextEventTimeOffset,
+                        // nextEventDesc: nextEventDesc, 
+                        nextEventDesc: h.nextEvent, 
+                        // prettyNext: prettyNext, 
+                        prettyNext: h.prettyNext, 
+                        // nextDates: nextDates 
+                        nextDates: times 
+                    };
+                } else {
+                    let times = h.nextDates && h.nextDates.slice(1);
+                    r = { 
+                        ...opts, 
+                        description: h.description, 
+                        // next: next,
+                        next: h.nextDate,
+                        // nextEventDesc: nextEventDesc, 
+                        nextEventDesc: h.nextDescription, 
+                        // prettyNext: prettyNext, 
+                        prettyNext: h.prettyNext, 
+                        // nextDates: nextDates 
+                        nextDates: times 
+                    };
+                }
+                
+                res.json(r);
+            } else if(operation == "getDynamic") {
+                let node = RED.nodes.getNode(req.params.id); 
+                let dynNodes = node.tasks.filter((e)=>e.isDynamic)
+                let exp = (t) => exportTask(t,false);
+                let dynNodesExp = dynNodes.map(exp)
+                res.json(dynNodesExp);
+            } else if(operation == "tz") {
+                res.json(timeZones);
+            }       
+    
         } catch (err) {
             res.sendStatus(500);
             console.error(err)
         }
     });
+
+    // RED.httpAdmin.post("/cronplustz", RED.auth.needsPermission("cronplus.read"), function (req, res) {
+    //     try {
+    //         res.json(timeZones);
+    //     } catch (err) {
+    //         res.sendStatus(500);
+    //         console.error(err)
+    //     }
+    // });
 };
 
 
