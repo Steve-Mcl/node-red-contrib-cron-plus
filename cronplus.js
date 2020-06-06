@@ -209,6 +209,10 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
             ds = parseDateSequence(expression);
             dsOk = ds.isDateSequence;
         } 
+        if(!exOk && !dsOk){
+            result.description = "Invalid expression"
+            return result;
+    }
     }
 
     if(dsOk){
