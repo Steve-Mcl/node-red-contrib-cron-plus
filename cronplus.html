@@ -675,7 +675,7 @@ copies or substantial portions of the Software.
                 if (!date) {
                     return "";
                 }
-                let datestring;
+                let dateString;
                 let o = {
                     timeZone: tz ? tz : undefined,
                     timeZoneName: "short",
@@ -688,11 +688,11 @@ copies or substantial portions of the Software.
                     second: "2-digit"
                 };
                 try {
-                    datestring = new Intl.DateTimeFormat('default', o).format(new Date(date))
+                    dateString = new Intl.DateTimeFormat('default', o).format(new Date(date))
                 } catch (error) {
-                    datestring = "Error. Check timezone setting"
+                    dateString = "Error. Check timezone setting"
                 }
-                return datestring;
+                return dateString;
             }
             var makeSolarChoice = function(value, label, tooltip){
                 return { 
@@ -881,7 +881,7 @@ copies or substantial portions of the Software.
                                             nextInfo += "<table class=>" + map1.join("\n") + "</table>"; 
                                         }
                                     }
-                                    var okcontent = function(){
+                                    var okContent = function(){
                                         setTimeout(function(){
                                             console.log("initTooltip-->callback-->setTimeout--> option-->position");
                                             $this.tooltip("option", "position", pos);
@@ -890,13 +890,13 @@ copies or substantial portions of the Software.
                                         },200)
                                         return buildExpressionTip(title_html, desc, nextInfo, expressionType);
                                     } 
-                                    callback(okcontent);
+                                    callback(okContent);
                                     $this.tooltip("option", "position", pos);
                                 })
                                 .fail(function (jqXHR, textStatus, errorThrown) {
                                     console.error(jqXHR, textStatus, errorThrown)
-                                    var errcontent = buildExpressionTip("Error...", "Cannot get description from node-red","", expressionType);
-                                    callback(errcontent);
+                                    var errContent = buildExpressionTip("Error...", "Cannot get description from node-red","", expressionType);
+                                    callback(errContent);
                                 });
                             } 
                         });
@@ -1194,7 +1194,7 @@ copies or substantial portions of the Software.
                 $.ajax({
                     url: "cronplusinject/" + node.id,
                     type: "POST",
-                    success: function (resp) {
+                    success: function (response) {
                         RED.notify(node._("inject.success", { label: label }), { type: "success", id: "inject" });
                     },
                     error: function (jqXHR, textStatus, errorThrown) {
