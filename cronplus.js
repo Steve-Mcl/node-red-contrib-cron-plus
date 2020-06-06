@@ -212,7 +212,7 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
         if(!exOk && !dsOk){
             result.description = "Invalid expression"
             return result;
-    }
+        }
     }
 
     if(dsOk){
@@ -1278,7 +1278,7 @@ module.exports = function (RED) {
                     }
                 }
                 let exp = (opts.expressionType === "solar") ? opts.location : opts.expression;
-                let h = _describeExpression(exp, opts.expressionType, opts.timeZone, opts.offset, opts.solarType, opts.solarEvents, null)
+                let h = _describeExpression(exp, opts.expressionType, opts.timezone, opts.offset, opts.solarType, opts.solarEvents, null)
                 let r = null;
                 if(opts.expressionType == "solar"){
                     let times = h.eventTimes && h.eventTimes.slice(1); 
