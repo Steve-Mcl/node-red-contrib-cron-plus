@@ -1782,8 +1782,8 @@ copies or substantial portions of the Software.
             <li>Add a new schedule...
                 <ul>
                     <li>Field 1 (name)      : Enter &quot;NYSEOPEN &quot;</li>
-                    <li>Field 2 (topic)     : Enter &quot;nyse/open&quot;</li>
-                    <li>Field 3 (payload)   : Select default</li>
+                    <li>Field 2 (topic)     : Enter &quot;stocks/nyse/trading&quot;</li>
+                    <li>Field 3 (payload)   : Select boolean - true</li>
                     <li>Field 4 (type)      : Select &quot;cron&quot;</li>
                     <li>Field 5 (expression): Enter the expression <code>0 30 9 * * 1-5</code></li>                    
                 </ul>
@@ -1791,8 +1791,8 @@ copies or substantial portions of the Software.
             <li>Add a new schedule...
                 <ul>
                     <li>Field 1 (name)      : Enter &quot;NYSECLOSE &quot;</li>
-                    <li>Field 2 (topic)     : Enter &quot;nyse/close&quot;</li>
-                    <li>Field 3 (payload)   : Select default</li>
+                    <li>Field 2 (topic)     : Enter &quot;stocks/nyse/trading&quot;</li>
+                    <li>Field 3 (payload)   : Select boolean - false</li>
                     <li>Field 4 (type)      : Select &quot;cron&quot;</li>
                     <li>Field 5 (expression): Enter the expression <code>0 0 16 * * 1-5</code></li>
                 </ul>
