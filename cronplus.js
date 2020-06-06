@@ -14,7 +14,7 @@ The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 */
 
-const parser = require('cronstrue');
+const cronstrue = require('cronstrue');
 const cronosjs = require("cronosjs");
 const prettyMs = require('pretty-ms');
 const coordParser = require("coord-parser");
@@ -53,7 +53,7 @@ const PERMITTED_SOLAR_EVENTS = [
  */
 var humanizeCron = function (expression) {
     try {
-        return parser.toString(expression);
+        return cronstrue.toString(expression);
     } catch (error) {
         return `Cannot parse expression '${expression}'`
     }
