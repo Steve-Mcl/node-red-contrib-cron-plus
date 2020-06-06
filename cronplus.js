@@ -51,9 +51,11 @@ const PERMITTED_SOLAR_EVENTS = [
  * @returns {string}
  * A human readable version of the expression 
  */
-var humanizeCron = function (expression) {
+var humanizeCron = function (expression, locale) {
     try {
-        return cronstrue.toString(expression);
+        var opt = { use24HourTimeFormat: true };
+        if(locale) opt.locale = locale;
+        return cronstrue.toString(expression, opt);
     } catch (error) {
         return `Cannot parse expression '${expression}'`
     }
