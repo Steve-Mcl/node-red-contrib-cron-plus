@@ -460,6 +460,7 @@ copies or substantial portions of the Software.
             name: { value: "" },
             outputField: { value: "payload" },
             timeZone: { value: "" },
+            persistDynamic: { value: false },
             commandResponseMsgOutput: { value: "output1" },
             outputs: { value: 1 },
             options: {
@@ -1007,6 +1008,8 @@ copies or substantial portions of the Software.
                 })
                 solarEventsField.typedInput("type", option.solarType || "all");
                 solarEventsField.typedInput("value", option.solarEvents || "");//added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
+                // debugger
+                // solarEventsField.typedInput("instance").
 
                 //generate location 
                 locationGroup = $('<div class="red-ui-typedInput-container" style="margin-left:5px; width: calc(28% - 16px);">' +
@@ -1401,7 +1404,12 @@ copies or substantial portions of the Software.
           <option value="output1">Send to output 1</option>
           <option value="output2">Send to separate output</option>
         </select>
-      </div>  
+    </div> 
+    <div class="form-row">
+        <label>&nbsp;</label>
+        <input type="checkbox" id="node-input-persistDynamic" style="display:inline-block; width:15px; vertical-align:baseline;" autocomplete="off">
+        <label style="width: 60%;" for="node-input-persistDynamic" title="Auto save and reload dynamic schedules">Persist dynamic schedules</span>
+    </div>
     <div id="node-cronplus-tab-static-schedules" class="form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%; min-height: 200px">
         <label for="node-input-option-container-div" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
         <div class="red-ui-editableList-border" id="node-input-option-container-div" 

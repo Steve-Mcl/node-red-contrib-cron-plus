@@ -19,6 +19,8 @@ const cronosjs = require("cronosjs");
 const prettyMs = require('pretty-ms');
 const coordParser = require("coord-parser");
 const SunCalc = require('suncalc2');
+const path = require('path');
+const fs = require('fs');
 
 SunCalc.addTime(-18,"nightEnd","nightStart");
 SunCalc.addTime(-6,"civilDawn","civilDusk");
@@ -654,7 +656,23 @@ function exportTask(task, includeStatus) {
     return o;
 }
 
+var userDir = '', persistPath = '', persistAvaiable = false;
+const cronplusDir = "cronplusdata";
+
 module.exports = function (RED) {
+    userDir = RED.settings.userDir
+    persistPath = path.join(userDir, cronplusDir);
+    try {
+        if (!fs.existsSync(persistPath)){
+            fs.mkdirSync(persistPath);
+        }
+        persistAvaiable = fs.existsSync(persistPath);
+    } catch (e) {
+        if ( e.code !== 'EEXIST' ) { 
+            RED.log.error(`cron-plus: Error creating persistance folder '${persistPath}'. ${e.message}`)
+            persistAvaiable = false;
+        }
+    }
     function CronPlus(config) {
         RED.nodes.createNode(this, config);
         var node = this;
@@ -664,6 +682,7 @@ module.exports = function (RED) {
         node.crontab = config.crontab;
         node.outputField = config.outputField || "payload";
         node.timeZone = config.timeZone;
+        node.persistDynamic = config.persistDynamic || false;
         node.options = config.options;
         node.commandResponseMsgOutput = config.commandResponseMsgOutput || "output1";
         node.outputs = config.commandResponseMsgOutput === "output2" ? 2 : 1;//1 output pins (all messages), 2 outputs (schedules out of pin1, command responses out of pin2)
@@ -1011,6 +1030,62 @@ module.exports = function (RED) {
             return task;
         }
 
+        function serialise(){
+            try {
+                if(!persistAvaiable || !node.persistDynamic){
+                    return;
+                }  
+                let filePath = getPersistFilePath();
+                let dynNodes = node.tasks.filter((e)=>e.isDynamic)
+                let exp = (t) => exportTask(t,false);
+                let dynNodesExp = dynNodes.map(exp);
+                let data = {
+                    version: 1,
+                    schedules: dynNodesExp
+                }
+                let fileData = JSON.stringify(data);
+                fs.writeFileSync(filePath,fileData);
+            } catch (e) {
+                RED.log.error(`cron-plus: Error saving persistance data '${filePath}'. ${e.message}`)
+            }
+        }
+
+        function deserialise(){
+            try {
+                if(!persistAvaiable || !node.persistDynamic){
+                    return;
+                }
+                let filePath = getPersistFilePath();
+                if(fs.existsSync(filePath)){
+                    let fileData = fs.readFileSync(filePath);
+                    let data = JSON.parse(fileData);
+                    if(!data){
+                        return; //nothing to add
+                    }
+                    if(data.version != 1){
+                        throw new Error("Invalid version - cannot load dynamic schedules")
+                    }
+                    if(!data.schedules || !data.schedules.length){
+                        return; //nothing to add
+                    }
+                    for(let iOpt = 0; iOpt < data.schedules.length; iOpt++){
+                        let opt = data.schedules[iOpt];
+                        opt.name = opt.name || opt.topic;
+                        createTask(node, opt, iOpt, false);
+                    }
+                } else {
+                    RED.log.log(`cron-plus: no persistance data found for node '${node.id}'.`)
+                }        
+            } catch (error) {
+                RED.log.error(`cron-plus: Error loading persistance data '${filePath}'. ${e.message}`)
+            }            
+        }
+
+        function getPersistFilePath(){
+            let fileName = `node-${node.id}.json`
+            return path.join(persistPath,fileName);
+        }
+
         try {
             node.status({});
             node.nextDate = null;
@@ -1021,11 +1096,14 @@ module.exports = function (RED) {
             } 
 
             node.tasks = [];
-            for(var iOpt = 0; iOpt < node.options.length; iOpt++){
+            for(let iOpt = 0; iOpt < node.options.length; iOpt++){
                 let opt = node.options[iOpt];
                 opt.name = opt.name || opt.topic;
                 createTask(node, opt, iOpt, true);
             }
+
+            //now load dynamic schedules from file
+            deserialise();
 
             updateNextStatus(node);
 
@@ -1210,15 +1288,18 @@ module.exports = function (RED) {
                         case "add":
                         case "update":
                             updateTask(node,cmd,msg);
+                            serialise();
                             break;
                         case "clear":
                         case "remove-all":
                         case "delete-all":
                             deleteAllTasks(node);
+                            serialise();
                             break;
                         case "remove":
                         case "delete":
                             deleteTask(node,cmd.name);
+                            serialise();
                             break;
                         case "start":
                             startTask(node,cmd.name);
