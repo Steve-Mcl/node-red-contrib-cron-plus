@@ -903,11 +903,9 @@ copies or substantial portions of the Software.
                 var container, nameField, topicField, payloadField;
                 var expressionTypeField, expressionField, solarEventsField, locationGroup, offsetField
                 //build options row
-                container = $('<li/>',{style:"margin:0; padding:5px 0px 0px; border-bottom: 1px solid #ccc;"});
-                var row = $('<div/>').appendTo(container);
-                var rowM = $('<div/>',{style:"padding-top:5px; padding-left:120px;"}).appendTo(container);
-                var row2 = $('<div/>').appendTo(container);
-                var row3 = $('<div/>',{style:"padding-top:5px; padding-left:120px;"}).appendTo(container);
+                container = $('<li/>',{style:"margin:0px 0px 5px 0px; padding:0px;"});
+                var row = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
+                var row2 = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
                 
                 var div = row.append( '<div/>' )
 
@@ -1412,7 +1410,7 @@ copies or substantial portions of the Software.
     </div>
     <div id="node-cronplus-tab-static-schedules" class="form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%; min-height: 200px">
         <label for="node-input-option-container-div" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
-        <div class="red-ui-editableList-border" id="node-input-option-container-div" 
+        <div class="red-ui-editableList-border red-ui-editableList-container" id="node-input-option-container-div" 
             style="min-width: 300px; box-sizing: border-box; border-radius: 5px; padding: 5px; overflow-y:scroll;display: inline-block; width: 100%; height: calc(100% - 28px); min-height: 150px;">
             <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;"></ol>
         </div>
