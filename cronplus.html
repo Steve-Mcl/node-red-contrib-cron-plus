@@ -1564,12 +1564,26 @@ copies or substantial portions of the Software.
 
     <h3>Inputs <i>(Advanced Usage)</i></h3>
     <dl class="message-properties">
-        <dt><i>payload</i> <span class="property-type">object|Array</span></dt>
-        <dd>It is possible to dynamically add, remove & control schedules by injecting a payload object into the node. The format of the payload object (or array of objects) depends on the operation. See below for details.</dd>
+        <dt><i>topic</i> <span class="property-type">string</span></dt>
+        <dd>Most of the commands can be provided in the topic with the name of schedule in the payload (where appropriate). <br>Supported command topics... 
+                    <ul>
+                        <li>status</li>
+                        <li>export</li>
+                        <li>remove</li>
+                        <li>pause</li>
+                        <li>stop</li>
+                        <li>start</li>
+            </ul>
+            This includes the <code>-all</code>, <code>-all-dynamic</code> and <code>-all-static</code> command topics (e.g. export-all, stop-all-dynamic, start-all-static)<br>
+            See <a href="#cron-plus-commands-info">command details</a> below.
+        </dd>
+    <dl class="message-properties">
+        <dt><i>payload</i> <span class="property-type">string|object|Array</span></dt>
+        <dd>It is possible to dynamically add, remove & control schedules by injecting a payload into the node. The format of the payload object (or array of objects) depends on the operation. See below for details.</dd>
         <dd>
             <p><b>Adding one (or more) schedules</b><br>
                 Example...<br>
-                <pre class="cron-plus-code">[
+                <pre class="cron-plus-code">payload: [
   {
     "command": "add",
     "name": "every 6",
@@ -1628,10 +1642,14 @@ copies or substantial portions of the Software.
                 </ul>
             </p>
 
-            <p><b>Removing, stopping, pausing, starting, a schedule</b><br>Example...<br>
-                <pre class="cron-plus-code">{
+            <p id="cron-plus-commands-info"><b>Removing, stopping, pausing, starting, a schedule</b><br>Example...<br>
+                Topic Method...<br>
+                <pre class="cron-plus-code">msg.topic = "command"; // command name - *see details below*,
+msg.payload = "name"; //  name of the schedule</pre>
+                Payload Method...<br>
+                <pre class="cron-plus-code">payload: {
   "command": "*see details below*",
-  "name": "every 6",
+  "name": "* name of schedule",
 }</pre>
                 <p><i>Details...</i><br>
                     <ul>
@@ -1645,7 +1663,7 @@ copies or substantial portions of the Software.
                                 <li>"start"</li>
                             </ul>
                         </li>
-                        <li>name: (string|required) The name of the schedule to affect</li>
+                        <li>name: (string|optional) The name of the schedule to affect (not required when using the -all filter)</li>
                     </ul>
                 </p>
                 <p><i>Notes...</i><br>
@@ -1655,55 +1673,31 @@ copies or substantial portions of the Software.
                         <li>remove will stop and remove the schedule. This option has no output.</li>
                         <li>stop will stop the schedule specified by <code>name</code> and reset its internal counter. This option has no output.</li>
                         <li>pause will stop the schedule specified by <code>name</code> but will not reset its internal counter. This option has no output.</li>
-                        <li>start will (re)start all schedules. Any schedule that reached its limit will start from the begining. Paused schedules will resume. This option has no output.</li>
-                    </ul>
-                </p>
-            </p>                
-
-            <p><b>Status all, export all, remove all, stop all, pause all, start all...</b><br>Example...<br>
-                <pre>{
-    "command": "*see details below*"
-}</pre>
-                <p><i>Details...</i><br>
-                    <ul>
-                        <li>command: (string|required) The operation to perform - this can be one of the following...
-                            <ul>
-                                <li>"status-all"</li>
-                                <li>"export-all"</li>
-                                <li>"export-all-dynamic"</li>
-                                <li>"export-all-static"</li>
-                                <li>"remove-all"</li>
-                                <li>"stop-all"</li>
-                                <li>"pause-all"</li>
-                                <li>"start-all"</li>
-                            </ul>
-                        </li>
-                    </ul>
-                </p>
-                <p><i>Notes...</i><br>
-                    <ul>
-                        <li>status-all returns all schedules in an array of objects containing the config and status (both those added in the UI and those added dynamically)</li>
-                        <li>export-all returns all schedules in an array of objects containing the config (both those added in the UI and those added dynamically)</li>
-                        <li>export-all returns all schedules in an array of objects containing the config (both those added in the UI and those added dynamically)</li>
-                        <li>export-all-dynamic same as export-all but only dynamically added schedules are exported</li>
-                        <li>export-all-static same as export-all but only statically added schedules are exported</li>
-                        <li>remove-all will stop and remove all schedules. This option has no output</li>
-                        <li>stop-all will stop all schedules and reset internal counters. This option has no output</li>
-                        <li>pause-all will stop all schedules but will not reset internal counters. This option has no output</li>
-                        <li>start-all will (re)start all schedules. Any schedule that reached its limit will start from the beginning. Paused schedules will resume. This option has no output</li>
+                        <li>start will (re)start all schedules. Any schedule that reached its limit will start from the beginning. Paused schedules will resume. This option has no output.</li>
+                        <li>FILTER: adding <code>-all</code> to any of these commands will operate on all schedules. e.g. <code>status-all</code> will return the status of all schedules</li>
+                        <li>FILTER: adding <code>-all-dynamic</code> to any of these commands will only affect dynamic schedules e.g. <code>delete-all-dynamic</code> will delete all dynamic schedules</li>
+                        <li>FILTER: adding <code>-all-static</code> to any of these commands will only affect static schedules e.g. <code>stop-all-static</code> will stop all static schedules</li>
                     </ul>
                 </p>
                 <p><i>Examples...</i><br>
-                    Example : cmd payload to export all dynamically added schedules...<br>
-                    <pre class="cron-plus-code">{
-  "command": "export-all-dynamic"
+                    Example : Using a simple topic command to export all dynamically added schedules...<br>
+                    <pre class="cron-plus-code">msg: {
+  "topic": "export-all-dynamic"
 }</pre>                    
-                    Example : cmd payload to pause all schedules...<br>
-                    <pre class="cron-plus-code">{
+                    Example : Using a simple topic command to delete a schedule named "schedule1"<br>
+                    <pre class="cron-plus-code">msg: {
+  "topic": "remove",
+  "payload": "schedule1"
+}</pre>                    
+                    Example : Using a cmd payload to pause all schedules...<br>
+                    <pre class="cron-plus-code">payload: {
   "command": "pause-all"
 }</pre> 
                 </p>
-            </p>  
+            </p>                 
+            </p>                
+
+                 
 
             <p><b>Describe</b><br>
                 Example : cmd payload to describe a cron expression...<br>
@@ -1745,10 +1739,12 @@ copies or substantial portions of the Software.
             <ul>
                 <li>Adding a schedule with the same name as an existing schedule will replace the existing one</li>
                 <li>Adding a schedule with property <code>"limit":3</code> will cause that schedule to be stopped after the third trigger. It can be started again by injecting a payload of <code>{"command":"start" "name": "schedule name"}</code></li>
-                <li>UI added tasks can be also be updated by using the name specified in the UI</li>
+                <li>Static (UI added) schedules can be also be updated by using the name specified in the UI</li>
                 <li>When a cron-plus-plus node is modified and deployed (or node-red is restarted), dynamic entries are discarded & must be injected again</li>
                 <li>When a cron-plus-plus node outputs a msg in response to a command, <code>msg.commandResponse</code> will be <code>true</code> to indicate the message is in response to a command and not a scheduled event</li>
                 <li>When a cron-plus-plus node outputs a msg for a cron/solar event, <code>msg.scheduledEvent</code> will be <code>true</code> to indicate the message is due to a scheduled event and not a control response</li>
+                <li>The status indicator will be shown as a "ring" for dynamic schedules or shown as a "dot" for static schedules</li>
+                <li>if the payload is to "Default Payload", then the content of <code>msg.cronplus</code> is moved to <code>msg.payload</code></li>
             </ul>
         </dd>
     </dl>

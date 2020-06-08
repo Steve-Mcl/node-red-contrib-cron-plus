@@ -47,6 +47,44 @@ const PERMITTED_SOLAR_EVENTS = [
     "nadir"
 ]
 
+//accepted commands using topic as the command & (in compatible cases, the payload is the schedule name)
+//commands not supported by topic are : add/update & describe
+const control_topics = [
+    {command: "status", payloadIsName: true},
+    {command: "status-all", payloadIsName: false},
+    {command: "status-dynamic", payloadIsName: false},
+    {command: "status-static", payloadIsName: false},
+    {command: "list", payloadIsName: true},
+    {command: "list-all", payloadIsName: false},
+    {command: "list-dynamic", payloadIsName: false},
+    {command: "list-static", payloadIsName: false},
+    {command: "export", payloadIsName: true},
+    {command: "export-all", payloadIsName: false},
+    {command: "export-dynamic", payloadIsName: false},
+    {command: "export-static", payloadIsName: false},
+    {command: "stop", payloadIsName: true},
+    {command: "stop-all", payloadIsName: false},
+    {command: "stop-all-dynamic", payloadIsName: false},
+    {command: "stop-all-static", payloadIsName: false},
+    {command: "pause", payloadIsName: true},
+    {command: "pause-all", payloadIsName: false},
+    {command: "pause-all-dynamic", payloadIsName: false},
+    {command: "pause-all-static", payloadIsName: false},
+    {command: "start", payloadIsName: true},
+    {command: "start-all", payloadIsName: false},
+    {command: "start-all-dynamic", payloadIsName: false},
+    {command: "start-all-static", payloadIsName: false},
+    {command: "clear", payloadIsName: false},
+    {command: "remove", payloadIsName: true},
+    {command: "delete", payloadIsName: true},
+    {command: "remove-all", payloadIsName: false},
+    {command: "remove-all-dynamic", payloadIsName: false},
+    {command: "remove-all-static", payloadIsName: false},
+    {command: "delete-all", payloadIsName: false},
+    {command: "delete-all-dynamic", payloadIsName: false},
+    {command: "delete-all-static", payloadIsName: false},
+]
+
 /**
  * Humanize a cron express
  * @param {string} expression the CRON expression to humanize
@@ -659,6 +697,7 @@ function exportTask(task, includeStatus) {
 var userDir = '', persistPath = '', persistAvaiable = false;
 const cronplusDir = "cronplusdata";
 
+
 module.exports = function (RED) {
     userDir = RED.settings.userDir
     persistPath = path.join(userDir, cronplusDir);
@@ -699,11 +738,34 @@ module.exports = function (RED) {
             set(msg, field, value);
         };
 
-        const updateDoneStatus = (node) => {
-            node.status({ fill: "green", shape: "dot", text: "Done: " + formatShortDateTimeWithTZ(Date.now(), node.timeZone) });
-            node.nextDate = getNextDate(node.tasks);
+        const updateNodeNextInfo = (node, now) => {
+            let t = getNextTask(node.tasks);
+            if(t){
+                let indicator = t.isDynamic ? "ring" : "dot";
+                let nx = (t._expression || t._sequence)
+                node.nextDate = nx.nextDate(now);
+                node.nextEvent = t.name;
+                node.nextIndicator = indicator;
+                if(t.node_solarEventTimes && t.node_solarEventTimes.nextEvent){
+                    node.nextEvent = t.node_solarEventTimes.nextEvent;
+                }
+            } else {
+                node.nextDate = null;
+                node.nextEvent = "";
+                node.nextIndicator = "";
+            }
+        }
+
+        const updateDoneStatus = (node, task) => {
+            let indicator = "dot";
+            if(task){
+                indicator = node.nextIndicator || "dot";
+            }
+            node.status({ fill: "green", shape: indicator, text: "Done: " + formatShortDateTimeWithTZ(Date.now(), node.timeZone) });
+            // node.nextDate = getNextTask(node.tasks);
+            let now = new Date();
+            updateNodeNextInfo(node, now);
             if (node.nextDate) {
-                let now = Date.now();
                 let next = new Date(node.nextDate).valueOf();
                 //node.nextDate
                 let msTillNext = next - now;
@@ -727,7 +789,8 @@ module.exports = function (RED) {
             msg.cronplus.config = exportTask(task);
             if(manualTrigger) msg.manualTrigger = true;
             msg.scheduledEvent = !msg.manualTrigger;
-            node.status({ fill: "green", shape: "ring", text: "Job started" });
+            let indicator = node.nextIndicator || "dot";
+            node.status({ fill: "green", shape: indicator, text: "Schedule Started" });
             try {
                 if (task.node_type !== 'flow' && task.node_type !== 'global') {
                     let pl;
@@ -749,7 +812,7 @@ module.exports = function (RED) {
                     }
                     setProperty(msg, node.outputField, pl);
                     node.send(msg);
-                    updateDoneStatus(node);
+                    updateDoneStatus(node, task);
                 } else {
                     RED.util.evaluateNodeProperty(task.node_payload, task.node_type, node, msg, function (err, res) {
                         if (err) {
@@ -757,7 +820,7 @@ module.exports = function (RED) {
                         } else {
                             setProperty(msg, node.outputField, res);
                             node.send(msg);
-                            updateDoneStatus(node);
+                            updateDoneStatus(node, task);
                         }
                     });
                 }
@@ -810,6 +873,7 @@ module.exports = function (RED) {
             }
             if(sol) {
                 r.solarState = h.solarState;
+                if(h.offset) r.solarStateOffset = h.solarStateOffset;
                 r.solarTimes = running ? h.eventTimes : null;
                 r.nextDescription = running ? nextDescription : null;//r.solarTimes && (r.solarTimes[0].event + " " + r.nextDescription);
             }
@@ -825,13 +889,23 @@ module.exports = function (RED) {
             updateNextStatus(node);
             return task;
         }
-        function stopAllTasks(node,resetCounter){
+        function stopAllTasks(node,resetCounter,filter){
             if(node.tasks){
                 for (let index = 0; index < node.tasks.length; index++) {
                     let task = node.tasks[index];
                     if(task){
-                        task.stop();
-                        if(resetCounter){ task.node_count = 0; }
+                        let skip = false;
+                        if(filter){
+                            if(filter == "static" && (task.isStatic == false || task.isDynamic == true)){
+                                skip = true;
+                            } else if(filter == "dynamic" && (task.isStatic == true || task.isDynamic == false)){
+                                skip = true;
+                            }
+                        }          
+                        if(!skip){
+                            task.stop();
+                            if(resetCounter){ task.node_count = 0; }
+                        }              
                     }    
                 }
             }
@@ -848,11 +922,19 @@ module.exports = function (RED) {
             updateNextStatus(node);
             return task;
         }
-        function startAllTasks(node){
+        function startAllTasks(node, filter){
             if(node.tasks){
                 for (let index = 0; index < node.tasks.length; index++) {
                     let task = node.tasks[index];
-                    if(task){
+                    let skip = false;
+                    if(filter){
+                        if(filter == "static" && (task.isStatic == false || task.isDynamic == true)){
+                            skip = true;
+                        } else if(filter == "dynamic" && (task.isStatic == true || task.isDynamic == false)){
+                            skip = true;
+                        }
+                    }
+                    if(!skip && task){
                         if(isTaskFinished(task)){
                             task.node_count = 0;
                         }
@@ -862,20 +944,32 @@ module.exports = function (RED) {
             }
             updateNextStatus(node);
         }
-        function deleteAllTasks(node){
+        function deleteAllTasks(node, filter){
             if(node.tasks){
                 for (let index = 0; index < node.tasks.length; index++) {
                     let task = node.tasks[index];
                     if(task){
-                        task.stop();
-                        task.off("ended")
-                        task.off("started")
-                        task.off("stopped")
-                        task = null;
+                        let skip = false;
+                        if(filter){
+                            if(filter == "static" && (task.isStatic == false || task.isDynamic == true)){
+                                skip = true;
+                            } else if(filter == "dynamic" && (task.isStatic == true || task.isDynamic == false)){
+                                skip = true;
+                            }
+                        }                        
+                        if(!skip){
+                            task.stop();
+                            task.off("ended")
+                            task.off("started")
+                            task.off("stopped")
+                            task = null;
+                            node.tasks.splice(index, 1);
+                            index--;
+                        }
+                        
                     }    
                 }
             }
-            node.tasks = [];
             updateNextStatus(node);
         }
         function deleteTask(node,name){
@@ -891,7 +985,8 @@ module.exports = function (RED) {
             updateNextStatus(node);
         }
         
-        function updateTask(node,options,msg){
+        function updateTask(node,options,msg,pauseNodeStatusUntilAfterStarted){
+            console.log("updateTask():", options)
             if(!options || typeof options != "object"){
                 node.warn("schedule settings are not valid",msg);
                 return null;
@@ -918,13 +1013,15 @@ module.exports = function (RED) {
                 let isStatic = task && task.isStatic;
                 let opCount = 0, modified = false;
                 if(task){
+                    task.pauseNodeStatusUntilAfterStarted = pauseNodeStatusUntilAfterStarted;
                     if(!isStatic) modified = true;
                     opCount  = task.node_count || 0; 
                     deleteTask(node,opt.name);
                 }
                 let taskCount = node.tasks ? node.tasks.length : 0;
-                let t = createTask(node, opt, taskCount, isStatic);    
+                let t = createTask(node, opt, taskCount, isStatic, pauseNodeStatusUntilAfterStarted);  
                 if(t){
+                    t.pauseNodeStatusUntilAfterStarted = pauseNodeStatusUntilAfterStarted;
                     if(modified) t.node_modified = true;
                     t.node_count = opCount;
                     t.isDynamic = isDynamic;
@@ -943,13 +1040,14 @@ module.exports = function (RED) {
         }
 
         
-        function createTask(node, opt, index, static) {
+        function createTask(node, opt, index, static, pauseNodeStatusUntilAfterStarted) {
             applyOptionDefaults(opt, index);
             try {
                 validateOpt(opt);                    
             } catch (error) {
                 node.warn(error);
-                node.status({ fill: "red", shape: "dot", text: error.message });
+                let indicator = static ? "dot" : "ring";
+                node.status({ fill: "red", shape: indicator, text: error.message });
                 return null
             }
             let cronOpts = node.timeZone ? { timezone: node.timeZone } : undefined;
@@ -965,6 +1063,7 @@ module.exports = function (RED) {
                 let ds = parseDateSequence(opt.expression);            
                 task = ds.task;
             }
+            task.pauseNodeStatusUntilAfterStarted = pauseNodeStatusUntilAfterStarted;
             task.isDynamic = !static;
             task.isStatic = static;
             task.name = ""+opt.name;
@@ -984,7 +1083,8 @@ module.exports = function (RED) {
             task.stop();
             task.on('run', (timestamp) => {
                 node.debug(`topic: ${task.node_topic}\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
-                node.status({ fill: "green", shape: "ring", text: "Running " + formatShortDateTimeWithTZ(timestamp, node.timeZone) });
+                let indicator = task.isDynamic ? "ring" : "dot";
+                node.status({ fill: "green", shape: indicator, text: "Running " + formatShortDateTimeWithTZ(timestamp, node.timeZone) });
                 if(isTaskFinished(task)){
                     process.nextTick(function(){
                         //using nextTick is a work around for an issue (#3) in cronosjs where the job restarts itself after this event handler has exited
@@ -997,19 +1097,42 @@ module.exports = function (RED) {
                 sendMsg(node, task, timestamp);   
                 process.nextTick(function(){
                     if( (task.node_expressionType === "solar") ){
-                        updateTask(node,task.node_opt,null);
+                        // node._inhibitStatusUpdates = true;
+                        // try {
+                            // node._inhibitStatusUpdates = true;
+                            updateTask(node,task.node_opt,null,true);
+                        // } finally {
+                            // node._inhibitStatusUpdates = false;                            
+                        // }
                     }
                 })
             })
             .on('ended', () => {
+                if(task.pauseNodeStatusUntilAfterStarted) {
+                    console.log("task.on ended - pauseNodeStatusUntilAfterStarted - skipping updateNextStatus", task);
+                    return;
+                }
+                console.log("task.on ended - calling updateNextStatus", task);
                 updateNextStatus(node);
             })
             .on('started', () => {
+                if(task.pauseNodeStatusUntilAfterStarted){
+                    console.log("task.on started - setting pauseNodeStatusUntilAfterStarted=false - skipping updateNextStatus", task);
+                    task._pauseStatusUntilAfterStarted = false;
+                    return;
+                }
+                console.log("task.on started - scheduling a updateNextStatus", task);
                 process.nextTick(function(){
+                    console.log("task.on started - process.nextTick - calling updateNextStatus");
                     updateNextStatus(node);
                 })
             })
             .on('stopped', () => {
+                if(task.pauseNodeStatusUntilAfterStarted) {
+                    console.log("task.on stopped - pauseNodeStatusUntilAfterStarted - skipping updateNextStatus", task);
+                    return;
+                }
+                console.log("task.on stopped - calling updateNextStatus", task);
                 updateNextStatus(node);
             });
             task.start()
@@ -1108,18 +1231,26 @@ module.exports = function (RED) {
             if (node.tasks) {
                 node.tasks.forEach(task => task.stop())
             }
-            node.status({ fill: "red", shape: "dot", text: "Error creating Job" });
+            node.status({ fill: "red", shape: "dot", text: "Error creating schedule" });
             node.error(err);
         }
         
         function updateNextStatus(node) {
+            // if(node._inhibitStatusUpdates){
+            //     console.log("node._inhibitStatusUpdates - skipping node status update")
+            //     return;
+            // }
+            let now = new Date();
+            console.log("node._inhibitStatusUpdates - skipping node status update")
+            updateNodeNextInfo(node, now);
             if (node.tasks) {
-                node.nextDate = getNextDate(node.tasks);
+                let indicator = node.nextIndicator || "dot";
+                //node.nextDate = getNextDate(node.tasks); 
                 if (node.nextDate) {
                     let d = formatShortDateTimeWithTZ(node.nextDate, node.timeZone) || "Never";
-                    node.status({ fill: "blue", shape: "dot", text: "Next: " + d });
+                    node.status({ fill: "blue", shape: indicator, text: (node.nextEvent || "Next") + ": " + d });
                 } else {
-                    node.status({ fill: "grey", shape: "dot", text: "Job stopped" });
+                    node.status({ fill: "grey", shape: indicator, text: "All stopped" });
                 }
             } else {
                     node.status({});
@@ -1131,7 +1262,7 @@ module.exports = function (RED) {
             //return _task.isRunning ? (_task.node_limit ? _task.node_count < _task.node_limit: true) : false;
             return _task.node_limit ? _task.node_count >= _task.node_limit : false;
         }
-        function getNextDate(tasks) {
+        function getNextTask(tasks) {
             try {
                 let now = new Date();
                 if(!tasks || !tasks.length)
@@ -1144,30 +1275,38 @@ module.exports = function (RED) {
                     return null;
                 }
 
-                let d;
+                let nextToRunTask;
                 if(runningTasks.length == 1){
-                    let x = (runningTasks[0]._expression || runningTasks[0]._sequence)
-                    d = x.nextDate(now);
+                    // let x = (runningTasks[0]._expression || runningTasks[0]._sequence)
+                    nextToRunTask = runningTasks[0];
+                    // d = x.nextDate(now);
                 } else {
                     nextToRunTask = runningTasks.reduce(function (prev, current) {
-                        let p, c; 
+                        // let p, c; 
                         if(!prev) return current;
                         if(!current) return prev;
                         let px = (prev._expression || prev._sequence)
                         let cx = (current._expression || current._sequence)
                         return (px.nextDate(now) < cx.nextDate(now)) ? prev : current;
                     });
-                    if(nextToRunTask){
-                        let nx = (nextToRunTask._expression || nextToRunTask._sequence)
-                        d = nx.nextDate(now);
-                    }
-                    else{
-                        d = null;
-                    }
+                    // if(nextToRunTask){
+                    //     // let nx = (nextToRunTask._expression || nextToRunTask._sequence)
+                    //     t = nextToRunTask;
+                    //     d = nx.nextDate(now);
+                    // }
+                    // else{
+                    //     t = null;
+                    //     d = null;
+                    // }
                 }
-                if(d instanceof Date){ 
-                    return d;
-                }
+                return nextToRunTask;
+                //return t;
+                // if(typeof t == "CronosTask"){ 
+                //     return d;
+                // }
+                // if(d instanceof Date){ 
+                //     return d;
+                // }
             } catch (error) {
                 node.debug(error);
             }
@@ -1181,13 +1320,34 @@ module.exports = function (RED) {
                 sendMsg(node, node.tasks[0], Date.now(), true);
                 return;
             }
-            if(typeof msg.payload != "object"){
+
+            let controlTopic = control_topics.find(ct => ct.command == msg.topic);
+            var payload = msg.payload;
+            if(controlTopic){
+                if(controlTopic.payloadIsName){
+                    if(!payload || typeof payload != "string"){
+                        node.error(`Invalid payload! Control topic '${msg.topic}' expects the name of the schedule to be in msg.payload`,msg);
+                        return;
+                    } 
+                    //emulate the cmd object
+                    payload = {
+                        command: controlTopic.command,
+                        name: payload
+                    }
+                } else {
+                    payload = {
+                        command: controlTopic.command
+                    }
+                }
+            }
+
+            if(typeof payload != "object"){
                 return;
             }
 
             try {
-                let input = msg.payload;
-                if(Array.isArray(msg.payload) == false){
+                let input = payload;
+                if(Array.isArray(payload) == false){
                     input = [input];
                 }
                 var sendCommandResponse = function(msg){
@@ -1202,6 +1362,14 @@ module.exports = function (RED) {
                     let cmd = input[i];
                     let action = cmd.command;
                     let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
+                    let all_static = action.endsWith("all-static");
+                    let all_dynamic = action.endsWith("all-dynamic");
+                    let cmd_filter = null;
+                    if(all_dynamic){
+                        cmd_filter = "dynamic"
+                    } else if(all_static) {
+                        cmd_filter = "static"
+                    }                    
                     switch (action) {
                         case "describe":
                             let exp = (cmd.expressionType === "solar") ? cmd.location : cmd.expression;
@@ -1233,16 +1401,25 @@ module.exports = function (RED) {
                             }
                             break;                            
                         case "list-all":
+                        case "list-all-dynamic":
+                        case "list-all-static":
                         case "status-all":
+                        case "status-all-all-dynamic":
+                        case "status-all-static":
                             {    
                                 let results = [];
                                 if(node.tasks){
                                     for (let index = 0; index < node.tasks.length; index++) {
                                         const task = node.tasks[index];
-                                        let result = {};
-                                        result.config = exportTask(task, true);
-                                        result.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
-                                        results.push(result);    
+                                        if( (all_dynamic && task.isDynamic) || 
+                                            (all_static && task.isStatic) || 
+                                            (!all_static && !all_dynamic)){
+                                            let result = {};
+                                            result.config = exportTask(task, true);
+                                            result.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
+                                            results.push(result);    
+                                        }
+
                                     }
                                 }
                                 newMsg.payload.result = results;
@@ -1254,14 +1431,12 @@ module.exports = function (RED) {
                         case "export-all-static":
                             {
                                 let results = [];
-                                let dynamicOnly = action === "export-all-dynamic";
-                                let staticOnly = action === "export-all-static";
                                 if(node.tasks){
                                     for (let index = 0; index < node.tasks.length; index++) {
                                         const task = node.tasks[index];
-                                        if(dynamicOnly) {
+                                        if(all_dynamic) {
                                             if(task.isDynamic) results.push(exportTask(task, false));    
-                                        } else if(staticOnly){
+                                        } else if(all_static){
                                             if(!task.isDynamic) results.push(exportTask(task, false));    
                                         } else {
                                             results.push(exportTask(task, false));    
@@ -1280,8 +1455,12 @@ module.exports = function (RED) {
                             break;
                         case "clear":
                         case "remove-all":
+                        case "remove-all-dynamic":
+                        case "remove-all-static":
                         case "delete-all":
-                            deleteAllTasks(node);
+                        case "delete-all-dynamic":
+                        case "delete-all-static":
+                            deleteAllTasks(node,cmd_filter);
                             serialise();
                             break;
                         case "remove":
@@ -1293,15 +1472,21 @@ module.exports = function (RED) {
                             startTask(node,cmd.name);
                             break;
                         case "start-all":
-                            startAllTasks(node);
+                        case "start-all-dynamic":
+                        case "start-all-static":
+                            startAllTasks(node, cmd_filter);
                             break;
                         case "stop":
                         case "pause":
                             stopTask(node,cmd.name,cmd.command == "stop");
                             break;
                         case "stop-all":
+                        case "stop-all-dynamic":
+                        case "stop-all-static":
                         case "pause-all":
-                            stopAllTasks(node,cmd.command == "stop-all");
+                        case "pause-all-dynamic":
+                        case "pause-all-static":
+                            stopAllTasks(node,cmd.command == "stop-all", cmd_filter);
                             break;
                     }
                 }
