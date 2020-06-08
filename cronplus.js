@@ -930,7 +930,6 @@ module.exports = function (RED) {
                     t.isDynamic = isDynamic;
                 }
             }
-            updateNextStatus(node);
         }
 
         function isDateSequence(data){
@@ -988,31 +987,19 @@ module.exports = function (RED) {
                 node.status({ fill: "green", shape: "ring", text: "Running " + formatShortDateTimeWithTZ(timestamp, node.timeZone) });
                 if(isTaskFinished(task)){
                     process.nextTick(function(){
-                        if( (task.node_expressionType === "solar") ){
-                            updateTask(node,task.node_opt,null);   
-                        } 
                         //using nextTick is a work around for an issue (#3) in cronosjs where the job restarts itself after this event handler has exited
                         task.stop();
                         updateNextStatus(node);
                     })
                     return;
                 } 
-                // if( (task.node_expressionType === "solar")){
-                //     updateTask(node,task.node_opt,null);
-                //     let t = getTask(node,task.name);
-                //     if(t){
-                //         t.node_count = t.node_count + 1;//++ stops at 2147483647
-                //         sendMsg(node, t, timestamp);    
-                //     }    
-                // } else {
-                //     task.node_count = task.node_count + 1;//++ stops at 2147483647
-                //     sendMsg(node, task, timestamp);    
-                // }
                 task.node_count = task.node_count + 1;//++ stops at 2147483647
-                sendMsg(node, task, timestamp);    
-                // if( (task.node_expressionType === "solar") ){
-                //     updateTask(node,task.node_opt,null);   
-                // } 
+                sendMsg(node, task, timestamp);   
+                process.nextTick(function(){
+                    if( (task.node_expressionType === "solar") ){
+                        updateTask(node,task.node_opt,null);
+                    }
+                })
             })
             .on('ended', () => {
                 updateNextStatus(node);
@@ -1108,6 +1095,7 @@ module.exports = function (RED) {
             updateNextStatus(node);
 
             node.on('close', function (done) {
+                serialise();
                 if (node.tasks) {
                     node.tasks.forEach((task) => {
                         task.stop()
@@ -1120,7 +1108,6 @@ module.exports = function (RED) {
             if (node.tasks) {
                 node.tasks.forEach(task => task.stop())
             }
-
             node.status({ fill: "red", shape: "dot", text: "Error creating Job" });
             node.error(err);
         }
@@ -1288,6 +1275,7 @@ module.exports = function (RED) {
                         case "add":
                         case "update":
                             updateTask(node,cmd,msg);
+                            updateNextStatus(node);
                             serialise();
                             break;
                         case "clear":
