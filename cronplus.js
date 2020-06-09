@@ -780,12 +780,14 @@ module.exports = function (RED) {
             msg = {cronplus: {}};
             msg.topic = task.node_topic;
             msg.cronplus.triggerTimestamp = crontimestamp;
-            let se = task.node_expressionType == "solar" ? task.node_solarEventTimes.nextEvent : "";
+            // let se = task.node_expressionType == "solar" ? task.node_solarEventTimes.nextEvent : "";
+            let se3 = task.node_expressionType == "solar" ? node.nextEvent : "";
             msg.cronplus.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
-            let se2 = task.node_expressionType == "solar" ? task.node_solarEventTimes.nextEvent : "";
+            // let se2 = task.node_expressionType == "solar" ? task.node_solarEventTimes.nextEvent : "";
 
-            if(se) msg.cronplus.status.solarEvent = se;
-            if(se) msg.cronplus.status.solarEvent2 = se2;
+            // if(se) msg.cronplus.status.solarEvent = se;
+            // if(se2) msg.cronplus.status.solarEvent2 = se2;
+            if(se3) msg.cronplus.status.solarEvent = se3;
             msg.cronplus.config = exportTask(task);
             if(manualTrigger) msg.manualTrigger = true;
             msg.scheduledEvent = !msg.manualTrigger;
@@ -1096,14 +1098,8 @@ module.exports = function (RED) {
                 task.node_count = task.node_count + 1;//++ stops at 2147483647
                 sendMsg(node, task, timestamp);   
                 process.nextTick(function(){
-                    if( (task.node_expressionType === "solar") ){
-                        // node._inhibitStatusUpdates = true;
-                        // try {
-                            // node._inhibitStatusUpdates = true;
+                    if( task.node_expressionType === "solar" ){
                             updateTask(node,task.node_opt,null,true);
-                        // } finally {
-                            // node._inhibitStatusUpdates = false;                            
-                        // }
                     }
                 })
             })
