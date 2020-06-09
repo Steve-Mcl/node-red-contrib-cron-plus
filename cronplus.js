@@ -83,6 +83,8 @@ const control_topics = [
     {command: "delete-all", payloadIsName: false},
     {command: "delete-all-dynamic", payloadIsName: false},
     {command: "delete-all-static", payloadIsName: false},
+    {command: "debug", payloadIsName: true},
+    {command: "debug-all", payloadIsName: false},
 ]
 
 /**
@@ -1099,7 +1101,7 @@ module.exports = function (RED) {
                 sendMsg(node, task, timestamp);   
                 process.nextTick(function(){
                     if( task.node_expressionType === "solar" ){
-                            updateTask(node,task.node_opt,null,true);
+                        updateTask(node,task.node_opt,null,true);
                     }
                 })
             })
@@ -1358,12 +1360,13 @@ module.exports = function (RED) {
                     let cmd = input[i];
                     let action = cmd.command;
                     let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
-                    let all_static = action.endsWith("all-static");
-                    let all_dynamic = action.endsWith("all-dynamic");
+                    let cmd_all = action.endsWith("-all");
+                    let cmd_all_static = action.endsWith("-all-static");
+                    let cmd_all_dynamic = action.endsWith("-all-dynamic");
                     let cmd_filter = null;
-                    if(all_dynamic){
+                    if(cmd_all_dynamic){
                         cmd_filter = "dynamic"
-                    } else if(all_static) {
+                    } else if(cmd_all_static) {
                         cmd_filter = "static"
                     }                    
                     switch (action) {
@@ -1407,9 +1410,9 @@ module.exports = function (RED) {
                                 if(node.tasks){
                                     for (let index = 0; index < node.tasks.length; index++) {
                                         const task = node.tasks[index];
-                                        if( (all_dynamic && task.isDynamic) || 
-                                            (all_static && task.isStatic) || 
-                                            (!all_static && !all_dynamic)){
+                                        if( (cmd_all_dynamic && task.isDynamic) || 
+                                            (cmd_all_static && task.isStatic) || 
+                                            (!cmd_all_static && !cmd_all_dynamic)){
                                             let result = {};
                                             result.config = exportTask(task, true);
                                             result.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
@@ -1430,9 +1433,9 @@ module.exports = function (RED) {
                                 if(node.tasks){
                                     for (let index = 0; index < node.tasks.length; index++) {
                                         const task = node.tasks[index];
-                                        if(all_dynamic) {
+                                        if(cmd_all_dynamic) {
                                             if(task.isDynamic) results.push(exportTask(task, false));    
-                                        } else if(all_static){
+                                        } else if(cmd_all_static){
                                             if(!task.isDynamic) results.push(exportTask(task, false));    
                                         } else {
                                             results.push(exportTask(task, false));    
@@ -1484,6 +1487,42 @@ module.exports = function (RED) {
                         case "pause-all-static":
                             stopAllTasks(node,cmd.command == "stop-all", cmd_filter);
                             break;
+                        case "debug":{
+                                let task = getTask(node,cmd.name)
+                                let thisDebug = getTaskStatus(node, task, {includeSolarStateOffset:true});
+                                thisDebug.name = task.name;
+                                thisDebug.topic = task.node_topic;
+                                thisDebug.expressionType = task.node_expressionType;
+                                thisDebug.expression = task.node_expression;
+                                thisDebug.location = task.node_location;
+                                thisDebug.offset = task.node_offset;
+                                thisDebug.solarType = task.node_solarType;
+                                thisDebug.solarEvents = task.node_solarEvents;
+                                newMsg.payload = thisDebug;
+                                sendCommandResponse(newMsg);
+                            }
+                            break;
+                        case "debug-all":{    
+                                let results = [];
+                                if(node.tasks){
+                                    for (let index = 0; index < node.tasks.length; index++) {
+                                        const task = node.tasks[index];
+                                        let thisDebug = getTaskStatus(node, task, {includeSolarStateOffset:true});
+                                        thisDebug.name = task.name;
+                                        thisDebug.topic = task.node_topic;
+                                        thisDebug.expressionType = task.node_expressionType;
+                                        thisDebug.expression = task.node_expression;
+                                        thisDebug.location = task.node_location;
+                                        thisDebug.offset = task.node_offset;
+                                        thisDebug.solarType = task.node_solarType;
+                                        thisDebug.solarEvents = task.node_solarEvents;
+                                        results.push(thisDebug);    
+                                    }
+                                }
+                                newMsg.payload = results;
+                                sendCommandResponse(newMsg);
+                            }
+                            break;    
                     }
                 }
             } catch (error) {
