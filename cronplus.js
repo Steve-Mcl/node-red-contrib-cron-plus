@@ -52,16 +52,16 @@ const PERMITTED_SOLAR_EVENTS = [
 const control_topics = [
     {command: "status", payloadIsName: true},
     {command: "status-all", payloadIsName: false},
-    {command: "status-dynamic", payloadIsName: false},
-    {command: "status-static", payloadIsName: false},
+    {command: "status-all-dynamic", payloadIsName: false},
+    {command: "status-all-static", payloadIsName: false},
     {command: "list", payloadIsName: true},
     {command: "list-all", payloadIsName: false},
     {command: "list-dynamic", payloadIsName: false},
     {command: "list-static", payloadIsName: false},
     {command: "export", payloadIsName: true},
     {command: "export-all", payloadIsName: false},
-    {command: "export-dynamic", payloadIsName: false},
-    {command: "export-static", payloadIsName: false},
+    {command: "export-all-dynamic", payloadIsName: false},
+    {command: "export-all-static", payloadIsName: false},
     {command: "stop", payloadIsName: true},
     {command: "stop-all", payloadIsName: false},
     {command: "stop-all-dynamic", payloadIsName: false},
@@ -1358,7 +1358,7 @@ module.exports = function (RED) {
                 }
                 for (let i = 0; i < input.length; i++) {
                     let cmd = input[i];
-                    let action = cmd.command;
+                    let action = cmd.command || "";
                     let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
                     let cmd_all = action.endsWith("-all");
                     let cmd_all_static = action.endsWith("-all-static");
@@ -1403,7 +1403,7 @@ module.exports = function (RED) {
                         case "list-all-dynamic":
                         case "list-all-static":
                         case "status-all":
-                        case "status-all-all-dynamic":
+                        case "status-all-dynamic":
                         case "status-all-static":
                             {    
                                 let results = [];
