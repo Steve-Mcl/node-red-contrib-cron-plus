@@ -466,24 +466,38 @@ copies or substantial portions of the Software.
             options: {
                 value:[{payload: '', topic : '', expression : ''}], 
                 validate:function(value) { 
+                    var dupCheck = {};
                     if (value.length) {
                         for (var i = 0; i < value.length; i++) {
-                            if(!value[i].topic){
+                            if(!value[i].topic) {
+                                console.warn("cron-plus: topic missing");
+                                return false;
+                            } 
+                            if(!value[i].name) {
+                                console.warn("cron-plus: schedule name missing");
+                                return false;
+                            }                            
+                            if(dupCheck[value[i].name]) {
+                                console.warn("cron-plus: duplicate schedule named '" + value[i].name + "'");
                                 return false;
                             }
+                            dupCheck[value[i].name] = true;
                             if (!value[i].expressionType || value[i].expressionType === "cron") {
                                 if (!value[i].expression) {
+                                    console.warn("cron-plus: expression missing")
                                     return false;
                                 }
                             } else if(value[i].expressionType === "solar" ) {
                                 if (value[i].solarType != "all" && value[i].solarType != "selected") {
-                                    console.warn("solarType is not 'all' or 'selected'")
+                                    console.warn("cron-plus: solarType is not 'all' or 'selected'");
                                     return false;
                                 }
                                 if (value[i].solarType == "selected" && !value[i].solarEvents) {
+                                    console.warn("cron-plus: solarEvents missing");
                                     return false;
                                 }
                             }
+
                         }
                     }
                     return true;
@@ -771,7 +785,6 @@ copies or substantial portions of the Software.
                         tooltipClass: "cron-plus-expression-tip",
                         position: pos,
                         content: function () { 
-                            debugger
                             return buildExpressionTip("Expression...", "Getting description...","",type) 
                         } ,
                         disabled: true
