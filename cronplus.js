@@ -116,7 +116,7 @@ function validateOpt(opt, permitDefaults=true) {
     if (!opt.name) {
         throw new Error(`Schedule name property missing`);
     }
-    if(!opt.expressionType || opt.expressionType === "cron" || opt.expressionType === "datesequence"){//cron
+    if(!opt.expressionType || opt.expressionType === "cron" || opt.expressionType === "dates"){//cron
         if (!opt.expression) {
             throw new Error(`Schedule '${opt.name}' - expression property missing`);
         }    
@@ -132,7 +132,7 @@ function validateOpt(opt, permitDefaults=true) {
             if(!valid){
                 valid = isDateSequence(opt.expression)
                 if(valid)
-                    opt.expressionType = "datesequence";
+                    opt.expressionType = "dates";
             }    
         } catch (error) {
             node.debug(error);
@@ -176,7 +176,7 @@ function validateOpt(opt, permitDefaults=true) {
             }
         }
     } else {
-        throw new Error(`Schedule '${opt.name}' - invalid schedule type '${opt.expressionType}'. Expected expressionType to be 'cron' or 'solar'`);
+        throw new Error(`Schedule '${opt.name}' - invalid schedule type '${opt.expressionType}'. Expected expressionType to be 'cron', 'dates' or 'solar'`);
     }
     opt.payload = permitDefaults ? opt.payload || "payload" : opt.payload;
     if (!opt.payload) {
@@ -195,9 +195,23 @@ function validateOpt(opt, permitDefaults=true) {
 }
 
 /**
+ * Tests if a string or array of date like items are a date or date sequence
+ * @param {String|Array} data An array of date like entries or a CSV string of dates
+ */
+function isDateSequence(data){
+    try {
+        let ds = parseDateSequence(data)
+        return (ds && ds.isDateSequence);    
+    } catch (error) {
+        
+    }
+    return false;
+}
+
+/**
  * Returns an object describing the parameters.
  * @param {string} expression The expressions or coordinates to use
- * @param {string} expressionType The expression type ("cron" | "solar")
+ * @param {string} expressionType The expression type ("cron" | "solar" | "dates")
  * @param {string} timeZone An optional timezone to use
  * @param {number} offset An optional offset to apply
  * @param {string} solarType Specifies either "all" or "selected" - related to solarEvents property
@@ -244,13 +258,12 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
             dsOk = ds && ds.isDateSequence;
         }
     } else {
-        let isValidCron = cronosjs.validate(expression);
-        if(isValidCron){
-            exOk = isValidCron;
-        } else { 
+        if(expressionType == "cron" || expressionType == ""){
+            exOk = cronosjs.validate(expression);
+        } else {
             ds = parseDateSequence(expression);
             dsOk = ds.isDateSequence;
-        } 
+        }
         if(!exOk && !dsOk){
             result.description = "Invalid expression"
             return result;
@@ -260,16 +273,14 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
     if(dsOk){
         let task = ds.task;
         let dates = ds.dates;
+        let dsFutureDates = dates.filter( d => d >= now );
+        let count = dsFutureDates ? dsFutureDates.length : 0;        
         result.description = "Date sequence with fixed dates";
-        if(task && task._sequence && dates){
-            if (result.nextEventTimeOffset) {
-                let ms = result.nextEventTimeOffset.valueOf() - now.valueOf();
-                result.prettyNext = (result.nextEvent ? result.nextEvent + " " : "") +  `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
-            }            
-            let first = dates[0]; 
-            // let nextEvent = result.eventTimes[0].event; 
-            let count = dates.length;
-            if(expressionType === "solar"){
+        if(task && task._sequence && count){
+            let first = dsFutureDates[0];
+            let ms = first.valueOf() - now.valueOf();
+            result.prettyNext = (result.nextEvent ? result.nextEvent + " " : "") +  `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
+            if(expressionType === "solar"){ 
                 if(solarType === "all"){
                     result.description = "All Solar Events"; 
                 } else {
@@ -281,6 +292,7 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
                 } else {
                     result.description = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
                 }
+                result.nextDates = dates.slice(0, 5);
             }            
         }
     } 
@@ -388,8 +400,12 @@ function applyOptionDefaults(option, optionIndex) {
     }
     optionIndex = optionIndex == null ? 0 : optionIndex;
     if (option.expressionType == "") {
-        option.expressionType = "cron";//if empty, default to cron
-    } else if (["cron", "solar"].indexOf(option.expressionType) < 0) {
+        if(isDateSequence(option.expression)){
+            option.expressionType = "dates";
+        } else {
+            option.expressionType = "cron";//if empty, default to cron
+        }
+    } else if (["cron", "dates", "solar"].indexOf(option.expressionType) < 0) {
         //if expressionType is not cron or solar - it might be sunrise or sunset from an older version
         if (option.expressionType == "sunrise") {
             option.solarEvents = option.solarEvents || "sunrise";
@@ -403,6 +419,8 @@ function applyOptionDefaults(option, optionIndex) {
     }
     option.name = option.name || "schedule" + (optionIndex + 1);
     option.topic = option.topic || option.name;
+    option.payloadType = option.payloadType || option.type || "default";
+    delete option.type;
     if (option.expressionType == "cron" && !option.expression) option.expression = "0 * * * * * *";
     if (!option.solarType) option.solarType =  option.solarEvents ? "selected" : "all";
     if (!option.solarEvents) option.solarEvents = "sunrise,sunset";
@@ -674,11 +692,10 @@ function exportTask(task, includeStatus) {
     var o = {
         topic: task.node_topic || task.name,
         name: task.name || task.node_topic,
+        payloadType: task.node_payloadType,
         payload: task.node_payload,
-        type: task.node_type,
         limit: task.node_limit || null,
         expressionType: task.node_expressionType,
-
     }
     if(o.expressionType === "solar"){
         o.solarType = task.node_solarType;
@@ -718,8 +735,9 @@ module.exports = function (RED) {
         RED.nodes.createNode(this, config);
         var node = this;
         node.name = config.name;
+        node.payloadType = config.payloadType || config.type || "default";
+        delete config.type;
         node.payload = config.payload;
-        node.payloadType = config.payloadType || "default";
         node.crontab = config.crontab;
         node.outputField = config.outputField || "payload";
         node.timeZone = config.timeZone;
@@ -796,29 +814,29 @@ module.exports = function (RED) {
             let indicator = node.nextIndicator || "dot";
             node.status({ fill: "green", shape: indicator, text: "Schedule Started" });
             try {
-                if (task.node_type !== 'flow' && task.node_type !== 'global') {
+                if (task.node_payloadType !== 'flow' && task.node_payloadType !== 'global') {
                     let pl;
-                    if ((task.node_type == null && task.node_payload === "") || task.node_type === "date") {
+                    if ((task.node_payloadType == null && task.node_payload === "") || task.node_payloadType === "date") {
                         pl = Date.now();
-                    } else if (task.node_type == null) {
+                    } else if (task.node_payloadType == null) {
                         pl = task.node_payload;
-                    } else if (task.node_type === 'none') {
+                    } else if (task.node_payloadType === 'none') {
                         pl = "";
-                    } else if(task.node_type === 'json' && isObject(task.node_payload)){
+                    } else if(task.node_payloadType === 'json' && isObject(task.node_payload)){
                         pl = task.node_payload;
-                    } else if(task.node_type === 'bin' && Array.isArray(task.node_payload)){
+                    } else if(task.node_payloadType === 'bin' && Array.isArray(task.node_payload)){
                         pl = Buffer.from(task.node_payload);
-                    } else if(task.node_type === 'default'){
+                    } else if(task.node_payloadType === 'default'){
                         pl = msg.cronplus;
                         delete msg.cronplus; //To delete or not?
                     } else {                        
-                        pl = RED.util.evaluateNodeProperty(task.node_payload, task.node_type, node, msg);    
+                        pl = RED.util.evaluateNodeProperty(task.node_payload, task.node_payloadType, node, msg);    
                     }
                     setProperty(msg, node.outputField, pl);
                     node.send(msg);
                     updateDoneStatus(node, task);
                 } else {
-                    RED.util.evaluateNodeProperty(task.node_payload, task.node_type, node, msg, function (err, res) {
+                    RED.util.evaluateNodeProperty(task.node_payload, task.node_payloadType, node, msg, function (err, res) {
                         if (err) {
                             node.error(err, msg);
                         } else {
@@ -1032,17 +1050,6 @@ module.exports = function (RED) {
                 }
             }
         }
-
-        function isDateSequence(data){
-            try {
-                let ds = parseDateSequence(data)
-                return (ds && ds.isDateSequence);    
-            } catch (error) {
-                
-            }
-            return false;
-        }
-
         
         function createTask(node, opt, index, static, pauseNodeStatusUntilAfterStarted) {
             applyOptionDefaults(opt, index);
@@ -1071,16 +1078,15 @@ module.exports = function (RED) {
             task.isDynamic = !static;
             task.isStatic = static;
             task.name = ""+opt.name;
-            // task.node_index = index;
             task.node_topic = opt.topic;
+            task.node_expressionType = opt.expressionType;
             task.node_expression = opt.expression;
+            task.node_payloadType = opt.payloadType;
             task.node_payload = opt.payload;
-            task.node_type = opt.type;
             task.node_count = 0;
             task.node_location = opt.location;
             task.node_solarType = opt.solarType;
             task.node_solarEvents = opt.solarEvents;
-            task.node_expressionType = opt.expressionType;
             task.node_offset = opt.offset;
             task.node_opt = opt;
             task.node_limit = opt.limit || 0;
@@ -1234,16 +1240,10 @@ module.exports = function (RED) {
         }
         
         function updateNextStatus(node) {
-            // if(node._inhibitStatusUpdates){
-            //     console.log("node._inhibitStatusUpdates - skipping node status update")
-            //     return;
-            // }
             let now = new Date();
-            console.log("node._inhibitStatusUpdates - skipping node status update")
             updateNodeNextInfo(node, now);
             if (node.tasks) {
                 let indicator = node.nextIndicator || "dot";
-                //node.nextDate = getNextDate(node.tasks); 
                 if (node.nextDate) {
                     let d = formatShortDateTimeWithTZ(node.nextDate, node.timeZone) || "Never";
                     node.status({ fill: "blue", shape: indicator, text: (node.nextEvent || "Next") + ": " + d });

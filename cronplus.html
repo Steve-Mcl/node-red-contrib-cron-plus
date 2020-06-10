@@ -66,6 +66,36 @@ copies or substantial portions of the Software.
         }
         return value;
     }
+
+    function isCronLike(expression){
+        if(typeof expression !== "string") return false;
+        if(expression.indexOf("*") >= 0) return true;
+        let cleaned = expression.replace(/\s\s+/g, ' ');
+        let spaces = cleaned.split(" ");
+        return spaces.length >= 4 && spaces.length <= 6 ; 
+    }
+
+    function isDateSequenceLike(expression){
+        try {
+            if(typeof expression !== "string") return false;
+            if(expression.indexOf("*") >= 0) return false;
+            if(expression.indexOf("#") >= 0) return false;
+            if(expression.indexOf("?") >= 0) return false;
+            var cleaned = expression.replace(/\s\s+/g, ' ');
+            var parts = cleaned.split(",");
+            for (var index = 0; index < parts.length; index++) {
+                var part = parts[index];
+                if(parseInt(part) == part) part = parseInt(part);
+                var d = new Date(part);
+                var isDate = (d instanceof Date && !isNaN(d.valueOf()));
+                if(!isDate) return false;
+            }
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
     function showSidebarHelpPanel(){
         if(RED.sidebar.help) {
             RED.sidebar.help.show();//  >= V1.1.0
@@ -438,6 +468,12 @@ copies or substantial portions of the Software.
             }
             return result;
         },
+        showMenu: function(){
+            this.button.show();
+        },
+        hideMenu: function(){
+            this.button.hide();
+        },
         show: function() {
             this.uiSelect.show();
         },
@@ -469,10 +505,13 @@ copies or substantial portions of the Software.
                     var dupCheck = {};
                     if (value.length) {
                         for (var i = 0; i < value.length; i++) {
-                            if(!value[i].topic) {
-                                console.warn("cron-plus: topic missing");
-                                return false;
-                            } 
+                            if(!value[i].name && value[i].topic) {
+                                value[i].name = value[i].topic;
+                            }
+                            // if(!value[i].topic && value[i].name) {
+                            //     console.warn("cron-plus: topic missing");
+                            //     return false;
+                            // } 
                             if(!value[i].name) {
                                 console.warn("cron-plus: schedule name missing");
                                 return false;
@@ -506,7 +545,7 @@ copies or substantial portions of the Software.
             },
         },
         label: function () {
-            return this.name || "CRON+"
+            return this.name || "cron-plus"
         },
         oneditprepare: function () {
             var node = this;
@@ -573,13 +612,18 @@ copies or substantial portions of the Software.
                         {"key":"name", "header":"Name"},
                         {"key":"topic", "header":"Topic"},
                         {"key":"expressionType", "header":"Schedule Type"},
-                        {"key":"type", "header":"Payload Type"},
+                        {"key":"type", "header":"Payload Type"},//compat
+                        {"key":"payloadType", "header":"Payload Type"},
                         {"key":"payload", "header":"Payload"},
                         {"key":"details", "header":"Details"},
                     ]          
                     var tableData = response.map(function(e,i){
                         e.item = i+1;
-                        if(e.type == "default") e.payload = "";
+                        if(e.type){
+                            e.payloadType == e.type;
+                        }
+                        delete e.type;
+                        if(e.payloadType == "default") e.payload = "";
                         e.details = "";
                         if(e.expressionType == "solar"){
                             if(e.solarType == "all") e.details += 'solarType:"' + e.solarType + '"<br>';
@@ -734,15 +778,28 @@ copies or substantial portions of the Software.
                 makeSolarChoice("nadir", "solar midnight", "when the sun is closest to nadir and the night is equidistant from dusk and dawn"),
             ];
                 
+            function isObject(o){
+                return (typeof o === 'object' && o !== null);
+            }
+
             /** 
              * Apply defaults to the cron schedule object
              * @param {integer} optionIndex An index number to use for defaults
              * @param {object} option The option object to update
             */         
             function applyOptionDefaults(optionIndex, option) {
-                if(option.expressionType == ""){
-                    option.expressionType = "cron";//if empty, default to cron
-                } else if (["cron","solar"].indexOf(option.expressionType) < 0){
+                if(isObject(option) == false){
+                    return;//no point in continuing
+                }
+                // var version;
+                // if( !option.version && option.expressionType !== "solar" && option.expressionType !== "dates" &&  
+                //     (!option.name || !option.topic) && (!option.payloadType || option.type) ){
+                //     version = 0;
+                // } else {
+                //     version = 1;
+                // }                
+                optionIndex = optionIndex == null ? 0 : optionIndex;
+                if (["cron","dates","solar"].indexOf(option.expressionType) < 0){
                     //if expressionType is not cron or solar - it may be sunrise or sunset
                     if(option.expressionType == "sunrise"){
                         option.solarEvents = option.solarEvents || "sunrise";
@@ -751,15 +808,27 @@ copies or substantial portions of the Software.
                         option.solarEvents = option.solarEvents || "sunset";
                         option.expressionType = "solar";
                     } else {
-                        option.expressionType = "cron";
+                        if(!option.expression) {
+                            option.expressionType = "cron";
+                        } else {
+                            if (!isCronLike(option.expression)) 
+                                option.expressionType = "dates";
+                            else if(isDateSequenceLike(option.expression))
+                                option.expressionType = "dates";
+                            else 
+                                option.expressionType = "cron";
+                        }
                     }   
                 }
-                option.name = option.name || "schedule" + (optionIndex+1);
+                option.name = option.name || "schedule" + (optionIndex + 1);
                 option.topic = option.topic || option.name;
-                if (!option.expression) option.expression = "0 * * * * * *"
+                option.payloadType = option.payloadType || option.type || "default";
+                delete option.type;                
+                if (option.expressionType == "cron" && !option.expression) option.expression = "0 * * * * * *";
                 if (!option.solarType) option.solarType =  option.solarEvents ? "selected" : "all";
                 if (!option.solarEvents) option.solarEvents = "sunrise,sunset";
                 if (!option.location) option.location = "";
+                // option.version = 1; 
             }
 
             /** 
@@ -771,7 +840,7 @@ copies or substantial portions of the Software.
                 applyOptionDefaults(optionIndex, option);
                 function buildExpressionTip(title, desc, text, type){
                     var helpFuncHtml = '';
-                    if(type === "" || type === "cron" || type === "solar" ){
+                    if(type === "cron" || type === "solar" ){
                         var helpFunc = type == "solar" ? "showSolarHelp" : "showCronHelp";
                         helpFuncHtml = '<span style="float: right"><button class="cron-plus-info-button" click="'+helpFunc+'();">help <i class="fa fa-external-link"></i></button></span>';
                     }
@@ -929,15 +998,15 @@ copies or substantial portions of the Software.
 
                 //generate the name field
                 var nameClass ="node-input-option-name" + ((!option.name) ? " input-error" : "");
-                nameField = $('<input/>',{class:nameClass,type:"text",style:"margin-left:0px; width:calc(25% - 16px);", placeholder: 'name', title: "name", value:option.name}).appendTo(div);
+                nameField = $('<input/>',{class:nameClass,type:"text",style:"margin-left:0px; width:calc(28% - 16px);", placeholder: 'name', title: "name", value:option.name}).appendTo(div);
 
                 //generate the topic field
                 var topicClass ="node-input-option-topic" + ((!option.topic) ? " input-error" : "");
                 topicField = $('<input/>',{class:topicClass,type:"text",style:"margin-left:5px; width:calc(32% - 16px);", placeholder: 'topic', title: "topic", value:option.topic}).appendTo(div);
                 
                 //generate the payload field
-                payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:5px; width:calc(43% - 25px);", placeholder: 'payload', value:option.payload || ""}).appendTo(div);
-                payloadField.typedInput({default:option.type||'default',types:[{
+                payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:5px; width:calc(40% - 25px);", placeholder: 'payload', value:option.payload || ""}).appendTo(div);
+                payloadField.typedInput({default:option.payloadType||'default',types:[{
                                     icon: "fa fa-envelope",
                                     value:"default",
                                     label:"Default Payload",
@@ -946,8 +1015,9 @@ copies or substantial portions of the Software.
 
                 //generate a dropdown for trigger type
                 var expressionType = option.expressionType || "cron";
-                expressionTypeField = $('<select/>',{class:"node-input-option-expressionType",type:"text",placeholder:"cron"}).css({"width":"calc(25% - 16px)","margin-right":"5px"}).appendTo(row2);
+                expressionTypeField = $('<select/>',{class:"node-input-option-expressionType",type:"text",placeholder:"cron"}).css({"width":"calc(28% - 16px)","margin-right":"5px"}).appendTo(row2);
                 $('<option />', {value: "cron", text: "cron"}).appendTo(expressionTypeField);
+                $('<option />', {value: "dates", text: "date sequence"}).appendTo(expressionTypeField);
                 $('<option />', {value: "solar", text: "solar events"}).appendTo(expressionTypeField);
                 expressionTypeField.val(expressionType);
                 expressionTypeField.prop("title", "Expression Type");   
@@ -971,7 +1041,7 @@ copies or substantial portions of the Software.
                         { label: "At 12:00 PM, on the last Monday of the month</option (0 12 * * MONL)", value: "0 12 * * MONL" },
                     ]
 
-                expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:0px; width:calc(75% - 36px);", placeholder: '* * * * * * *', list: "cron-expression-example-list",title:"cron expression", value:option.expression}).appendTo(row2);
+                expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:0px; width:calc(72% - 36px);", placeholder: '* * * * * * *', list: "cron-expression-example-list",title:"cron expression", value:option.expression}).appendTo(row2);
                 expressionField.appendTo(row2);
                 
                 expressionField.combobox({
@@ -1072,9 +1142,9 @@ copies or substantial portions of the Software.
                 offsetField.prop("title", "Minutes Offset +/- 1439");  
                 
                 //init tooltips
-                var expDropButton = expressionField.combobox("instance").button;
+                // var expDropButton = expressionField.combobox("instance").button;
                 initTooltip(locationField,"solar", { my: "right top", at: "right bottom+5", of: offsetField, collision: "flipfit" });
-                initTooltip(expressionField,"cron", { my: "right top", at: "right bottom+5", of: expDropButton, collision: "flipfit" });
+                initTooltip(expressionField,"cron", { my: "right top", at: "right bottom+5", of: expressionField /*expDropButton*/, collision: "flipfit" });
 
                 locationField.keyup(function() {
                     var f = $(this);
@@ -1110,7 +1180,15 @@ copies or substantial portions of the Software.
                             expressionField.combobox("hide");
                             solarEventsField.typedInput("show");
                             break;
+                        case "dates":
+                            expressionField.combobox("hideMenu");
+                            expressionField.combobox("show");
+                            locationGroup.hide();
+                            offsetField.hide();                            
+                            solarEventsField.typedInput("hide");
+                            break;
                         default: //cron
+                            expressionField.combobox("showMenu");
                             expressionField.combobox("show");
                             locationGroup.hide();
                             offsetField.hide();                            
@@ -1157,11 +1235,11 @@ copies or substantial portions of the Software.
             options.each(function(i) {
                 var option = $(this);
                 var o = {
-                    expressionType: option.find(".node-input-option-expressionType").val(),
                     name: option.find(".node-input-option-name").val(),
                     topic: option.find(".node-input-option-topic").val(),
+                    payloadType: option.find(".node-input-option-payload").typedInput('type'),
                     payload: option.find(".node-input-option-payload").typedInput('value'),
-                    type: option.find(".node-input-option-payload").typedInput('type'),
+                    expressionType: option.find(".node-input-option-expressionType").val(),
                     expression: option.find(".node-input-option-expression").val(),
                     location: option.find(".node-input-option-location").val(),
                     offset: option.find(".node-input-option-offset").val(),
@@ -1463,7 +1541,7 @@ copies or substantial portions of the Software.
         </div>
         <h4>Schedules - Type</h4>
         <div style="padding-left: 15px">
-            The type determines what type of schedule. Options are <code>cron</code> or <code>solar events</code>
+            The type determines what type of schedule. Options are <code>cron</code>, <code>dates</code> or <code>solar events</code>
         </div>
         <h4>Schedules - Name</h4>
         <div style="padding-left: 15px">
@@ -1519,7 +1597,7 @@ copies or substantial portions of the Software.
         </div>        
         <h4>Schedules - Expression</h4>
         <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>cron</b></i><br>
+            <i>NOTE: Only displayed when the type is set to <b>cron</b> or <b>date sequence</b></i><br>
             A CRON expression, a date, a comma separated list of dates or an array of dates<br><br>
             <p> Date or Date Sequence Format...<br>
                 When you wish to use a fixed date or sequence of dates, the expression can be a string date, comma separated list of dates, an array of dates (The array can contain a mix of string, date objects and timestamps).
@@ -1602,7 +1680,7 @@ copies or substantial portions of the Software.
     "name": "every 6",
     "expression": "*/6 * * * * * *",
     "expressionType": "cron",
-    "type": "default",
+    "payloadType": "default",
     "limit": 3 
   },
   {
@@ -1613,8 +1691,8 @@ copies or substantial portions of the Software.
     "solarEvents": "morningGoldenHourStart,sunriseStart,eveningGoldenHourStart,sunsetStart",
     "location": "54.999320540937035 -1.417407989501953",
     "offset": "-60",
+    "payloadType": "str",
     "payload": "In 60 mins, it will be a great time to take photographs",
-    "type": "str",
     "limit": null
   }
 ]</pre>
@@ -1628,8 +1706,20 @@ copies or substantial portions of the Software.
                         <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
                         <li>expression: (string|optional) A CRON expression, a date, a comma separated list of dates or an array of dates</li>
                         <li>expressionType: (string|optional) specify the schedule type. (if omitted, "cron" is the default)</li>
+                        <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
-                        <li>type: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
+                        <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
+                    </ul><br>
+                    Adding a date sequence
+                    <ul>
+                        <li>Multiple schedules can be added if the payload is an array of objects</li>
+                        <li>command: (string|required) The operation to perform - in this case "add"</li>
+                        <li>name: (string|required) This will identify schedule</li>
+                        <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
+                        <li>expression: (string|optional) A CRON expression, a date, a comma separated list of dates or an array of dates</li>
+                        <li>expressionType: (string|required) specify the schedule type - in this case "dates"</li>
+                        <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
+                        <li>payload: (any|optional) What to send when schedule triggers</li>
                         <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
                     </ul><br>
                     Adding a solar event schedule
@@ -1643,8 +1733,8 @@ copies or substantial portions of the Software.
                         <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected". Accepted values are listed under <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">see above</a> </li>
                         <li>location: (string|required) longitude latitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
                         <li>offset: (number|optional) number of minutes to offset a sunrise or sunset</li>
+                        <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
-                        <li>type: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
                         <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
                     </ul>
                 </p>
