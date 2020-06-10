@@ -1531,7 +1531,7 @@ copies or substantial portions of the Software.
         </div>
         <h4>Schedules - Type</h4>
         <div style="padding-left: 15px">
-            The type determines what type of schedule. Options are <code>cron</code>, <code>dates</code> or <code>solar events</code>
+            The type determines what type of schedule. Options are <code>cron</code>, <code>dates sequence</code> or <code>solar events</code>
         </div>
         <h4>Schedules - Name</h4>
         <div style="padding-left: 15px">
@@ -1541,50 +1541,6 @@ copies or substantial portions of the Software.
         <div style="padding-left: 15px">
             The value to send in the payload when the schedule triggers. (NOTE: the property that the payload gets written to is determined by "output to").
         </div>     
-        <h4 id="cron-plus-solar-events-info">Schedules - Solar Events</h4>
-        <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
-            The Solar Events field permits you to chose which solar events you want a schedule to fire upon.<br>
-            Solar Events...
-            <table class="cron-plus-solar-events-table">
-                <tr><th>Event ID</th><th>Event</th><th>Information</th></tr>
-                <tr><td>nightEnd</td><td>night end / astronomical dawn</td><td>night ends, astronomical twilight starts (-18°)</td></tr>
-                <!-- <tr><td>astronomicalDawn</td><td>astronomical dawn</td><td>night ends, astronomical twilight starts (-18°)")</td></tr> -->
-                <tr><td>nauticalDawn</td><td>nautical dawn</td><td>astronomical twilight ends, nautical twilight starts (-12°)</td></tr>
-                <tr><td>civilDawn</td><td>civil dawn / golden hour</td><td>nautical twilight ends, civil twilight and golden hour starts (-6°)</td></tr>
-                <!-- <tr><td>morningGoldenHourStart</td><td>golden hour starts</td><td>when the sun is 6 degrees below the horizon (-6°)")</td></tr> -->
-                <tr><td>sunrise</td><td>sunrise</td><td>top edge of the sun appears on the horizon (-0.833°)</td></tr>
-                <tr><td>sunriseEnd</td><td>sunrise end</td><td>bottom edge of the sun touches the horizon (-0.3°)</td></tr>
-                <tr><td>morningGoldenHourEnd</td><td>morning golden hour ends</td><td>when the sun is 6 degrees above the horizon (6°)</td></tr>
-                <tr><td>solarNoon</td><td>solar noon</td><td>sun is at its highest position</td></tr>
-                <tr><td>eveningGoldenHourStart</td><td>evening golden hour start</td><td>when the sun is 6 degrees above the horizon (6°)")</td></tr>
-                <tr><td>sunsetStart</td><td>sunset start</td><td>bottom edge of the sun touches the horizon (-0.3°)</td></tr>
-                <tr><td>sunset</td><td>sunset</td><td>civil twilight starts, sun disappears below the horizon (0.833°)</td></tr>
-                <!-- <tr><td>eveningGoldenHourEnd</td><td>evening golden hour end</td><td>golden hour ends (-6°)")</td></tr> -->
-                <tr><td>civilDusk</td><td>civil dusk / golden hour end</td><td>civil twilight and golden hour ends, nautical twilight starts (-6°)</td></tr>
-                <tr><td>nauticalDusk</td><td>nautical dusk</td><td>nautical twilight ends, astronomical twilight starts (-12°)</td></tr>
-                <!-- <tr><td>astronomicalDusk</td><td>astronomical dusk</td><td>astronomical twilight ends, night starts (-18°)</td></tr> -->
-                <tr><td>nightStart</td><td>astronomical dusk / night start</td><td>astronomical twilight ends, night starts (-18°)</td></tr>
-                <tr><td>nadir</td><td>solar midnight</td><td>when the sun is closest to nadir and the night is equidistant from dusk and dawn</td></tr>
-            </table>
-        </div>
-        <h4>Schedules - Location</h4>
-        <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
-            The location field is expected to contain longitude and latitude coordinates for the calculation of solar events.<br>
-            Accepted formats...
-            <ul>
-                <li>Decimal Degrees E.g: <code class="cron-plus-coordinates">54.9992500,-1.4170300</code> or <code class="cron-plus-coordinates">54.9992500° N 1.4170300° W</code></li>
-                <li>Degrees Minutes Seconds E.g: <code class="cron-plus-coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
-                <li>Decimal Minutes E.g: <code class="cron-plus-coordinates">54° 59.955' , -1° 25.0218'</code></li>
-                <li>GPS E.g: <code class="cron-plus-coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="cron-plus-coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="cron-plus-coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="cron-plus-coordinates">54:59:57.3N 1:25:1.308W</code></li>
-            </ul>
-        </div>        
-        <h4>Schedules - Offset</h4>
-        <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
-            The offset field can be used to add a positive or negative offset in minutes to the sunrise or sunset time.
-        </div>        
         <h4>Schedules - Expression</h4>
         <div style="padding-left: 15px">
             <i>NOTE: Only displayed when the type is set to <b>cron</b> or <b>date sequence</b></i><br>
@@ -1632,6 +1588,50 @@ copies or substantial portions of the Software.
                 <li>See <a href="https://github.com/jaclarke/cronosjs">here</a> for more examples and info</li>
             </ul>
         </div>
+        <h4 id="cron-plus-solar-events-info">Schedules - Solar Events</h4>
+        <div style="padding-left: 15px">
+            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
+            The Solar Events field permits you to chose which solar events you want a schedule to fire upon.<br>
+            Solar Events...
+            <table class="cron-plus-solar-events-table">
+                <tr><th>Event ID</th><th>Event</th><th>Information</th></tr>
+                <tr><td>nightEnd</td><td>night end / astronomical dawn</td><td>night ends, astronomical twilight starts (-18°)</td></tr>
+                <!-- <tr><td>astronomicalDawn</td><td>astronomical dawn</td><td>night ends, astronomical twilight starts (-18°)")</td></tr> -->
+                <tr><td>nauticalDawn</td><td>nautical dawn</td><td>astronomical twilight ends, nautical twilight starts (-12°)</td></tr>
+                <tr><td>civilDawn</td><td>civil dawn / golden hour</td><td>nautical twilight ends, civil twilight and golden hour starts (-6°)</td></tr>
+                <!-- <tr><td>morningGoldenHourStart</td><td>golden hour starts</td><td>when the sun is 6 degrees below the horizon (-6°)")</td></tr> -->
+                <tr><td>sunrise</td><td>sunrise</td><td>top edge of the sun appears on the horizon (-0.833°)</td></tr>
+                <tr><td>sunriseEnd</td><td>sunrise end</td><td>bottom edge of the sun touches the horizon (-0.3°)</td></tr>
+                <tr><td>morningGoldenHourEnd</td><td>morning golden hour ends</td><td>when the sun is 6 degrees above the horizon (6°)</td></tr>
+                <tr><td>solarNoon</td><td>solar noon</td><td>sun is at its highest position</td></tr>
+                <tr><td>eveningGoldenHourStart</td><td>evening golden hour start</td><td>when the sun is 6 degrees above the horizon (6°)")</td></tr>
+                <tr><td>sunsetStart</td><td>sunset start</td><td>bottom edge of the sun touches the horizon (-0.3°)</td></tr>
+                <tr><td>sunset</td><td>sunset</td><td>civil twilight starts, sun disappears below the horizon (0.833°)</td></tr>
+                <!-- <tr><td>eveningGoldenHourEnd</td><td>evening golden hour end</td><td>golden hour ends (-6°)")</td></tr> -->
+                <tr><td>civilDusk</td><td>civil dusk / golden hour end</td><td>civil twilight and golden hour ends, nautical twilight starts (-6°)</td></tr>
+                <tr><td>nauticalDusk</td><td>nautical dusk</td><td>nautical twilight ends, astronomical twilight starts (-12°)</td></tr>
+                <!-- <tr><td>astronomicalDusk</td><td>astronomical dusk</td><td>astronomical twilight ends, night starts (-18°)</td></tr> -->
+                <tr><td>nightStart</td><td>astronomical dusk / night start</td><td>astronomical twilight ends, night starts (-18°)</td></tr>
+                <tr><td>nadir</td><td>solar midnight</td><td>when the sun is closest to nadir and the night is equidistant from dusk and dawn</td></tr>
+            </table>
+        </div>
+        <h4>Schedules - Location</h4>
+        <div style="padding-left: 15px">
+            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
+            The location field is expected to contain longitude and latitude coordinates for the calculation of solar events.<br>
+            Accepted formats...
+            <ul>
+                <li>Decimal Degrees E.g: <code class="cron-plus-coordinates">54.9992500,-1.4170300</code> or <code class="cron-plus-coordinates">54.9992500° N 1.4170300° W</code></li>
+                <li>Degrees Minutes Seconds E.g: <code class="cron-plus-coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
+                <li>Decimal Minutes E.g: <code class="cron-plus-coordinates">54° 59.955' , -1° 25.0218'</code></li>
+                <li>GPS E.g: <code class="cron-plus-coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="cron-plus-coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="cron-plus-coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="cron-plus-coordinates">54:59:57.3N 1:25:1.308W</code></li>
+            </ul>
+        </div>        
+        <h4>Schedules - Offset</h4>
+        <div style="padding-left: 15px">
+            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
+            The offset field can be used to add a positive or negative offset in minutes to the sunrise or sunset time.
+        </div>        
 
     </dl>
     <h3>Output</h3>
