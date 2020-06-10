@@ -1,6 +1,6 @@
 node-red-contrib-cron-plus
 ============================
-_A flexible scheduler (cron, solar events, datetime) node for Node-RED with full dynamic control and Timezone support_
+_A flexible scheduler (cron, solar events, simple dates) node for Node-RED with full dynamic control and Timezone support_
 
 
 QUICK DEMO...
@@ -11,7 +11,7 @@ QUICK DEMO...
 FEATURES
 --------
 * Schedule by CRON, date sequences and solar events (with offset) 
-  * Human readable descriptions of your CRON expression are provided as you type.
+  * A human readable description of your expression is provided as you type.
   * ![cron-tt](https://user-images.githubusercontent.com/44235289/84030877-afe8b300-a98c-11ea-8a77-be84d840bf5d.gif)
 * Multiple schedules can be entered by the node editor UI or dynamically at runtime
 * Send a default payload or any of the following: timestamp, string, number, boolean, flow variable, global variable, JSON, Buffer or Env variable as the output.
