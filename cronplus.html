@@ -555,6 +555,9 @@ copies or substantial portions of the Software.
                 width: ($(document).width() < 800) ? 600 : $(document).width() - 200 ,
                 modal: true,
                 buttons: {
+                    Cancel: function() {
+                        $( "#cron-plus-map-dialog" ).dialog( "close" );
+                    },
                     "OK": function(){
                         $( "#cron-plus-map-dialog" ).dialog( "close" );
                         if(selectedLocation) {
@@ -563,9 +566,6 @@ copies or substantial portions of the Software.
                             }
                             selectedLocationInput.focus();
                         }
-                    },
-                    Cancel: function() {
-                        $( "#cron-plus-map-dialog" ).dialog( "close" );
                     }
                 },
                 show: {
