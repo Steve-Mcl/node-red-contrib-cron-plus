@@ -1008,7 +1008,7 @@ module.exports = function (RED) {
         }
         
         function updateTask(node,options,msg,pauseNodeStatusUntilAfterStarted){
-            console.log("updateTask():", options)
+            //console.log("updateTask():", options)
             if(!options || typeof options != "object"){
                 node.warn("schedule settings are not valid",msg);
                 return null;
@@ -1052,6 +1052,12 @@ module.exports = function (RED) {
         }
         
         function createTask(node, opt, index, static, pauseNodeStatusUntilAfterStarted) {
+            opt = opt || {}
+            try {
+                node.debug(`createTask - index: ${index}, static: ${static}, opt: ${JSON.stringify(opt)}`)
+            } catch (error) {
+                node.error(error)
+            }
             applyOptionDefaults(opt, index);
             try {
                 validateOpt(opt);                    
@@ -1092,7 +1098,7 @@ module.exports = function (RED) {
             task.node_limit = opt.limit || 0;
             task.stop();
             task.on('run', (timestamp) => {
-                node.debug(`topic: ${task.node_topic}\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
+                node.debug(`run - topic: ${task.node_topic}\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
                 let indicator = task.isDynamic ? "ring" : "dot";
                 node.status({ fill: "green", shape: indicator, text: "Running " + formatShortDateTimeWithTZ(timestamp, node.timeZone) });
                 if(isTaskFinished(task)){
@@ -1112,31 +1118,34 @@ module.exports = function (RED) {
                 })
             })
             .on('ended', () => {
+                node.debug(`ended - topic: ${task.node_topic}`)
                 if(task.pauseNodeStatusUntilAfterStarted) {
-                    console.log("task.on ended - pauseNodeStatusUntilAfterStarted - skipping updateNextStatus", task);
+                    // console.log("task.on ended - pauseNodeStatusUntilAfterStarted - skipping updateNextStatus", task);
                     return;
                 }
-                console.log("task.on ended - calling updateNextStatus", task);
+                // console.log("task.on ended - calling updateNextStatus", task);
                 updateNextStatus(node);
             })
             .on('started', () => {
+                node.debug(`started - name: ${task.name}}`)
                 if(task.pauseNodeStatusUntilAfterStarted){
-                    console.log("task.on started - setting pauseNodeStatusUntilAfterStarted=false - skipping updateNextStatus", task);
+                    // console.log("task.on started - setting pauseNodeStatusUntilAfterStarted=false - skipping updateNextStatus", task);
                     task._pauseStatusUntilAfterStarted = false;
                     return;
                 }
-                console.log("task.on started - scheduling a updateNextStatus", task);
+                // console.log("task.on started - scheduling a updateNextStatus", task);
                 process.nextTick(function(){
-                    console.log("task.on started - process.nextTick - calling updateNextStatus");
+                    // console.log("task.on started - process.nextTick - calling updateNextStatus");
                     updateNextStatus(node);
                 })
             })
             .on('stopped', () => {
+                node.debug(`stopped - topic: ${task.node_topic}`)
                 if(task.pauseNodeStatusUntilAfterStarted) {
-                    console.log("task.on stopped - pauseNodeStatusUntilAfterStarted - skipping updateNextStatus", task);
+                    // console.log("task.on stopped - pauseNodeStatusUntilAfterStarted - skipping updateNextStatus", task);
                     return;
                 }
-                console.log("task.on stopped - calling updateNextStatus", task);
+                // console.log("task.on stopped - calling updateNextStatus", task);
                 updateNextStatus(node);
             });
             task.start()
@@ -1549,7 +1558,7 @@ module.exports = function (RED) {
     });
 
     RED.httpAdmin.post("/cronplus/:id/:operation", RED.auth.needsPermission("cronplus.read"), function (req, res) {
-        console.log("/cronplus", req.body);       
+        // console.log("/cronplus", req.body);       
         try {
             let operation = req.params.operation; 
             if(operation == "expressionTip"){
@@ -1617,14 +1626,6 @@ module.exports = function (RED) {
         }
     });
 
-    // RED.httpAdmin.post("/cronplustz", RED.auth.needsPermission("cronplus.read"), function (req, res) {
-    //     try {
-    //         res.json(timeZones);
-    //     } catch (err) {
-    //         res.sendStatus(500);
-    //         console.error(err)
-    //     }
-    // });
 };
 
 

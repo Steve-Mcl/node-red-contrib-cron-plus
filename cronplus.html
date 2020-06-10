@@ -17,7 +17,7 @@ copies or substantial portions of the Software.
 
 <script type="text/javascript">
 (function(){
-
+    var debug = false;
     var map, mapPopup, selectedLocation, selectedLocationInput;
 
     var filesadded=[] //list of files already added 
@@ -131,7 +131,7 @@ copies or substantial portions of the Software.
                 lon = arrLatlon[1];
             }
         }
-        console.log("createMap", lat, lon)
+        if(debug) console.log("createMap", lat, lon)
         var zoom = 3;//by default, zoomed out
         var showPopupOnOpen = false;
         if (lat != undefined && lon != undefined) {
@@ -140,9 +140,9 @@ copies or substantial portions of the Software.
         }
         lat = safeFloat(lat, 50.0);
         lon = safeFloat(lon, 0.0);
-        console.log("lat/lon", lat, lon)
+        if(debug) console.log("lat/lon", lat, lon)
         selectedLocation = window.L.latLng(lat, lon);
-        console.log("selectedLocation", selectedLocation.lat, selectedLocation.lng)
+        if(debug) console.log("selectedLocation", selectedLocation.lat, selectedLocation.lng)
 
         // create leaflet map
         map = window.L.map('cron-plus-map', {
@@ -153,11 +153,9 @@ copies or substantial portions of the Software.
         mapPopup = window.L.popup();
 
         map.on('click', function (e) {
-            console.log(e);
+            if(debug) console.log(e);
             showMapPopup(e.latlng.lat, e.latlng.lng, map);
             selectedLocation = e.latlng
-            // $("#lng").val(e.latlng.lng);
-            // $("#lat").val(e.latlng.lat);
         });
 
 
@@ -199,7 +197,7 @@ copies or substantial portions of the Software.
                 }
 
                 layer.on('featureClick', function (e, latlng, pos, data, layer) {
-                    console.log("click", latlng, data);
+                    if(debug) console.log("click", latlng, data);
                 });
             });
 
@@ -207,7 +205,7 @@ copies or substantial portions of the Software.
 
 
     function updateEditorLayout(){
-        console.log("cronplus-updateEditorLayout")
+        if(debug) console.log("cronplus-updateEditorLayout")
         var dlg = $("#dialog-form");
         var height = dlg.height() - 5;
         var expandRow = dlg.find('.form-row-auto-height');
@@ -223,7 +221,7 @@ copies or substantial portions of the Software.
     }
 
     function JSONtoTable(data, header, placeholder, options) {
-        console.log("JSONtoTable")
+        if(debug) console.log("JSONtoTable")
         options = options || {};
         if(!data || !data.length){
             $('<div class="ui-dialog-title"/>' + (options.emptyMessage || 'no data') + '<div>').appendTo(placeholder);
@@ -311,7 +309,7 @@ copies or substantial portions of the Software.
             this.menu = this._createMenu(this.options.menu);
         },
         _createMenu: function(options) {
-            console.log("combobox -> _createMenu  options:", options)
+            if(debug) console.log("combobox -> _createMenu  options:", options)
             var that = this;
             this.disarmClick = false;
             options = options || {};
@@ -508,10 +506,6 @@ copies or substantial portions of the Software.
                             if(!value[i].name && value[i].topic) {
                                 value[i].name = value[i].topic;
                             }
-                            // if(!value[i].topic && value[i].name) {
-                            //     console.warn("cron-plus: topic missing");
-                            //     return false;
-                            // } 
                             if(!value[i].name) {
                                 console.warn("cron-plus: schedule name missing");
                                 return false;
@@ -588,7 +582,7 @@ copies or substantial portions of the Software.
                     duration: 500
                 },
                 close: function( event, ui ) {
-                    console.log("destroying map")
+                    if(debug) console.log("destroying map")
                     if(map) map.remove();
                 }
             });
@@ -606,7 +600,7 @@ copies or substantial portions of the Software.
                     datatype: 'json'
                 })
                 .done(function (response) {
-                    console.log("cronplus/" + nodeId + "/getDynamic => response:",response)
+                    if(debug) console.log("cronplus/" + nodeId + "/getDynamic => response:",response)
                     var titles = [
                         {"key":"item", "header":"Item"},
                         {"key":"name", "header":"Name"},
@@ -858,18 +852,18 @@ copies or substantial portions of the Software.
                         } ,
                         disabled: true
                     }).off('focusout').off('mouseleave').mouseleave(function(e){
-                        console.log("initTooltip--mouseleave")
+                        if(debug) console.log("initTooltip--mouseleave")
                         if (selector.is(':focus')) {
-                            console.log("initTooltip--mouseleave selector:is(':focus')")
+                            if(debug) console.log("initTooltip--mouseleave selector:is(':focus')")
                             e.preventDefault();
                             e.stopImmediatePropagation();
                             //selector.tooltip('open');
                             return false;
                         }
                     }).on("blur", function (e) {
-                        console.log("initTooltip-->on-blur.  relatedTarget:", e.relatedTarget)
+                        if(debug) console.log("initTooltip-->on-blur.  relatedTarget:", e.relatedTarget)
                         if(e.relatedTarget && e.relatedTarget.className == "cron-plus-info-button"){
-                            console.log('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-info-button"');
+                            if(debug) console.log('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-info-button"');
                             if(type == "cron")
                                 showCronHelp();
                             else if(type == "solar")
@@ -882,7 +876,7 @@ copies or substantial portions of the Software.
                         }
                         $(this).tooltip("close").tooltip("disable");
                     }).on("focusin change keyup", function (e) {
-                        console.log("initTooltip--focusin change keyup",e )
+                        if(debug) console.log("initTooltip--focusin change keyup",e )
                         var $this = $(this);
                         var expression = $this.val();
                         let $timeZone = $("#node-input-timeZone");
@@ -901,7 +895,7 @@ copies or substantial portions of the Software.
                             disabled: false,
                             show: { effect: "fade" },
                             content: function (callback) {
-                                console.log("initTooltip-->content")
+                                if(debug) console.log("initTooltip-->content")
                                 expression = $this.val();
                                 var solarType = $solarEvents.typedInput("type");
                                 var solarEvents = $solarEvents.typedInput("value");
@@ -937,8 +931,7 @@ copies or substantial portions of the Software.
                                     datatype: 'json'
                                 })
                                 .done(function (data) {
-                                    
-                                    console.log("initTooltip-->Ajax done, data...",data)
+                                    if(debug) console.log("initTooltip-->Ajax done, data...",data)
                                     let nextInfo = "";
                                     let desc = data.description;
                                     if (data.prettyNext) {
@@ -961,7 +954,7 @@ copies or substantial portions of the Software.
                                     }
                                     var okContent = function(){
                                         setTimeout(function(){
-                                            console.log("initTooltip-->callback-->setTimeout--> option-->position");
+                                            if(debug) console.log("initTooltip-->callback-->setTimeout--> option-->position");
                                             $this.tooltip("option", "position", pos);
                                             $this.tooltip("enable").tooltip("open");
                                             $this.tooltip("option", "position", pos);
@@ -1057,7 +1050,6 @@ copies or substantial portions of the Software.
                     }
                 })
                 
-                //debugger
                 expressionField.combobox("instance").button.prop("title", "Expression examples...");
                 expressionField.combobox("value", option.expression || "");
                 
@@ -1089,8 +1081,6 @@ copies or substantial portions of the Software.
                 })
                 solarEventsField.typedInput("type", option.solarType || "all");
                 solarEventsField.typedInput("value", option.solarEvents || "");//added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
-                // debugger
-                // solarEventsField.typedInput("instance").
 
                 //generate location 
                 locationGroup = $('<div class="red-ui-typedInput-container" style="margin-left:5px; width: calc(28% - 16px);">' +
