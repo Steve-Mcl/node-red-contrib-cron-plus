@@ -171,8 +171,7 @@ copies or substantial portions of the Software.
 
 
         // add a base layer
-        var tileUrl = "http://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png";
-        //var tileUrl = "http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
+        var tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
         var layer = L.tileLayer(tileUrl, {});
         layer.addTo(map);
         // add cartodb layer with one sublayer
