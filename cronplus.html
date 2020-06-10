@@ -105,7 +105,7 @@ copies or substantial portions of the Software.
     }
     function showCronHelp(){
         showSidebarHelpPanel();
-        $("#cron-plus-cron-format-info").get(0).scrollIntoView();
+        $("#cron-plus-expression-info").get(0).scrollIntoView();
     }
     function showSolarHelp(){
         showSidebarHelpPanel();
@@ -834,10 +834,8 @@ copies or substantial portions of the Software.
                 applyOptionDefaults(optionIndex, option);
                 function buildExpressionTip(title, desc, text, type){
                     var helpFuncHtml = '';
-                    if(type === "cron" || type === "solar" ){
-                        var helpFunc = type == "solar" ? "showSolarHelp" : "showCronHelp";
-                        helpFuncHtml = '<span style="float: right"><button class="cron-plus-info-button" click="'+helpFunc+'();">help <i class="fa fa-external-link"></i></button></span>';
-                    }
+                    var helpFunc = type == "solar" ? "showSolarHelp" : "showCronHelp";
+                    helpFuncHtml = '<span style="float: right"><button class="cron-plus-info-button" click="'+helpFunc+'();">help <i class="fa fa-external-link"></i></button></span>';
                     return '<div style="min-height:190px"><span style="font-size: 12px; font-weight: bold">' + title + '</span>' + helpFuncHtml +
                             '<hr><div>' + desc + '</div>' +
                             '<pre  class="cron-plus-form-tip">' + text + '</pre></div>'
@@ -1541,7 +1539,7 @@ copies or substantial portions of the Software.
         <div style="padding-left: 15px">
             The value to send in the payload when the schedule triggers. (NOTE: the property that the payload gets written to is determined by "output to").
         </div>     
-        <h4>Schedules - Expression</h4>
+        <h4 id="cron-plus-expression-info">Schedules - Expression</h4>
         <div style="padding-left: 15px">
             <i>NOTE: Only displayed when the type is set to <b>cron</b> or <b>date sequence</b></i><br>
             A CRON expression, a date, a comma separated list of dates or an array of dates<br><br>
@@ -1550,7 +1548,7 @@ copies or substantial portions of the Software.
                 When specifying a string date, you can use timezone e.g. "2020-01-01 00:00 GMT+2".
                 You can even mix time zones e.g. "2020-01-01 00:00 GMT+2, 2020-01-01 00:00 GMT-7"
             </p>
-            <p id="cron-plus-cron-format-info">CRON Format...</p>
+            <p>CRON Format...</p>
             <pre style="white-space: pre; padding: 0px; font-size: smaller;"> * * * * * * *    Field              Allowed values    Special symbols
  | | | | | | |    -----------------  ---------------   ---------------
  `-|-|-|-|-|-|->  Second (optional)  0-59              * / , -
