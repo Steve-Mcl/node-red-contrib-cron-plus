@@ -1612,6 +1612,10 @@ module.exports = function (RED) {
                 res.json(r);
             } else if(operation == "getDynamic") {
                 let node = RED.nodes.getNode(req.params.id); 
+                if(!node){
+                    res.json([]);
+                    return
+                }
                 let dynNodes = node.tasks.filter((e)=>e.isDynamic)
                 let exp = (t) => exportTask(t,false);
                 let dynNodesExp = dynNodes.map(exp)
