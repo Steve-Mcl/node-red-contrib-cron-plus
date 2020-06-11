@@ -670,20 +670,24 @@ copies or substantial portions of the Software.
                     console.error(jqXHR,textStatus,errorThrown);
                 });
             }
-            
+            var dnRepositionResize = function(){
+                var w = ($(document).width() < 800) ? "95%" : "80%";
+                console.log("dialog-open-drawDynamicSchedulesTable done - should now center and resize width", w)
+                $("#cron-plus-dynamic-nodes-dialog").dialog("option", "width", w);
+                $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", {my: "center", at: "center", of: window});
+            }
             $( "#cron-plus-dynamic-nodes-dialog" ).dialog({
                 autoOpen: false,
                 height: getIdealDialogHeight(),
                 height: "auto",
                 minHeight: 400,
-                width: Math.min(1000, ($(document).width() < 800) ? ($(document).width() - 30) : $(document).width() -100),
                 minWidth: 300,
                 maxWidth: 1000,
                 modal: true,
                 buttons: {
                     "Refresh": function() {
                         var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id;
-                        drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader");
+                        drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader", dnRepositionResize);
                     },
                     "Close": function(){
                         $( "#cron-plus-dynamic-nodes-dialog" ).dialog( "close" );
@@ -697,9 +701,8 @@ copies or substantial portions of the Software.
                     $(this).css('padding', '0px 0px 0px 0px');
                     $('.ui-dialog-buttonpane').find('button:contains("Close")').addClass('primary');
                     var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id;
-                    drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader", function(){
-                        $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", {my: "center", at: "center", of: window});
-                    });
+                    dnRepositionResize();
+                    drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader", dnRepositionResize);
                 },
                 hide: {
                     effect: "fade",
@@ -707,11 +710,11 @@ copies or substantial portions of the Software.
                 }
             });
             $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id = node.id;
+            dnRepositionResize();
 
             var tzData;
             $.ajax({
                 url: "cronplus/0/tz",
-                // url: 'cronplus/tz',
                 type: 'POST',
                 datatype: 'json'
             })
