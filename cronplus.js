@@ -1162,6 +1162,13 @@ module.exports = function (RED) {
                 let dynNodes = node.tasks.filter((e)=>e.isDynamic)
                 let exp = (t) => exportTask(t,false);
                 let dynNodesExp = dynNodes.map(exp);
+                /*if(!dynNodesExp || !dynNodesExp.length){
+                    //FUTURE TODO: Sanity check before deletion
+                    //and only if someone asks for it :)
+                    //other wise, file clean up is a manual task
+                    fs.unlinkSync(filePath);
+                    return;
+                } */
                 let data = {
                     version: 1,
                     schedules: dynNodesExp
