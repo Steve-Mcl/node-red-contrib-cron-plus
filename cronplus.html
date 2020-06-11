@@ -899,7 +899,7 @@ copies or substantial portions of the Software.
                                 var expressionType = $expressionType.val();
                                 var offset = $offset.val();
                                 let timeZone = $timeZone.val();
-                                var title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0,50) + (expression.length > 50 ? "..." : "") + '</span>';
+                                var title_html;
                                 let e = { expressionType: expressionType };
                                 if (timeZone) e.timeZone = timeZone;
                                 if (expressionType == "solar"){
@@ -916,7 +916,7 @@ copies or substantial portions of the Software.
                                     e.solarType = solarType;
                                     e.solarEvents = solarEvents;
                                 } else {
-                                    title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
+                                    var title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0,50) + (expression.length > 50 ? "..." : "") + '</span>';
                                     e.expression = expression;
                                 }
 
