@@ -800,14 +800,9 @@ module.exports = function (RED) {
             msg = {cronplus: {}};
             msg.topic = task.node_topic;
             msg.cronplus.triggerTimestamp = crontimestamp;
-            // let se = task.node_expressionType == "solar" ? task.node_solarEventTimes.nextEvent : "";
-            let se3 = task.node_expressionType == "solar" ? node.nextEvent : "";
+            let se = task.node_expressionType == "solar" ? node.nextEvent : "";
             msg.cronplus.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
-            // let se2 = task.node_expressionType == "solar" ? task.node_solarEventTimes.nextEvent : "";
-
-            // if(se) msg.cronplus.status.solarEvent = se;
-            // if(se2) msg.cronplus.status.solarEvent2 = se2;
-            if(se3) msg.cronplus.status.solarEvent = se3;
+            if(se) msg.cronplus.status.solarEvent = se;
             msg.cronplus.config = exportTask(task);
             if(manualTrigger) msg.manualTrigger = true;
             msg.scheduledEvent = !msg.manualTrigger;
@@ -1273,7 +1268,6 @@ module.exports = function (RED) {
 
         function isTaskFinished(_task){
             if(!_task) return true;
-            //return _task.isRunning ? (_task.node_limit ? _task.node_count < _task.node_limit: true) : false;
             return _task.node_limit ? _task.node_count >= _task.node_limit : false;
         }
         function getNextTask(tasks) {
@@ -1303,24 +1297,9 @@ module.exports = function (RED) {
                         let cx = (current._expression || current._sequence)
                         return (px.nextDate(now) < cx.nextDate(now)) ? prev : current;
                     });
-                    // if(nextToRunTask){
-                    //     // let nx = (nextToRunTask._expression || nextToRunTask._sequence)
-                    //     t = nextToRunTask;
-                    //     d = nx.nextDate(now);
-                    // }
-                    // else{
-                    //     t = null;
-                    //     d = null;
-                    // }
                 }
                 return nextToRunTask;
-                //return t;
-                // if(typeof t == "CronosTask"){ 
-                //     return d;
-                // }
-                // if(d instanceof Date){ 
-                //     return d;
-                // }
+
             } catch (error) {
                 node.debug(error);
             }

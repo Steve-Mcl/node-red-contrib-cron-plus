@@ -963,7 +963,6 @@ copies or substantial portions of the Software.
 
                                 $.ajax({
                                     url: "cronplus/0/expressionTip",
-                                    // url: 'cronplus',
                                     type: 'POST',
                                     data: e,
                                     datatype: 'json'
@@ -1079,9 +1078,6 @@ copies or substantial portions of the Software.
                     menu: {
                         menu: expressionMenuData,
                         options: {},
-                        // callback: function(e){
-                        //     console.log("expressionField.combobox callback",e)
-                        // }
                     },
                     validate: function(value){
                         return (!!value) && value.length >= 9 ;//better validation required?
@@ -1170,7 +1166,6 @@ copies or substantial portions of the Software.
                 offsetField.prop("title", "Minutes Offset +/- 1439");  
                 
                 //init tooltips
-                // var expDropButton = expressionField.combobox("instance").button;
                 initTooltip(locationField,"solar", { my: "right top", at: "right bottom+5", of: offsetField, collision: "flipfit" });
                 initTooltip(expressionField,"cron", { my: "right top", at: "right bottom+5", of: expressionField /*expDropButton*/, collision: "flipfit" });
 
