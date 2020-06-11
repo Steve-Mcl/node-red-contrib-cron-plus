@@ -245,7 +245,7 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
         if(validateOpt(opt)){
             let pos = coordParser(opt.location);
             let offset = isNumber(opt.offset) ? parseInt(opt.offset) : 0;
-            let nowOffset =  new Date(now.getTime() + offset*60000)
+            let nowOffset =  new Date(now.getTime() - offset*60000)
             result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset)
             if(opts.includeSolarStateOffset && offset != 0){
                 let ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0)
