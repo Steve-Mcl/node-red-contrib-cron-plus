@@ -198,6 +198,7 @@ copies or substantial portions of the Software.
                 layer.on('featureClick', function (e, latlng, pos, data, layer) {
                     if(debug) console.log("click", latlng, data);
                 });
+                $( "#cron-plus-map-dialog" ).dialog("option", "position", {my: "center", at: "center", of: window});
             });
 
     }
@@ -545,14 +546,18 @@ copies or substantial portions of the Software.
             node.commandResponseMsgOutput = node.commandResponseMsgOutput == "output2" ? "output2" : "output1";
             node.outputs = node.commandResponseMsgOutput == "output2" ? 2 : 1;
             $( "#node-input-commandResponseMsgOutput" ).val(node.commandResponseMsgOutput);
-
+            var getIdealDialogHeight = function(){
+                return Math.min(800, ($(document).height() < 600) ? $(document).width() - 30 : $(document).height() - 100)
+            }
             $( "#cron-plus-map-dialog" ).dialog({
                 classes: {
                     "ui-dialog-content": "cron-plus-map-dialog-content"
                 },
                 autoOpen: false,
-                height: ($(document).height() < 600) ? 400 : $(document).height() - 200,
-                width: ($(document).width() < 800) ? 600 : $(document).width() - 200 ,
+                height: getIdealDialogHeight(),
+                width: "90%",
+                minWidth: 300,
+                maxWidth: 1000,
                 modal: true,
                 buttons: {
                     Cancel: function() {
@@ -575,6 +580,8 @@ copies or substantial portions of the Software.
                 open: function(event) {
                     $(this).css('padding', '0px 0px 0px 0px');
                     $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary');
+                    $( "#cron-plus-map-dialog" ).dialog( "option", "height", getIdealDialogHeight() );
+                    $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", {my: "center", at: "center", of: window});
                 },
                 hide: {
                     effect: "explode",
@@ -666,8 +673,12 @@ copies or substantial portions of the Software.
             
             $( "#cron-plus-dynamic-nodes-dialog" ).dialog({
                 autoOpen: false,
-                height: Math.min(600, ($(document).height() < 600) ? 400 : $(document).height() - 200),
-                width: Math.min(1000, ($(document).width() < 800) ? 600 : $(document).width() -200),
+                height: getIdealDialogHeight(),
+                height: "auto",
+                minHeight: 400,
+                width: Math.min(1000, ($(document).width() < 800) ? ($(document).width() - 30) : $(document).width() -100),
+                minWidth: 300,
+                maxWidth: 1000,
                 modal: true,
                 buttons: {
                     "Refresh": function() {
@@ -686,15 +697,17 @@ copies or substantial portions of the Software.
                     $(this).css('padding', '0px 0px 0px 0px');
                     $('.ui-dialog-buttonpane').find('button:contains("Close")').addClass('primary');
                     var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id;
-                    drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader");
+                    drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader", function(){
+                        $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", {my: "center", at: "center", of: window});
+                    });
                 },
                 hide: {
                     effect: "fade",
                     duration: 250
                 }
             });
-
             $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id = node.id;
+
             var tzData;
             $.ajax({
                 url: "cronplus/0/tz",
@@ -910,8 +923,8 @@ copies or substantial portions of the Software.
                             return;
                         }
                         
-                        $this.tooltip("option", "position", pos);
                         $this.tooltip("enable").tooltip("open");
+                        $this.tooltip("option", "position", pos);
                         $this.tooltip({ 
                             position: pos,
                             disabled: false,
@@ -1321,25 +1334,23 @@ copies or substantial portions of the Software.
 <script type="text/html" data-template-name="cronplus">
     <style>
         table.cron-plus-table {
-            border: solid 1px #DDEEEE;
+            border: solid 1px #aaa;
             border-collapse: collapse;
             border-spacing: 0;
-            font: normal 13px Arial, sans-serif;
         }
         table.cron-plus-table th {
             background-color: #000;
-            border: solid 1px #DDEEEE;
+            border: solid 1px #aaa;
             color: #fff;
-            padding: 10px;
             text-align: left;
-
         }
-        table.cron-plus-table td {
-            border: solid 1px #DDEEEE;
+        table.cron-plus-table > tr > td {
+            font-family: monospace;
+            font-size: 10pt;
+            border: solid 1px #aaa;
             color: #333;
-            padding: 10px;
             background: #eee;
-        }        
+        }
         .cron-plus-expression-tip {
             background: #ffe;
             width: 100%;
@@ -1479,7 +1490,7 @@ copies or substantial portions of the Software.
     </div>
 
     <div id="cron-plus-dynamic-nodes-dialog" style="display: none;" title="Dynamic schedules...">
-        <div id="cron-plus-dynamic-nodes-table-placeholder"  style="display: flex;align-items: center;justify-content: center;">
+        <div id="cron-plus-dynamic-nodes-table-placeholder"  style="display: flex;align-items: center;/*justify-content: center;*/">
         </div>
         <div id="cron-plus-dynamic-nodes-loader" style="position: absolute;  left: 46%;  top: 46%;">
             <i class="fa fa-spinner fa-spin" style="font-size:48px"></i>
