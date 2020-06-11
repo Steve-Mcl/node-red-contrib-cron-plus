@@ -277,8 +277,8 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
         let count = dsFutureDates ? dsFutureDates.length : 0;        
         result.description = "Date sequence with fixed dates";
         if(task && task._sequence && count){
-            let first = dsFutureDates[0];
-            let ms = first.valueOf() - now.valueOf();
+            result.nextDate = dsFutureDates[0];
+            let ms = result.nextDate.valueOf() - now.valueOf();
             result.prettyNext = (result.nextEvent ? result.nextEvent + " " : "") +  `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`;
             if(expressionType === "solar"){ 
                 if(solarType === "all"){
@@ -288,11 +288,11 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
                 }
             } else {
                 if(count == 1){
-                    result.description = "One time at " + formatShortDateTimeWithTZ(first,timeZone) ;
+                    result.description = "One time at " + formatShortDateTimeWithTZ(result.nextDate,timeZone) ;
                 } else {
-                    result.description = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(first,timeZone) ;
+                    result.description = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(result.nextDate,timeZone) ;
                 }
-                result.nextDates = dates.slice(0, 5);
+                result.nextDates = dsFutureDates.slice(0, 5);
             }            
         }
     } 
