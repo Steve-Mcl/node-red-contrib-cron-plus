@@ -1522,6 +1522,15 @@ copies or substantial portions of the Software.
                 <li>Send to separate output - schedule messages will be fired out of output 1, command responses will be fired out of output 2</li>
             </ul>
         </div>    
+        <h4>Persist dynamic schedules</h4>
+        <div style="padding-left: 15px">
+            Enabling this option causes dynamic schedules to be saved to file & re-loaded when the cron-plus node is loaded or re-deployed. <br>
+            NOTES...
+            <ul>
+                <li>Any time an update to any dynamic schedule occurs, all dynamic schedules are saved to file</li>
+                <li>The schedules are saved in a directory called <code>cronplusdata</code> under your node-red folder</li>
+            </ul>
+        </div>    
         <h4>Schedules</h4>
         <div style="padding-left: 15px">
             A table of schedules. 
