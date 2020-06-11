@@ -1533,20 +1533,24 @@ copies or substantial portions of the Software.
         </div>    
         <h4>Schedules</h4>
         <div style="padding-left: 15px">
-            A table of schedules. 
+            A table of schedules. Entries here are considered static & will be reloaded when node-red starts or the cron-plus node is (re)deployed.
+        </div>
+        <h4>Schedules - Name</h4>
+        <div style="padding-left: 15px">
+            The name is used to identify the schedule. Dynamic adjustments to an individual schedule will need to specify this name.
+        </div>
+        <h4>Schedules - Topic</h4>
+        <div style="padding-left: 15px">
+            The topic will be sent in <code>msg.topic</code> when the schedule triggers. This is to permit the flow to act on the triggered schedule.
+        </div>
+        <h4>Schedules - Payload</h4>
+        <div style="padding-left: 15px">
+            The value to send in the payload when the schedule triggers. (NOTE: the property that the payload gets written to is determined by "output to").
         </div>
         <h4>Schedules - Type</h4>
         <div style="padding-left: 15px">
             The type determines what type of schedule. Options are <code>cron</code>, <code>dates sequence</code> or <code>solar events</code>
         </div>
-        <h4>Schedules - Name</h4>
-        <div style="padding-left: 15px">
-            The name is used to both identify the schedule and will be sent in <code>msg.topic</code> when the schedule triggers. This is to permit the user to determine which schedule has triggered.
-        </div>
-        <h4>Schedules - Payload</h4>
-        <div style="padding-left: 15px">
-            The value to send in the payload when the schedule triggers. (NOTE: the property that the payload gets written to is determined by "output to").
-        </div>     
         <h4 id="cron-plus-expression-info">Schedules - Expression</h4>
         <div style="padding-left: 15px">
             <i>NOTE: Only displayed when the type is set to <b>cron</b> or <b>date sequence</b></i><br>
