@@ -602,30 +602,55 @@ copies or substantial portions of the Software.
                     if(debug) console.log("cronplus/" + nodeId + "/getDynamic => response:",response)
                     var titles = [
                         {"key":"item", "header":"Item"},
-                        {"key":"name", "header":"Name"},
-                        {"key":"topic", "header":"Topic"},
-                        {"key":"expressionType", "header":"Schedule Type"},
-                        {"key":"type", "header":"Payload Type"},//compat
-                        {"key":"payloadType", "header":"Payload Type"},
-                        {"key":"payload", "header":"Payload"},
+                        {"key":"expressionType", "header":"Type"},
+                        // {"key":"name", "header":"Name"},
+                        // {"key":"topic", "header":"Topic"},
+                        // {"key":"payloadType", "header":"Payload Type"},
+                        // {"key":"payload", "header":"Payload"},
+                        {"key":"info", "header":"Info"},
                         {"key":"details", "header":"Details"},
-                    ]          
+                    ];
+                    //tidy up date for display
                     var tableData = response.map(function(e,i){
                         e.item = i+1;
                         if(e.type){
                             e.payloadType == e.type;
                         }
-                        delete e.type;
-                        if(e.payloadType == "default") e.payload = "";
-                        e.details = "";
-                        if(e.expressionType == "solar"){
-                            if(e.solarType == "all") e.details += 'solarType:"' + e.solarType + '"<br>';
-                            if(e.solarType == "selected") e.details += 'solarEvents:"' + e.solarEvents + '"<br>';
-                            e.details += 'location:"' + e.location + '"<br>';
-                            e.details += 'offset:"' + e.offset + '"<br>';
-                        } else {
-                            e.details += 'expression:"' + e.expression + '"';
+                        if(e.payloadType == "default") e.payload = null;
+                        var payload, payloadTT = "";
+                        if(e.payload && isObject(e.payload)){
+                            try {
+                                payload = JSON.stringify(e.payload);
+                                if(payload.length > 100) {
+                                    payloadTT = payload;
+                                    payload = payload.substring(0,100) + "..."
+                                }
+                            } catch (error) {
+                                payload = typeof e.payload;
+                            }
                         }
+
+                        var info = ["<table>"];
+                        info.push('<tr><td>Name</td><td>' + e.name + '</td></tr>');
+                        info.push('<tr><td>Topic</td><td>' + e.topic + '</td></tr>');
+                        info.push('<tr><td>PayloadType</td><td>' + e.payloadType + '</td></tr>');
+                        if(payload) {
+                            info.push('<tr><td title="' + payloadTT + '">Payload</td><td>' + payload + '</td></tr>');
+                        }                       
+                        info.push("</table>");
+                        e.info = info.join("");
+
+                        var details = ["<table>"];
+                        if(e.expressionType == "solar"){
+                            if(e.solarType == "all") details.push('<tr><td>solarType</td><td>' + e.solarType + '</td></tr>');
+                            if(e.solarType == "selected") details.push('<tr><td>solarEvents</td><td>' + e.solarEvents + '</td></tr>');
+                            details.push('<tr><td>location</td><td>' + e.location + '</td></tr>');
+                            details.push('<tr><td>offset</td><td>' + e.offset + '</td></tr>');
+                        } else {
+                            details.push('<tr><td>expression</td><td>' + e.expression + '</td></tr>');
+                        }
+                        details.push("</table>");
+                        e.details = details.join("");
                         return e;
                     });       
                     JSONtoTable(tableData, titles, $table, { class:"cron-plus-table", width: "100%", emptyMessage: "No dynamic schedules!" });    
