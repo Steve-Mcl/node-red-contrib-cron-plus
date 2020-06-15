@@ -745,7 +745,7 @@ module.exports = function (RED) {
         node.options = config.options;
         node.commandResponseMsgOutput = config.commandResponseMsgOutput || "output1";
         node.outputs = config.commandResponseMsgOutput === "output2" ? 2 : 1;//1 output pins (all messages), 2 outputs (schedules out of pin1, command responses out of pin2)
-
+        node.statusUpdatePending = false;
         const setProperty = function (msg, field, value) {
             const set = (obj, path, val) => {
                 const keys = path.split('.');
@@ -781,18 +781,22 @@ module.exports = function (RED) {
             if(task){
                 indicator = node.nextIndicator || "dot";
             }
+            console.debug("updateDoneStatus-> setting DONE status for node " + node.id)
             node.status({ fill: "green", shape: indicator, text: "Done: " + formatShortDateTimeWithTZ(Date.now(), node.timeZone) });
             // node.nextDate = getNextTask(node.tasks);
             let now = new Date();
             updateNodeNextInfo(node, now);
-            if (node.nextDate) {
-                let next = new Date(node.nextDate).valueOf();
-                //node.nextDate
-                let msTillNext = next - now;
-                if (msTillNext > 5000)
-                    setTimeout(function() {
-                        updateNextStatus(node);
-                    }, 4000);
+            let next = node.nextDate ? new Date(node.nextDate).valueOf() : (Date.now() + 5001);
+            let msTillNext = next - now;
+            if (msTillNext > 5000){
+                console.debug("updateDoneStatus-> setting node.statusUpdatePending=true")
+                node.statusUpdatePending = true;
+                console.debug("updateDoneStatus -> setting timeout for node " + node.id)
+                setTimeout(function() {
+                    console.debug("updateDoneStatus -> setTimeout occuring now for node " + node.id)
+                    node.statusUpdatePending = false;
+                    updateNextStatus(node, true);
+                }, 4000);
             }
         }
 
@@ -903,7 +907,6 @@ module.exports = function (RED) {
                 task.stop();
                 if(resetCounter){ task.node_count = 0; }
             }
-            updateNextStatus(node);
             return task;
         }
         function stopAllTasks(node,resetCounter,filter){
@@ -926,7 +929,6 @@ module.exports = function (RED) {
                     }    
                 }
             }
-            updateNextStatus(node);
         }
         function startTask(node,name){
             let task = getTask(node,name);
@@ -936,7 +938,6 @@ module.exports = function (RED) {
                 }
                 task.start();
             }
-            updateNextStatus(node);
             return task;
         }
         function startAllTasks(node, filter){
@@ -959,7 +960,6 @@ module.exports = function (RED) {
                     }    
                 }
             }
-            updateNextStatus(node);
         }
         function deleteAllTasks(node, filter){
             if(node.tasks){
@@ -987,7 +987,6 @@ module.exports = function (RED) {
                     }    
                 }
             }
-            updateNextStatus(node);
         }
         function deleteTask(node,name){
             let task = getTask(node,name);
@@ -999,10 +998,9 @@ module.exports = function (RED) {
                 node.tasks = node.tasks.filter(t => t.name != name);
                 task = null;
             }
-            updateNextStatus(node);
         }
         
-        function updateTask(node,options,msg,pauseNodeStatusUntilAfterStarted){
+        function updateTask(node,options,msg){
             //console.log("updateTask():", options)
             if(!options || typeof options != "object"){
                 node.warn("schedule settings are not valid",msg);
@@ -1030,15 +1028,13 @@ module.exports = function (RED) {
                 let isStatic = task && task.isStatic;
                 let opCount = 0, modified = false;
                 if(task){
-                    task.pauseNodeStatusUntilAfterStarted = pauseNodeStatusUntilAfterStarted;
                     if(!isStatic) modified = true;
                     opCount  = task.node_count || 0; 
                     deleteTask(node,opt.name);
                 }
                 let taskCount = node.tasks ? node.tasks.length : 0;
-                let t = createTask(node, opt, taskCount, isStatic, pauseNodeStatusUntilAfterStarted);  
+                let t = createTask(node, opt, taskCount, isStatic);  
                 if(t){
-                    t.pauseNodeStatusUntilAfterStarted = pauseNodeStatusUntilAfterStarted;
                     if(modified) t.node_modified = true;
                     t.node_count = opCount;
                     t.isDynamic = isDynamic;
@@ -1046,7 +1042,7 @@ module.exports = function (RED) {
             }
         }
         
-        function createTask(node, opt, index, static, pauseNodeStatusUntilAfterStarted) {
+        function createTask(node, opt, index, static) {
             opt = opt || {}
             try {
                 node.debug(`createTask - index: ${index}, static: ${static}, opt: ${JSON.stringify(opt)}`)
@@ -1075,7 +1071,6 @@ module.exports = function (RED) {
                 let ds = parseDateSequence(opt.expression);            
                 task = ds.task;
             }
-            task.pauseNodeStatusUntilAfterStarted = pauseNodeStatusUntilAfterStarted;
             task.isDynamic = !static;
             task.isStatic = static;
             task.name = ""+opt.name;
@@ -1108,27 +1103,16 @@ module.exports = function (RED) {
                 sendMsg(node, task, timestamp);   
                 process.nextTick(function(){
                     if( task.node_expressionType === "solar" ){
-                        updateTask(node,task.node_opt,null,true);
+                        updateTask(node,task.node_opt,null);
                     }
                 })
             })
             .on('ended', () => {
                 node.debug(`ended - topic: ${task.node_topic}`)
-                if(task.pauseNodeStatusUntilAfterStarted) {
-                    // console.log("task.on ended - pauseNodeStatusUntilAfterStarted - skipping updateNextStatus", task);
-                    return;
-                }
-                // console.log("task.on ended - calling updateNextStatus", task);
                 updateNextStatus(node);
             })
             .on('started', () => {
                 node.debug(`started - name: ${task.name}}`)
-                if(task.pauseNodeStatusUntilAfterStarted){
-                    // console.log("task.on started - setting pauseNodeStatusUntilAfterStarted=false - skipping updateNextStatus", task);
-                    task._pauseStatusUntilAfterStarted = false;
-                    return;
-                }
-                // console.log("task.on started - scheduling a updateNextStatus", task);
                 process.nextTick(function(){
                     // console.log("task.on started - process.nextTick - calling updateNextStatus");
                     updateNextStatus(node);
@@ -1136,11 +1120,6 @@ module.exports = function (RED) {
             })
             .on('stopped', () => {
                 node.debug(`stopped - topic: ${task.node_topic}`)
-                if(task.pauseNodeStatusUntilAfterStarted) {
-                    // console.log("task.on stopped - pauseNodeStatusUntilAfterStarted - skipping updateNextStatus", task);
-                    return;
-                }
-                // console.log("task.on stopped - calling updateNextStatus", task);
                 updateNextStatus(node);
             });
             task.start()
@@ -1224,13 +1203,17 @@ module.exports = function (RED) {
             for(let iOpt = 0; iOpt < node.options.length; iOpt++){
                 let opt = node.options[iOpt];
                 opt.name = opt.name || opt.topic;
+                node.statusUpdatePending = true;//prevent uneccesary status updates while loading
                 createTask(node, opt, iOpt, true);
             }
 
             //now load dynamic schedules from file
             deserialise();
 
-            updateNextStatus(node);
+            setTimeout(() => {
+                updateNextStatus(node, true);    
+            }, 200);
+            
 
             node.on('close', function (done) {
                 serialise();
@@ -1250,9 +1233,17 @@ module.exports = function (RED) {
             node.error(err);
         }
         
-        function updateNextStatus(node) {
+        function updateNextStatus(node, force) {
             let now = new Date();
             updateNodeNextInfo(node, now);
+            if(node.statusUpdatePending == true){
+                if(force){
+                    node.statusUpdatePending = false;
+                } else {
+                    return;
+                }
+            }
+            
             if (node.tasks) {
                 let indicator = node.nextIndicator || "dot";
                 if (node.nextDate) {
@@ -1262,7 +1253,7 @@ module.exports = function (RED) {
                     node.status({ fill: "grey", shape: indicator, text: "All stopped" });
                 }
             } else {
-                    node.status({});
+                node.status({});
             }
         }
 
@@ -1382,6 +1373,7 @@ module.exports = function (RED) {
                                 }
                                 sendCommandResponse(newMsg);
                             }
+                            updateNextStatus(node, true);
                             break;
                         case "export":
                             {
@@ -1444,7 +1436,7 @@ module.exports = function (RED) {
                         case "add":
                         case "update":
                             updateTask(node,cmd,msg);
-                            updateNextStatus(node);
+                            updateNextStatus(node, true);
                             serialise();
                             break;
                         case "clear":
@@ -1455,24 +1447,29 @@ module.exports = function (RED) {
                         case "delete-all-dynamic":
                         case "delete-all-static":
                             deleteAllTasks(node,cmd_filter);
+                            updateNextStatus(node,force);
                             serialise();
                             break;
                         case "remove":
                         case "delete":
                             deleteTask(node,cmd.name);
+                            updateNextStatus(node,force);
                             serialise();
                             break;
                         case "start":
                             startTask(node,cmd.name);
+                            updateNextStatus(node,force);
                             break;
                         case "start-all":
                         case "start-all-dynamic":
                         case "start-all-static":
                             startAllTasks(node, cmd_filter);
+                            updateNextStatus(node,force);
                             break;
                         case "stop":
                         case "pause":
                             stopTask(node,cmd.name,cmd.command == "stop");
+                            updateNextStatus(node,force);
                             break;
                         case "stop-all":
                         case "stop-all-dynamic":
@@ -1481,6 +1478,7 @@ module.exports = function (RED) {
                         case "pause-all-dynamic":
                         case "pause-all-static":
                             stopAllTasks(node,cmd.command == "stop-all", cmd_filter);
+                            updateNextStatus(node,force);
                             break;
                         case "debug":{
                                 let task = getTask(node,cmd.name)
