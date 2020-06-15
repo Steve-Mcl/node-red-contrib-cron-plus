@@ -1068,7 +1068,7 @@ copies or substantial portions of the Software.
                         { label: "Every day at noon in Jan, Mar and Dec (0 0 12 * JAN,MAR,DEC *)", value: "0 0 12 * JAN,MAR,DEC *" },
                         { label: "Every minute, on the first weekday of the month (* * 1W * *)", value: "* * 1W * *" },
                         { label: "Every minute, on the third Tuesday of the month (* * * * Tue#3)", value: "* * * * Tue#3" },
-                        { label: "At 12:00 PM, on the last Monday of the month</option (0 12 * * MONL)", value: "0 12 * * MONL" },
+                        { label: "At 12:00 PM, on the last Monday of the month (0 12 * * MONL)", value: "0 12 * * MONL" },
                     ]
 
                 expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:0px; width:calc(72% - 36px);", placeholder: '* * * * * * *', list: "cron-expression-example-list",title:"cron expression", value:option.expression}).appendTo(row2);
