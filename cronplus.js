@@ -1447,29 +1447,29 @@ module.exports = function (RED) {
                         case "delete-all-dynamic":
                         case "delete-all-static":
                             deleteAllTasks(node,cmd_filter);
-                            updateNextStatus(node,force);
+                            updateNextStatus(node,true);
                             serialise();
                             break;
                         case "remove":
                         case "delete":
                             deleteTask(node,cmd.name);
-                            updateNextStatus(node,force);
+                            updateNextStatus(node,true);
                             serialise();
                             break;
                         case "start":
                             startTask(node,cmd.name);
-                            updateNextStatus(node,force);
+                            updateNextStatus(node,true);
                             break;
                         case "start-all":
                         case "start-all-dynamic":
                         case "start-all-static":
                             startAllTasks(node, cmd_filter);
-                            updateNextStatus(node,force);
+                            updateNextStatus(node,true);
                             break;
                         case "stop":
                         case "pause":
                             stopTask(node,cmd.name,cmd.command == "stop");
-                            updateNextStatus(node,force);
+                            updateNextStatus(node,true);
                             break;
                         case "stop-all":
                         case "stop-all-dynamic":
@@ -1478,7 +1478,7 @@ module.exports = function (RED) {
                         case "pause-all-dynamic":
                         case "pause-all-static":
                             stopAllTasks(node,cmd.command == "stop-all", cmd_filter);
-                            updateNextStatus(node,force);
+                            updateNextStatus(node,true);
                             break;
                         case "debug":{
                                 let task = getTask(node,cmd.name)
