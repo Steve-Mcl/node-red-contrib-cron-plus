@@ -279,6 +279,7 @@ copies or substantial portions of the Software.
             });
 
             this.uiSelect.addClass("red-ui-typedInput-container");
+            this.uiSelect.css("display","inline-block");
 
             // this.input.on('focus', function() {
             //     that.uiSelect.addClass('red-ui-typedInput-focus');
@@ -686,7 +687,8 @@ copies or substantial portions of the Software.
                 modal: true,
                 buttons: {
                     "Refresh": function() {
-                        var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id;
+                        // var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id;
+                        var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id");
                         drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader", dnRepositionResize);
                     },
                     "Close": function(){
@@ -700,7 +702,8 @@ copies or substantial portions of the Software.
                 open: function(event) {
                     $(this).css('padding', '0px 0px 0px 0px');
                     $('.ui-dialog-buttonpane').find('button:contains("Close")').addClass('primary');
-                    var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id;
+                    // var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id;
+                    var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id");
                     dnRepositionResize();
                     drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader", dnRepositionResize);
                 },
@@ -709,7 +712,8 @@ copies or substantial portions of the Software.
                     duration: 250
                 }
             });
-            $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id = node.id;
+            $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id",node.id);
+            // $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id = node.id;
             dnRepositionResize();
 
             var tzData;
@@ -1083,10 +1087,11 @@ copies or substantial portions of the Software.
                         return (!!value) && value.length >= 9 ;//better validation required?
                     }
                 })
-                
-                expressionField.combobox("instance").button.prop("title", "Expression examples...");
+                try {
+                    expressionField.combobox().button.prop("title", "Expression examples...");
+                    expressionField.combobox("instance").button.prop("title", "Expression examples...");                
+                } catch (error) {}
                 expressionField.combobox("value", option.expression || "");
-                
 
                 //generate the solar events field
                 solarEventsField = $('<input/>',{class:"node-input-option-solarEvents",type:"text",style:"margin-left:0px; width:calc(32% - 16px);", placeholder: 'select solar events', value: option.solarEvents || ""}).appendTo(row2);
@@ -1115,11 +1120,10 @@ copies or substantial portions of the Software.
                 })
                 solarEventsField.typedInput("type", option.solarType || "all");
                 solarEventsField.typedInput("value", option.solarEvents || "");//added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
-
                 //generate location 
-                locationGroup = $('<div class="red-ui-typedInput-container" style="margin-left:5px; width: calc(25% - 16px);">' +
+                locationGroup = $('<div class="red-ui-typedInput-container" style="margin-left:5px; width: calc(25% - 16px); display: inline-block;">' +
                         '<button class="red-ui-typedInput-type-select" style="width:25px" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
-                        '<div class="red-ui-typedInput-input-wrap" style="left: 25px; right: 0px;">' +
+                        '<div class="red-ui-typedInput-input red-ui-typedInput-input-wrap" style="left: 25px; right: 0px;">' +
                         '<input class="red-ui-typedInput-input node-input-option-location" type="text" value="" placeholder="lat lng"></div> </div>');                
                 var locationField = locationGroup.find("input");
                 var locationButton = locationGroup.find("button");
@@ -1199,20 +1203,27 @@ copies or substantial portions of the Software.
                     switch (value) {
                         case "solar":
                             locationGroup.show();
+                            locationGroup.css("display","inline-block");
                             offsetField.show();
                             expressionField.combobox("hide");
                             solarEventsField.typedInput("show");
+                            //solarEventsField.typedInput().css("display","inline-block");
+                            solarEventsField.css("display","inline-block");
                             break;
                         case "dates":
-                            expressionField.combobox("hideMenu");
                             expressionField.combobox("show");
+                            expressionField.css("display","inline-block");
+                            //expressionField.combobox().css("display","inline-block");
+                            expressionField.combobox("hideMenu");
                             locationGroup.hide();
                             offsetField.hide();                            
                             solarEventsField.typedInput("hide");
                             break;
                         default: //cron
-                            expressionField.combobox("showMenu");
                             expressionField.combobox("show");
+                            expressionField.combobox("showMenu");
+                            // expressionField.combobox().css("display","inline-block");
+                            expressionField.css("display","inline-block");
                             locationGroup.hide();
                             offsetField.hide();                            
                             solarEventsField.typedInput("hide");
@@ -1322,7 +1333,19 @@ copies or substantial portions of the Software.
             }
         },
         oneditresize: function(){
-            updateEditorLayout()
+            // console.log("RESIZING")
+            updateEditorLayout();
+            //HACK for old versions of node-red - prior to typedInput resizing changed from code to CSS
+            var tics = $(".red-ui-typedInput-container");
+            if(tics && tics.length){
+                var idx = 0
+                for (idx = 0; idx < tics.length; idx++) {
+                    var element = $(tics[idx]);
+                    if(element && element.length && element.is(":visible") ){
+                        element.css("display","inline-block");
+                    }
+                }
+            } 
         }
     });
 
