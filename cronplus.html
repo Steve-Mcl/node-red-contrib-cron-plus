@@ -1336,16 +1336,18 @@ copies or substantial portions of the Software.
             // console.log("RESIZING")
             updateEditorLayout();
             //HACK for old versions of node-red - prior to typedInput resizing changed from code to CSS
-            var tics = $(".red-ui-typedInput-container");
-            if(tics && tics.length){
-                var idx = 0
-                for (idx = 0; idx < tics.length; idx++) {
-                    var element = $(tics[idx]);
-                    if(element && element.length && element.is(":visible") ){
-                        element.css("display","inline-block");
+            if(RED.settings.version && RED.settings.version.split(".")[0] < 1){
+                var tics = $(".red-ui-typedInput-container");
+                if(tics && tics.length){
+                    var idx = 0
+                    for (idx = 0; idx < tics.length; idx++) {
+                        var element = $(tics[idx]);
+                        if(element && element.length && element.is(":visible") ){
+                            element.css("display","inline-block");
+                        }
                     }
-                }
-            } 
+                } 
+            }
         }
     });
 
