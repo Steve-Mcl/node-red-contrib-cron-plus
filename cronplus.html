@@ -508,26 +508,26 @@ copies or substantial portions of the Software.
                                 value[i].name = value[i].topic;
                             }
                             if(!value[i].name) {
-                                console.warn("cron-plus: schedule name missing");
+                                if(debug) console.warn("cron-plus: schedule name missing");
                                 return false;
                             }                            
                             if(dupCheck[value[i].name]) {
-                                console.warn("cron-plus: duplicate schedule named '" + value[i].name + "'");
+                                if(debug) console.warn("cron-plus: duplicate schedule named '" + value[i].name + "'");
                                 return false;
                             }
                             dupCheck[value[i].name] = true;
                             if (!value[i].expressionType || value[i].expressionType === "cron") {
                                 if (!value[i].expression) {
-                                    console.warn("cron-plus: expression missing")
+                                    if(debug) console.warn("cron-plus: expression missing")
                                     return false;
                                 }
                             } else if(value[i].expressionType === "solar" ) {
                                 if (value[i].solarType != "all" && value[i].solarType != "selected") {
-                                    console.warn("cron-plus: solarType is not 'all' or 'selected'");
+                                    if(debug) console.warn("cron-plus: solarType is not 'all' or 'selected'");
                                     return false;
                                 }
                                 if (value[i].solarType == "selected" && !value[i].solarEvents) {
-                                    console.warn("cron-plus: solarEvents missing");
+                                    if(debug) console.warn("cron-plus: solarEvents missing");
                                     return false;
                                 }
                             }
@@ -673,7 +673,7 @@ copies or substantial portions of the Software.
             }
             var dnRepositionResize = function(){
                 var w = ($(document).width() < 800) ? "95%" : "80%";
-                console.log("dialog-open-drawDynamicSchedulesTable done - should now center and resize width", w)
+                if(debug) console.log("dialog-open-drawDynamicSchedulesTable done - should now center and resize width", w)
                 $("#cron-plus-dynamic-nodes-dialog").dialog("option", "width", w);
                 $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", {my: "center", at: "center", of: window});
             }
