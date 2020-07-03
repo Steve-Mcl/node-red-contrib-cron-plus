@@ -306,7 +306,7 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
             try {
                 result.nextDates = ex.nextNDates(now, 5);
             } catch (error) {
-                console.debug(error);
+                node.debug(error);
             }
         }
         result.description = humanizeCron(expression);
@@ -781,7 +781,6 @@ module.exports = function (RED) {
             if(task){
                 indicator = node.nextIndicator || "dot";
             }
-            console.debug("updateDoneStatus-> setting DONE status for node " + node.id)
             node.status({ fill: "green", shape: indicator, text: "Done: " + formatShortDateTimeWithTZ(Date.now(), node.timeZone) });
             // node.nextDate = getNextTask(node.tasks);
             let now = new Date();
@@ -789,11 +788,8 @@ module.exports = function (RED) {
             let next = node.nextDate ? new Date(node.nextDate).valueOf() : (Date.now() + 5001);
             let msTillNext = next - now;
             if (msTillNext > 5000){
-                console.debug("updateDoneStatus-> setting node.statusUpdatePending=true")
                 node.statusUpdatePending = true;
-                console.debug("updateDoneStatus -> setting timeout for node " + node.id)
                 setTimeout(function() {
-                    console.debug("updateDoneStatus -> setTimeout occuring now for node " + node.id)
                     node.statusUpdatePending = false;
                     updateNextStatus(node, true);
                 }, 4000);
@@ -1003,7 +999,6 @@ module.exports = function (RED) {
         }
         
         function updateTask(node,options,msg){
-            //console.log("updateTask():", options)
             if(!options || typeof options != "object"){
                 node.warn("schedule settings are not valid",msg);
                 return null;
@@ -1090,8 +1085,7 @@ module.exports = function (RED) {
             task.node_limit = opt.limit || 0;
             task.stop();
             task.on('run', (timestamp) => {
-                console.log(`now time ${new Date()}\n crontime ${new Date(timestamp)}`)
-                node.debug(`run - topic: ${task.node_topic}\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
+                node.debug(`running '${task.name}' ~ '${task.node_topic}'\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
                 let indicator = task.isDynamic ? "ring" : "dot";
                 node.status({ fill: "green", shape: indicator, text: "Running " + formatShortDateTimeWithTZ(timestamp, node.timeZone) });
                 if(isTaskFinished(task)){
@@ -1111,18 +1105,17 @@ module.exports = function (RED) {
                 })
             })
             .on('ended', () => {
-                node.debug(`ended - topic: ${task.node_topic}`)
+                node.debug(`ended '${task.name}' ~ '${task.node_topic}'`)
                 updateNextStatus(node);
             })
             .on('started', () => {
-                node.debug(`started - name: ${task.name}}`)
+                node.debug(`started '${task.name}' ~ '${task.node_topic}'`)
                 process.nextTick(function(){
-                    // console.log("task.on started - process.nextTick - calling updateNextStatus");
                     updateNextStatus(node);
                 })
             })
             .on('stopped', () => {
-                node.debug(`stopped - topic: ${task.node_topic}`)
+                node.debug(`stopped '${task.name}' ~ '${task.node_topic}'`)
                 updateNextStatus(node);
             });
             task.stop();//prevent bug where calling start without first calling stop causes events to bunch up
