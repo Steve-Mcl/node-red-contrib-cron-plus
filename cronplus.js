@@ -936,6 +936,7 @@ module.exports = function (RED) {
                 if(isTaskFinished(task)){
                     task.node_count = 0;
                 }
+                task.stop();//prevent bug where calling start without first calling stop causes events to bunch up
                 task.start();
             }
             return task;
@@ -956,6 +957,7 @@ module.exports = function (RED) {
                         if(isTaskFinished(task)){
                             task.node_count = 0;
                         }
+                        task.stop();//prevent bug where calling start without first calling stop causes events to bunch up
                         task.start();
                     }    
                 }
@@ -1088,6 +1090,7 @@ module.exports = function (RED) {
             task.node_limit = opt.limit || 0;
             task.stop();
             task.on('run', (timestamp) => {
+                console.log(`now time ${new Date()}\n crontime ${new Date(timestamp)}`)
                 node.debug(`run - topic: ${task.node_topic}\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
                 let indicator = task.isDynamic ? "ring" : "dot";
                 node.status({ fill: "green", shape: indicator, text: "Running " + formatShortDateTimeWithTZ(timestamp, node.timeZone) });
@@ -1122,6 +1125,7 @@ module.exports = function (RED) {
                 node.debug(`stopped - topic: ${task.node_topic}`)
                 updateNextStatus(node);
             });
+            task.stop();//prevent bug where calling start without first calling stop causes events to bunch up
             task.start()
             node.tasks.push(task);
             return task;
