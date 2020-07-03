@@ -1042,7 +1042,7 @@ module.exports = function (RED) {
         function createTask(node, opt, index, static) {
             opt = opt || {}
             try {
-                node.debug(`createTask - index: ${index}, static: ${static}, opt: ${JSON.stringify(opt)}`)
+                node.log(`createTask - index: ${index}, static: ${static}, opt: ${JSON.stringify(opt)}`)
             } catch (error) {
                 node.error(error)
             }
