@@ -279,7 +279,7 @@ copies or substantial portions of the Software.
             });
 
             this.uiSelect.addClass("red-ui-typedInput-container");
-            this.uiSelect.css("display","inline-block");
+            // this.uiSelect.css("display","inline-block");
 
             // this.input.on('focus', function() {
             //     that.uiSelect.addClass('red-ui-typedInput-focus');
@@ -1121,7 +1121,7 @@ copies or substantial portions of the Software.
                 solarEventsField.typedInput("type", option.solarType || "all");
                 solarEventsField.typedInput("value", option.solarEvents || "");//added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
                 //generate location 
-                locationGroup = $('<div class="red-ui-typedInput-container" style="margin-left:5px; width: calc(25% - 16px); display: inline-block;">' +
+                locationGroup = $('<div class="red-ui-typedInput-container" style="margin-left:5px; width: calc(25% - 16px); /*display: inline-block;*/">' +
                         '<button class="red-ui-typedInput-type-select" style="width:25px" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
                         '<div class="red-ui-typedInput-input red-ui-typedInput-input-wrap" style="left: 25px; right: 0px;">' +
                         '<input class="red-ui-typedInput-input node-input-option-location" type="text" value="" placeholder="lat lng"></div> </div>');                
@@ -1203,7 +1203,7 @@ copies or substantial portions of the Software.
                     switch (value) {
                         case "solar":
                             locationGroup.show();
-                            locationGroup.css("display","inline-block");
+                            // locationGroup.css("display","inline-block");
                             offsetField.show();
                             expressionField.combobox("hide");
                             solarEventsField.typedInput("show");
@@ -1212,7 +1212,7 @@ copies or substantial portions of the Software.
                             break;
                         case "dates":
                             expressionField.combobox("show");
-                            expressionField.css("display","inline-block");
+                            // expressionField.css("display","inline-block");
                             //expressionField.combobox().css("display","inline-block");
                             expressionField.combobox("hideMenu");
                             locationGroup.hide();
@@ -1223,7 +1223,7 @@ copies or substantial portions of the Software.
                             expressionField.combobox("show");
                             expressionField.combobox("showMenu");
                             // expressionField.combobox().css("display","inline-block");
-                            expressionField.css("display","inline-block");
+                            // expressionField.css("display","inline-block");
                             locationGroup.hide();
                             offsetField.hide();                            
                             solarEventsField.typedInput("hide");
