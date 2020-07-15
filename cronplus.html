@@ -502,36 +502,48 @@ copies or substantial portions of the Software.
                 value:[{payload: '', topic : '', expression : ''}], 
                 validate:function(value) { 
                     var dupCheck = {};
+                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").removeClass("input-error");
+                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-topic").removeClass("input-error");
+                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-payload").removeClass("input-error");
+                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-expressionType").removeClass("input-error");
+                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-expression").removeClass("input-error");
                     if (value.length) {
                         for (var i = 0; i < value.length; i++) {
                             if(!value[i].name && value[i].topic) {
                                 value[i].name = value[i].topic;
                             }
                             if(!value[i].name) {
-                                if(debug) console.warn("cron-plus: schedule name missing");
+                                console.warn("cron-plus: validation error - schedule name missing");
+                                $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").addClass("input-error");
                                 return false;
-                            }                            
+                            } else {
+                                $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").removeClass("input-error");
+                            }                 
                             if(dupCheck[value[i].name]) {
-                                if(debug) console.warn("cron-plus: duplicate schedule named '" + value[i].name + "'");
+                                console.warn("cron-plus: validation error - duplicate schedule named '" + value[i].name + "'");
+                                $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").addClass("input-error");
                                 return false;
+                            } else {
+                                $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").removeClass("input-error");
                             }
                             dupCheck[value[i].name] = true;
                             if (!value[i].expressionType || value[i].expressionType === "cron") {
                                 if (!value[i].expression) {
-                                    if(debug) console.warn("cron-plus: expression missing")
+                                    console.warn("cron-plus: validation error - expression missing");
+                                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-expressionType").addClass("input-error");
                                     return false;
                                 }
                             } else if(value[i].expressionType === "solar" ) {
                                 if (value[i].solarType != "all" && value[i].solarType != "selected") {
-                                    if(debug) console.warn("cron-plus: solarType is not 'all' or 'selected'");
+                                    console.warn("cron-plus: validation error - solarType is not 'all' or 'selected'");
+                                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-solarType").addClass("input-error");
                                     return false;
                                 }
                                 if (value[i].solarType == "selected" && !value[i].solarEvents) {
-                                    if(debug) console.warn("cron-plus: solarEvents missing");
+                                    console.warn("cron-plus: validation error - solarEvents missing");
                                     return false;
                                 }
                             }
-
                         }
                     }
                     return true;
@@ -544,6 +556,7 @@ copies or substantial portions of the Software.
         },
         oneditprepare: function () {
             var node = this;
+            var dupCheck = {};
             node.commandResponseMsgOutput = node.commandResponseMsgOutput == "output2" ? "output2" : "output1";
             node.outputs = node.commandResponseMsgOutput == "output2" ? 2 : 1;
             $( "#node-input-commandResponseMsgOutput" ).val(node.commandResponseMsgOutput);
@@ -571,6 +584,7 @@ copies or substantial portions of the Software.
                                 selectedLocationInput.val(selectedLocation.lat + " " + selectedLocation.lng);
                             }
                             selectedLocationInput.focus();
+                            selectedLocationInput.change();
                         }
                     }
                 },
@@ -1029,10 +1043,10 @@ copies or substantial portions of the Software.
                 var deleteButton = $('<a/>',{href:"#",class:"editor-button editor-button-small", style:"margin-top:27px; margin-left:5px;"}).appendTo(span);
                 $('<i/>',{class:"fa fa-remove"}).appendTo(deleteButton);
 
-
-                //generate the name field
-                var nameClass ="node-input-option-name" + ((!option.name) ? " input-error" : "");
+                //generate the name field                              
+                var nameClass ="node-input-option-name" + ((!option.name || dupCheck[option.name]) ? " input-error" : "");
                 nameField = $('<input/>',{class:nameClass,type:"text",style:"margin-left:0px; width:calc(28% - 16px);", placeholder: 'name', title: "name", value:option.name}).appendTo(div);
+                dupCheck[option.name] = true;
 
                 //generate the topic field
                 var topicClass ="node-input-option-topic" + ((!option.topic) ? " input-error" : "");
@@ -1067,11 +1081,11 @@ copies or substantial portions of the Software.
                         { label: "Every 20 minutes, at 9:00 AM and 5:00 PM (0 */20 9,17 * * *)", value: "0 */20 9,17 * * *" },
                         { label: "At 15, 30, and 45 minutes past the hour (0 15,30,45 * * * *)", value: "0 15,30,45 * * * *" },
                         { label: "Every day at noon - 12pm (0 0 12 * * *)", value: "0 0 12 * * *" },
-                        { label: "At 02:00 AM, on day 29 of Feb (leap years) (0 0 2 29 FEB * 2020/4)", value: "0 0 2 29 FEB * 2020/4" },
-                        { label: "At 07:00 AM, on the first Monday of the month (0 0 7 * * MON#1 *)", value: "0 0 7 * * MON#1 *" },
-                        { label: "Every day at noon in Jan, Mar and Dec (0 0 12 * JAN,MAR,DEC *)", value: "0 0 12 * JAN,MAR,DEC *" },
-                        { label: "Every minute, on the first weekday of the month (* * 1W * *)", value: "* * 1W * *" },
-                        { label: "Every minute, on the third Tuesday of the month (* * * * Tue#3)", value: "* * * * Tue#3" },
+                        { label: "At 02:00 AM, on day 29 of Feb (0 0 2 29 FEB * 2020/4)", value: "0 0 2 29 FEB * 2020/4" },
+                        { label: "At 07:00 AM, on the 1st Mon of the month (0 0 7 * * MON#1 *)", value: "0 0 7 * * MON#1 *" },
+                        { label: "Every day at noon in Jan, Mar & Dec (0 0 12 * JAN,MAR,DEC *)", value: "0 0 12 * JAN,MAR,DEC *" },
+                        { label: "Every minute, on the 1st weekday of the month (* * 1W * *)", value: "* * 1W * *" },
+                        { label: "Every minute, on the third Tue of the month (* * * * Tue#3)", value: "* * * * Tue#3" },
                         { label: "At 12:00 PM, on the last Monday of the month (0 12 * * MONL)", value: "0 12 * * MONL" },
                     ]
 
@@ -1183,6 +1197,22 @@ copies or substantial portions of the Software.
                     }
                 });
             
+                nameField.keyup(function() {
+                    if ($(this).val() && $(this).hasClass('input-error')) {
+                        $(this).removeClass('input-error')
+                    } else if (!$(this).val()) {
+                        $(this).addClass('input-error')
+                    }
+                });                      
+            
+                locationField.change(function() {
+                    if ($(this).val() && locationGroup.hasClass("input-error")) {
+                        locationGroup.removeClass('input-error')
+                    } else if (!$(this).val()) {
+                        locationGroup.removeClass('input-error')
+                    }
+                });                      
+            
                 topicField.keyup(function() {
                     if ($(this).val() && $(this).hasClass('input-error')) {
                         $(this).removeClass('input-error')
@@ -1233,6 +1263,8 @@ copies or substantial portions of the Software.
                 expressionTypeField.change();
                 $("#node-input-option-container").append(container);
             }
+
+            $("#node-input-outputField").typedInput({types:[{label:"msg.", value:"str"}]});
 
             $("#node-input-add-option").click(function() {
                 generateOption($("#node-input-option-container").children().length, {});
@@ -1373,6 +1405,9 @@ copies or substantial portions of the Software.
             border: solid 1px #aaa;
             color: #333;
             background: #eee;
+        }
+        .cron-plus-form-row > label {
+            width: 120px !important;
         }
         .cron-plus-expression-tip {
             background: #ffe;
@@ -1520,39 +1555,39 @@ copies or substantial portions of the Software.
         </div>
     </div>
 
-    <div class="form-row">
+    <div class="form-row cron-plus-form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
         <input type="text" id="node-input-name" placeholder="Name">
     </div>
 
-    <div class="form-row">
-        <label for="node-input-outputField"><i class="fa fa-envelope"></i> Output to</label>
+    <div class="form-row cron-plus-form-row">
+        <label for="node-input-outputField"><i class="fa fa-sign-out"></i> Output property</label>
         <input type="text" id="node-input-outputField" placeholder="payload">
     </div>         
-    <div class="form-row">
+    <div class="form-row cron-plus-form-row">
         <label for="node-input-timeZone"><i class="fa fa-globe"></i> Timezone</label>
         <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
     </div>  
-    <div class="form-row">
-        <label for="node-input-commandResponseMsgOutput"><i class="fa fa-dot-circle-o"></i><span style="font-stretch: condensed;"> Command Resp</span></label>
+    <div class="form-row cron-plus-form-row">
+        <label for="node-input-commandResponseMsgOutput"><i class="fa fa-dot-circle-o"></i> Command Resp</label>
         <select style="width: 70%" id="node-input-commandResponseMsgOutput">
           <option value="output1">Send to output 1</option>
           <option value="output2">Send to separate output</option>
         </select>
     </div> 
-    <div class="form-row">
+    <div class="form-row cron-plus-form-row">
         <label>&nbsp;</label>
         <input type="checkbox" id="node-input-persistDynamic" style="display:inline-block; width:15px; vertical-align:baseline;" autocomplete="off">
-        <label style="width: 60%;" for="node-input-persistDynamic" title="Auto save and reload dynamic schedules">Persist dynamic schedules</span>
+        <label style="width: 60% !important;" for="node-input-persistDynamic" title="Auto save and reload dynamic schedules">Persist dynamic schedules</span>
     </div>
-    <div id="node-cronplus-tab-static-schedules" class="form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%; min-height: 200px">
+    <div id="node-cronplus-tab-static-schedules" class="form-row cron-plus-form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%; min-height: 200px">
         <label for="node-input-option-container-div" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
         <div class="red-ui-editableList-border red-ui-editableList-container" id="node-input-option-container-div" 
             style="min-width: 300px; box-sizing: border-box; border-radius: 5px; padding: 5px; overflow-y:scroll;display: inline-block; width: 100%; height: calc(100% - 28px); min-height: 150px;">
             <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;"></ol>
         </div>
     </div> 
-    <div class="form-row">
+    <div class="form-row cron-plus-form-row">
         <a href="#" class="editor-button editor-button-small" id="node-input-add-option" style="margin-top: 4px;"><i class="fa fa-plus"></i> <span>add</span></a>
         <a href="#" class="editor-button editor-button-small" id="node-input-show-dynamic" style="margin-top: 4px;"><i class="fa fa-table"></i> <span>view dynamic schedules</span></a>
     </div>
@@ -1564,7 +1599,7 @@ copies or substantial portions of the Software.
     <p>Schedule the injection of a payload to start a flow</p>
     <h3>Properties...</h3>
     <dl class="message-properties">
-        <h4>Output to</h4>
+        <h4>Output property</h4>
         <div style="padding-left: 15px">
             The <code>msg.</code> property to send the payload to.  Typically this would be payload.
         </div>
@@ -1604,7 +1639,7 @@ copies or substantial portions of the Software.
         </div>
         <h4>Schedules - Payload</h4>
         <div style="padding-left: 15px">
-            The value to send in the payload when the schedule triggers. (NOTE: the property that the payload gets written to is determined by "output to").
+            The value to send in the payload when the schedule triggers. (NOTE: the property that the payload gets written to is determined by "Output property").
         </div>
         <h4>Schedules - Type</h4>
         <div style="padding-left: 15px">
@@ -1705,9 +1740,9 @@ copies or substantial portions of the Software.
     </dl>
     <h3>Output</h3>
     <dl class="message-properties">
-        <dt><i>payload (see 'Output to')</i> <span class="property-type">number|string|boolean|object|buffer</span></dt>
-        <dd>msg.[Output to] will contain whatever is configured in 'payload'</dd>
-        <dd>e.g. if 'Output to' is set to <b>data.value</b> then <code>msg.data.value</code> will contain the value of the <i>payload</i></dd>
+        <dt><i>payload (see 'Output property')</i> <span class="property-type">number|string|boolean|object|buffer</span></dt>
+        <dd>msg.[Output property] will contain whatever is configured in 'payload'</dd>
+        <dd>e.g. if 'Output property' is set to <b>data.value</b> then <code>msg.data.value</code> will contain the value of the <i>payload</i></dd>
         <dd>msg.topic will contain the name of the schedule. This simplifies separating out which schedule has triggered</dd>
         <dd>Additional properties are also added to the msg object. Check the debug output (use show complete msg)</dd>
     </dl>
