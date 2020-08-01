@@ -713,7 +713,7 @@ function exportTask(task, includeStatus) {
     return o;
 }
 
-var userDir = '', persistPath = '', persistAvaiable = false;
+var userDir = '', persistPath = '', persistAvailable = false;
 const cronplusDir = "cronplusdata";
 
 
@@ -724,11 +724,11 @@ module.exports = function (RED) {
         if (!fs.existsSync(persistPath)){
             fs.mkdirSync(persistPath);
         }
-        persistAvaiable = fs.existsSync(persistPath);
+        persistAvailable = fs.existsSync(persistPath);
     } catch (e) {
         if ( e.code !== 'EEXIST' ) { 
             RED.log.error(`cron-plus: Error creating persistance folder '${persistPath}'. ${e.message}`)
-            persistAvaiable = false;
+            persistAvailable = false;
         }
     }
     function CronPlus(config) {
@@ -1126,7 +1126,7 @@ module.exports = function (RED) {
 
         function serialise(){
             try {
-                if(!persistAvaiable || !node.persistDynamic){
+                if(!persistAvailable || !node.persistDynamic){
                     return;
                 }  
                 let filePath = getPersistFilePath();
@@ -1153,7 +1153,7 @@ module.exports = function (RED) {
 
         function deserialise(){
             try {
-                if(!persistAvaiable || !node.persistDynamic){
+                if(!persistAvailable || !node.persistDynamic){
                     return;
                 }
                 let filePath = getPersistFilePath();
