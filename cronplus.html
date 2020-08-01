@@ -20,11 +20,11 @@ copies or substantial portions of the Software.
     var debug = false;
     var map, mapPopup, selectedLocation, selectedLocationInput;
 
-    var filesadded=[] //list of files already added 
-    function checkloadjscssfile(filename, filetype, callback){
-        if (filesadded.indexOf(filename)===-1){
-            loadjscssfile(filename, filetype, function(){
-                filesadded.push(filename);
+    var filesAdded=[] //list of files already added 
+    function checkLoadJsCssFile(filename, filetype, callback){
+        if (filesAdded.indexOf(filename)===-1){
+            loadJsCssFile(filename, filetype, function(){
+                filesAdded.push(filename);
                 if(callback) callback();
             })
         } else {
@@ -32,22 +32,22 @@ copies or substantial portions of the Software.
         }
     }
 
-    function loadjscssfile(filename, filetype, callback){
+    function loadJsCssFile(filename, filetype, callback){
         if (filetype=="js"){ //if filename is a external JavaScript file
-            var fileref=document.createElement('script')
-            fileref.setAttribute("type","text/javascript")
-            fileref.setAttribute("src", filename)
+            var fileRef=document.createElement('script')
+            fileRef.setAttribute("type","text/javascript")
+            fileRef.setAttribute("src", filename)
         }
         else if (filetype=="css"){ //if filename is an external CSS file
-            var fileref=document.createElement("link")
-            fileref.setAttribute("rel", "stylesheet")
-            fileref.setAttribute("type", "text/css")
-            fileref.setAttribute("href", filename)
+            var fileRef=document.createElement("link")
+            fileRef.setAttribute("rel", "stylesheet")
+            fileRef.setAttribute("type", "text/css")
+            fileRef.setAttribute("href", filename)
         }
-        if (typeof fileref!="undefined")
-            document.getElementsByTagName("head")[0].appendChild(fileref)
+        if (typeof fileRef!="undefined")
+            document.getElementsByTagName("head")[0].appendChild(fileRef)
 
-        fileref.onload = function() {
+        fileRef.onload = function() {
             if (callback) callback();
         }
     }
@@ -482,7 +482,7 @@ copies or substantial portions of the Software.
     });
 
 
-    // checkloadjscssfile("https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.js","js")
+    // checkLoadJsCssFile("https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.js","js")
 
     RED.nodes.registerType('cronplus', {
         category: "input",
@@ -1158,15 +1158,15 @@ copies or substantial portions of the Software.
                         $(".cron-plus-map-loading").hide();
                         $("#cron-plus-map").hide();
                         let proto = location.protocol === 'https:' ? location.protocol : "http:"
-                        checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css","css", function(){
-                            checkloadjscssfile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js","js", function(){
+                        checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css","css", function(){
+                            checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js","js", function(){
                                 createMap(selectedLocationInput);
                             });
                         });
 
                         /* google maps - future possibility...
                             https://jsfiddle.net/user2314737/8ndjuoyj/
-                            checkloadjscssfile("https://maps.googleapis.com/maps/api/js?v=3&amp;sensor=false","js", function(){
+                            checkLoadJsCssFile("https://maps.googleapis.com/maps/api/js?v=3&amp;sensor=false","js", function(){
                                 createMap(selectedLocationInput);
                             })
                         */

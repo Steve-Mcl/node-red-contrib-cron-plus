@@ -104,7 +104,7 @@ var humanizeCron = function (expression, locale) {
 }
 
 /**
- * Validate a shcedule options. Returns true if OK otherwise throws an apporpriate error
+ * Validate a schedule options. Returns true if OK otherwise throws an appropriate error
  * @param {object} opt the options object to validate
  * @param {boolean} permitDefaults allow certain items to be a default (missing value)
  * @returns {boolean}
@@ -327,7 +327,7 @@ function formatShortDateTimeWithTZ(date, tz) {
     if (!date) {
         return "";
     }
-    let datestring;
+    let dateString;
     let o = {
         timeZone: tz ? tz : undefined,
         timeZoneName: "short",
@@ -340,12 +340,12 @@ function formatShortDateTimeWithTZ(date, tz) {
         second: "2-digit"
     };
     try {
-        datestring = new Intl.DateTimeFormat('default', o).format(new Date(date))    
+        dateString = new Intl.DateTimeFormat('default', o).format(new Date(date))    
     } catch (error) {
-        datestring = "Error. Check timezone setting"
+        dateString = "Error. Check timezone setting"
     }
         
-    return datestring;
+    return dateString;
 }
 
 /**
@@ -359,7 +359,7 @@ function isNumber(n) {
 
 /**
  * Determine if a variable is a valid object
- * NOTE: Arrays are also objects - be sure to use Arra.isArray if you need to know the diference
+ * NOTE: Arrays are also objects - be sure to use Array.isArray if you need to know the difference
  * @param {*} o The variable to test
  * @returns {boolean}
  */
@@ -727,7 +727,7 @@ module.exports = function (RED) {
         persistAvailable = fs.existsSync(persistPath);
     } catch (e) {
         if ( e.code !== 'EEXIST' ) { 
-            RED.log.error(`cron-plus: Error creating persistance folder '${persistPath}'. ${e.message}`)
+            RED.log.error(`cron-plus: Error creating persistence folder '${persistPath}'. ${e.message}`)
             persistAvailable = false;
         }
     }
@@ -1147,7 +1147,7 @@ module.exports = function (RED) {
                 let fileData = JSON.stringify(data);
                 fs.writeFileSync(filePath,fileData);
             } catch (e) {
-                RED.log.error(`cron-plus: Error saving persistance data '${filePath}'. ${e.message}`)
+                RED.log.error(`cron-plus: Error saving persistence data '${filePath}'. ${e.message}`)
             }
         }
 
@@ -1175,10 +1175,10 @@ module.exports = function (RED) {
                         createTask(node, opt, iOpt, false);
                     }
                 } else {
-                    RED.log.log(`cron-plus: no persistance data found for node '${node.id}'.`)
+                    RED.log.log(`cron-plus: no persistence data found for node '${node.id}'.`)
                 }        
             } catch (error) {
-                RED.log.error(`cron-plus: Error loading persistance data '${filePath}'. ${e.message}`)
+                RED.log.error(`cron-plus: Error loading persistence data '${filePath}'. ${e.message}`)
             }            
         }
 
@@ -1200,7 +1200,7 @@ module.exports = function (RED) {
             for(let iOpt = 0; iOpt < node.options.length; iOpt++){
                 let opt = node.options[iOpt];
                 opt.name = opt.name || opt.topic;
-                node.statusUpdatePending = true;//prevent uneccesary status updates while loading
+                node.statusUpdatePending = true;//prevent unnecessary status updates while loading
                 createTask(node, opt, iOpt, true);
             }
 
@@ -1297,7 +1297,7 @@ module.exports = function (RED) {
         this.on("input", function (msg) {
 
             //is this an button press?...
-            if(!msg.payload && !msg.topic){//TODO: better method of differenciating between bad input and button press
+            if(!msg.payload && !msg.topic){//TODO: better method of differentiating between bad input and button press
                 sendMsg(node, node.tasks[0], Date.now(), true);
                 return;
             }
