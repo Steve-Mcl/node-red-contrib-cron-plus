@@ -1212,16 +1212,6 @@ module.exports = function (RED) {
             }, 200);
             
 
-            node.on('close', function (done) {
-                serialise();
-                if (node.tasks) {
-                    node.tasks.forEach((task) => {
-                        task.stop()
-                    })
-                }
-                done();
-            });
-
         } catch (err) {
             if (node.tasks) {
                 node.tasks.forEach(task => task.stop())
@@ -1294,11 +1284,40 @@ module.exports = function (RED) {
             return null;
         }
 
-        this.on("input", function (msg) {
+        node.on('close', function (removed, done) {
+            try {
+                serialise();
+            } catch (error) {
+                node.error(error, msg)
+            }
+            try {
+                 if (node.tasks) {
+                    node.tasks.forEach((task) => {
+                        task.stop()
+                    })
+                }  
+            } catch (error) { }
 
+            if(removed){
+                if(clockMonitor) clearInterval(clockMonitor);
+                stopAllTasks(this);
+            } else {
+                refreshTasks(this);
+            }
+            done();
+        });
+
+        this.on("input", function (msg, send, done) {
+            send = send || function() { node.send.apply(node,arguments) }
+            done = done || function(err) {
+                if(err){
+                    node.error(err,msg);
+                }
+            };
             //is this an button press?...
             if(!msg.payload && !msg.topic){//TODO: better method of differentiating between bad input and button press
                 sendMsg(node, node.tasks[0], Date.now(), true);
+                done();
                 return;
             }
 
@@ -1516,7 +1535,8 @@ module.exports = function (RED) {
                     }
                 }
             } catch (error) {
-                node.error(error,msg);
+                done(error);
+                //node.error(error,msg);
             }            
         });
 
