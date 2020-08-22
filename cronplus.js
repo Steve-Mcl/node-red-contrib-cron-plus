@@ -746,6 +746,20 @@ module.exports = function (RED) {
         node.commandResponseMsgOutput = config.commandResponseMsgOutput || "output1";
         node.outputs = config.commandResponseMsgOutput === "output2" ? 2 : 1;//1 output pins (all messages), 2 outputs (schedules out of pin1, command responses out of pin2)
         node.statusUpdatePending = false;
+
+
+        const MAX_CLOCK_DIFF = 5000;
+        var clockMonitor = setInterval(function timeChecker() {
+            var oldTime = timeChecker.oldTime || new Date();
+            var newTime = new Date();
+            var timeDiff = newTime - oldTime;
+            timeChecker.oldTime = newTime;
+            if (Math.abs(timeDiff) >= MAX_CLOCK_DIFF) {
+                node.log("System Time Change Detected!");
+                refreshTasks(node);
+            }
+        }, 1000);
+
         const setProperty = function (msg, field, value) {
             const set = (obj, path, val) => {
                 const keys = path.split('.');
@@ -896,7 +910,36 @@ module.exports = function (RED) {
             }
             return r;
         }
-        
+        function refreshTasks(node) {
+            let tasks = node.tasks;
+            node.log("Refreshing running schedules");
+            if(tasks){
+                try {
+                    let now = new Date();
+                    if(!tasks || !tasks.length)
+                        return null;
+                    let tasksToRefresh = tasks.filter(function(task) {
+                        return task._sequence || (task.isRunning && task._expression  && !isTaskFinished(task));
+                    });
+                    if(!tasksToRefresh || !tasksToRefresh.length){
+                        return null;
+                    }
+                    for (let index = 0; index < node.tasks.length; index++) {
+                        let task = node.tasks[index];
+                        if(task.node_expressionType == "cron") {
+                            task.stop();
+                            task.start();
+                        } else {
+                            updateTask(node,task.node_opt,null);
+                        }
+                        task.runScheduledTasks();
+                        index--;
+                    }
+                }
+                catch(e){ }
+                updateNextStatus(node);
+            }
+        }
         function stopTask(node,name,resetCounter){
             let task = getTask(node,name);
             if(task){
@@ -1097,7 +1140,7 @@ module.exports = function (RED) {
                     return;
                 } 
                 task.node_count = task.node_count + 1;//++ stops at 2147483647
-                sendMsg(node, task, timestamp);   
+                sendMsg(node, task, timestamp);
                 process.nextTick(function(){
                     if( task.node_expressionType === "solar" ){
                         updateTask(node,task.node_opt,null);
