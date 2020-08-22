@@ -279,14 +279,7 @@ copies or substantial portions of the Software.
             });
 
             this.uiSelect.addClass("red-ui-typedInput-container");
-            // this.uiSelect.css("display","inline-block");
 
-            // this.input.on('focus', function() {
-            //     that.uiSelect.addClass('red-ui-typedInput-focus');
-            // });
-            // this.input.on('blur', function() {
-            //     that.uiSelect.removeClass('red-ui-typedInput-focus');
-            // });
             this.input.on('change', function() {
                 that.validate();
             })
@@ -563,6 +556,8 @@ copies or substantial portions of the Software.
             var getIdealDialogHeight = function(){
                 return Math.min(800, ($(document).height() < 600) ? $(document).width() - 30 : $(document).height() - 100)
             }
+
+            //create map popup dialog
             $( "#cron-plus-map-dialog" ).dialog({
                 classes: {
                     "ui-dialog-content": "cron-plus-map-dialog-content"
