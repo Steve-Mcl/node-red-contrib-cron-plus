@@ -486,6 +486,7 @@ copies or substantial portions of the Software.
         outputLabels: ["Output","Command Responses"],
         defaults: {
             name: { value: "" },
+            //FUTURE config: { type: "CRON-PLUS Config" },
             outputField: { value: "payload" },
             timeZone: { value: "" },
             persistDynamic: { value: false },
@@ -696,7 +697,6 @@ copies or substantial portions of the Software.
                 modal: true,
                 buttons: {
                     "Refresh": function() {
-                        // var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id;
                         var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id");
                         drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader", dnRepositionResize);
                     },
@@ -711,7 +711,6 @@ copies or substantial portions of the Software.
                 open: function(event) {
                     $(this).css('padding', '0px 0px 0px 0px');
                     $('.ui-dialog-buttonpane').find('button:contains("Close")').addClass('primary');
-                    // var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id;
                     var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id");
                     dnRepositionResize();
                     drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader", dnRepositionResize);
@@ -722,7 +721,6 @@ copies or substantial portions of the Software.
                 }
             });
             $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id",node.id);
-            // $( "#cron-plus-dynamic-nodes-dialog" ).dialog("instance")._cron_node_id = node.id;
             dnRepositionResize();
 
             var tzData;
@@ -1066,6 +1064,7 @@ copies or substantial portions of the Software.
                 expressionTypeField.prop("title", "Expression Type");   
 
 
+
                 //generate a combo for cron expression
                 var expression = option.expression == null ? "0 * * * * * *" : option.expression;
                 var expressionClass = "node-input-option-expression" + ((!expression) ? " input-error" : "");
@@ -1087,6 +1086,7 @@ copies or substantial portions of the Software.
                 expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:0px; width:calc(72% - 36px);", placeholder: '* * * * * * *', list: "cron-expression-example-list",title:"cron expression", value:option.expression}).appendTo(row2);
                 expressionField.appendTo(row2);
                 
+                //setup the expression combo
                 expressionField.combobox({
                     menu: {
                         menu: expressionMenuData,
@@ -1554,7 +1554,10 @@ copies or substantial portions of the Software.
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
         <input type="text" id="node-input-name" placeholder="Name">
     </div>
-
+    <!-- <div class="form-row cron-plus-form-row">
+        <label for="node-input-config"><i class="icon-globe"></i><span data-i18n="common.label.config"> Config</span></label>
+        <input type="text" id="node-input-config">
+    </div> -->
     <div class="form-row cron-plus-form-row">
         <label for="node-input-outputField"><i class="fa fa-sign-out"></i> Output property</label>
         <input type="text" id="node-input-outputField" style="width: 70%" placeholder="payload">
