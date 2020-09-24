@@ -636,7 +636,7 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
     updateSolarState(solarState);//only sending `stateObject` makes updateSolarState() compute dawn/dusk etc
     
     //now filter to only events of interest
-    var futureEvents = sorted.filter( (e) => e.timeOffset >= startDate );
+    var futureEvents = sorted.filter( (e) => e && e.timeOffset >= startDate );
     var wantedFutureEvents = [];
     for (let index = 0; index < futureEvents.length; index++) {
         const fe = futureEvents[index];
@@ -1173,7 +1173,7 @@ module.exports = function (RED) {
                     return;
                 }  
                 let filePath = getPersistFilePath();
-                let dynNodes = node.tasks.filter((e)=>e.isDynamic)
+                let dynNodes = node.tasks.filter((e)=>e && e.isDynamic)
                 let exp = (t) => exportTask(t,false);
                 let dynNodesExp = dynNodes.map(exp);
                 /*if(!dynNodesExp || !dynNodesExp.length){
@@ -1662,7 +1662,7 @@ module.exports = function (RED) {
                     res.json([]);
                     return
                 }
-                let dynNodes = node.tasks.filter((e)=>e.isDynamic)
+                let dynNodes = node.tasks.filter((e)=>e&&e.isDynamic)
                 let exp = (t) => exportTask(t,false);
                 let dynNodesExp = dynNodes.map(exp)
                 res.json(dynNodesExp);
