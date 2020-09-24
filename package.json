@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-cron-plus",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "A flexible scheduler (cron, solar events, simple dates) node for Node-RED with full dynamic control and Timezone support",
   "main": "cronplus.js",
   "scripts": {
@@ -35,8 +35,8 @@
   "homepage": "https://github.com/Steve-Mcl/node-red-contrib-cron-plus#readme",
   "dependencies": {
     "coord-parser": "^1.0.0",
-    "cronosjs": "^1.6.0",
-    "cronstrue": "^1.94.0",
+    "cronosjs": "^1.7.0",
+    "cronstrue": "^1.100.0",
     "pretty-ms": "^7.0.0",
     "suncalc2": "^1.8.1"
   },
