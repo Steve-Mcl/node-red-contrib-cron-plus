@@ -1437,13 +1437,15 @@ copies or substantial portions of the Software.
                 
                 //generate the payload field
                 payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:5px; width:calc(40% - 25px);", placeholder: 'payload', value:option.payload || ""}).appendTo(div);
-                payloadField.typedInput({default:option.payloadType||'default',types:[{
-                                    icon: "fa fa-envelope",
-                                    value:"default",
-                                    label:"Default Payload",
-                                    hasValue: false 
-                                },'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']});
-
+                payloadField.typedInput({
+                    default:option.payloadType||'default',
+                    types:[{
+                        icon: "fa fa-envelope",
+                        value:"default",
+                        label:"Default Payload",
+                        hasValue: false 
+                    }, 'flow', 'global', 'str', 'num', 'bool', 'json', 'jsonata', 'bin', 'date', 'env']
+                });
                 //generate a dropdown for trigger type
                 var expressionType = option.expressionType || "cron";
                 expressionTypeField = $('<select/>',{class:"node-input-option-expressionType",type:"text",placeholder:"cron"}).css({"width":"calc(28% - 16px)","margin-right":"5px"}).appendTo(row2);
