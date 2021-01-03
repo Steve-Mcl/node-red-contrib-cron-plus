@@ -744,9 +744,17 @@ module.exports = function (RED) {
         node.persistDynamic = config.persistDynamic || false;
         node.options = config.options;
         node.commandResponseMsgOutput = config.commandResponseMsgOutput || "output1";
-        node.outputs = config.commandResponseMsgOutput === "output2" ? 2 : 1;//1 output pins (all messages), 2 outputs (schedules out of pin1, command responses out of pin2)
+        node.outputs = 1;
+        node.fanOut = false;
+        if (config.commandResponseMsgOutput === "output2") {
+            node.outputs = 2; //1 output pins (all messages), 2 outputs (schedules out of pin1, command responses out of pin2)
+        } else if (config.commandResponseMsgOutput === "fanOut") {
+            node.outputs = 2 + (node.options ? node.options.length : 0);
+            node.fanOut = true;
+        } else {
+            config.commandResponseMsgOutput = "output1";
+        }
         node.statusUpdatePending = false;
-
 
         const MAX_CLOCK_DIFF = 5000;
         var clockMonitor = setInterval(function timeChecker() {
@@ -821,6 +829,8 @@ module.exports = function (RED) {
             if(manualTrigger) msg.manualTrigger = true;
             msg.scheduledEvent = !msg.manualTrigger;
             let indicator = node.nextIndicator || "dot";
+            let taskType = task.isDynamic ? "dynamic" : "static";
+            let index = task.node_index || 0;
             node.status({ fill: "green", shape: indicator, text: "Schedule Started" });
             try {
                 if (task.node_payloadType !== 'flow' && task.node_payloadType !== 'global') {
@@ -842,7 +852,7 @@ module.exports = function (RED) {
                         pl = RED.util.evaluateNodeProperty(task.node_payload, task.node_payloadType, node, msg);    
                     }
                     setProperty(msg, node.outputField, pl);
-                    node.send(msg);
+                    node.send(generateSendMsg(node, msg, taskType, index));
                     updateDoneStatus(node, task);
                 } else {
                     RED.util.evaluateNodeProperty(task.node_payload, task.node_payloadType, node, msg, function (err, res) {
@@ -850,7 +860,7 @@ module.exports = function (RED) {
                             node.error(err, msg);
                         } else {
                             setProperty(msg, node.outputField, res);
-                            node.send(msg);
+                            node.send(generateSendMsg(node, msg, taskType, index));
                             updateDoneStatus(node, task);
                         }
                     });
@@ -915,7 +925,7 @@ module.exports = function (RED) {
             node.log("Refreshing running schedules");
             if(tasks){
                 try {
-                    let now = new Date();
+                    // let now = new Date();
                     if(!tasks || !tasks.length)
                         return null;
                     let tasksToRefresh = tasks.filter(function(task) {
@@ -932,8 +942,8 @@ module.exports = function (RED) {
                         } else {
                             updateTask(node,task.node_opt,null);
                         }
-                        task.runScheduledTasks();
-                        index--;
+                        //task.runScheduledTasks();
+                        //index--;
                     }
                 }
                 catch(e){ }
@@ -1124,6 +1134,7 @@ module.exports = function (RED) {
             task.node_solarType = opt.solarType;
             task.node_solarEvents = opt.solarEvents;
             task.node_offset = opt.offset;
+            task.node_index = index;
             task.node_opt = opt;
             task.node_limit = opt.limit || 0;
             task.stop();
@@ -1326,6 +1337,40 @@ module.exports = function (RED) {
             }
             return null;
         }
+        function generateSendMsg(node, msg, type, index) {
+            var outputCount = node.outputs;
+            var fanOut = node.fanOut;
+            var hasCommandOutputPin = (node.commandResponseMsgOutput === "output2" || fanOut) ? true : false;
+            var optionCount = node.options ? node.options.length : 0;
+            var staticOutputPinIndex = 0;
+            var dynOutputPinIndex = 0;
+            var cmdOutputPin = 0;
+            if (fanOut) {
+                dynOutputPinIndex = optionCount;
+                cmdOutputPin = optionCount + 1;
+                staticOutputPinIndex = index || 0;
+            }
+            if (!fanOut && hasCommandOutputPin) {
+                cmdOutputPin = 1;  
+            }
+
+            let idx = 0;
+            switch (type) {
+                case "static":
+                    idx = staticOutputPinIndex;
+                    break;
+                case "dynamic":
+                    idx = dynOutputPinIndex;
+                    break;
+                case "command-response":
+                    idx = cmdOutputPin;
+                    break;
+            }
+            var arr = Array(outputCount||(idx+1));
+            arr.fill(null);
+            arr[idx] = msg;
+            return arr;
+        }
 
         node.on('close', function (removed, done) {
             try {
@@ -1394,12 +1439,7 @@ module.exports = function (RED) {
                     input = [input];
                 }
                 var sendCommandResponse = function(msg){
-                    if(node.outputs == 2){
-                        node.send([null,msg]);
-                    } else {
-                        msg.commandResponse = true;
-                        node.send(msg);
-                    }
+                    send(generateSendMsg(node, msg, "command-response"));
                 }
                 for (let i = 0; i < input.length; i++) {
                     let cmd = input[i];

@@ -822,7 +822,6 @@ copies or substantial portions of the Software.
         color: "#a6bbcf",
         inputs: 1,
         outputs: 1,
-        outputLabels: ["Output","Command Responses"],
         defaults: {
             name: { value: "" },
             //FUTURE config: { type: "CRON-PLUS Config" },
@@ -887,12 +886,48 @@ copies or substantial portions of the Software.
         label: function () {
             return this.name || "cron-plus"
         },
+        outputLabels: function(index) {
+            var node = this;
+            var fanOut = node.commandResponseMsgOutput === "fanOut" ? true : false;
+            var hasCommandOutputPin = (node.commandResponseMsgOutput === "output2" || fanOut) ? true : false;
+            var optionCount = node.options ? node.options.length : 0;
+            var staticOutputPinIndex = 0;
+            var dynOutputPinIndex = 0;
+            var cmdOutputPinIndex = hasCommandOutputPin ? 1 : 0;
+            if (fanOut) {
+                staticOutputPinIndex = index;
+                dynOutputPinIndex = optionCount;
+                cmdOutputPinIndex = optionCount+1;
+            }
+            if (!fanOut && !hasCommandOutputPin) return "All messages and events";
+            if (!fanOut && hasCommandOutputPin && index == 0) return "Static and Dynamic schedule messages";
+            if (index == cmdOutputPinIndex) return "Command responses only";
+            if (index == dynOutputPinIndex) return "Dynamic schedules only";
+            var item = node.options && node.options[index];
+            if (item) return item.name + " (" + item.expressionType + ")"; 
+        },
         oneditprepare: function () {
             var node = this;
             var dupCheck = {};
-            node.commandResponseMsgOutput = node.commandResponseMsgOutput == "output2" ? "output2" : "output1";
-            node.outputs = node.commandResponseMsgOutput == "output2" ? 2 : 1;
+            node.commandResponseMsgOutput = ["output1", "output2", "fanOut"].indexOf(node.commandResponseMsgOutput) >= 0 ? node.commandResponseMsgOutput : "output1";
+            // $( "#node-input-commandResponseMsgOutput" ).on("change", function() {
+            //     var $tip = $("#cron-plus-outputs-tip");
+            //     var choice = $(this).val();
+            //     switch (choice) {
+            //         case "output2":
+            //             $tip.val("Send schedule events to output 1, command responses to output 2");
+            //             break;
+            //         case "fanOut":
+            //             $tip.val("Separate outputs for each static schedule, 2nd last output is for dynamic schedules, last output for command responses");
+            //             break;
+                
+            //         default:
+            //             $tip.val("All events go to output 1");
+            //             break;
+            //     }
+            // })
             $( "#node-input-commandResponseMsgOutput" ).val(node.commandResponseMsgOutput);
+
             var getIdealDialogHeight = function(){
                 return Math.min(800, ($(document).height() < 600) ? $(document).width() - 30 : $(document).height() - 100)
             }
@@ -1685,9 +1720,8 @@ copies or substantial portions of the Software.
         },
         oneditsave: function () {
             var node = this;
+            debugger
             var node_id = node.id;
-            node.commandResponseMsgOutput = $("#node-input-commandResponseMsgOutput").val() || "output1";
-            node.outputs = node.commandResponseMsgOutput === "output2" ? 2 : 1;
             var options = $("#node-input-option-container").children();
             node.options = [];
             options.each(function(i) {
@@ -1712,7 +1746,14 @@ copies or substantial portions of the Software.
                 }
                 node.options.push(o);
             });
-
+            var o = $("#node-input-commandResponseMsgOutput").val();
+            node.commandResponseMsgOutput = ["output1", "output2", "fanOut"].indexOf(o) >= 0 ? o : "output1";
+            var fanOut = node.commandResponseMsgOutput == "fanOut";
+            var optionCount = (options && options.length > 0) ? options.length : 0;
+            node.outputs = node.commandResponseMsgOutput === "output1" ? 1 : 2;
+            if (fanOut && options && options.length) {
+                node.outputs = options.length + 2; // in fanout mode, we add a separate output for dynamic schedules & command responses
+            }
             $("#node-input-timeZone").off();
             $("#node-input-crontab").off();
         },
@@ -1983,16 +2024,17 @@ copies or substantial portions of the Software.
         <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
     </div>  
     <div class="form-row cron-plus-form-row">
-        <label for="node-input-commandResponseMsgOutput"><i class="fa fa-dot-circle-o"></i> Command Resp</label>
+        <label for="node-input-commandResponseMsgOutput"><i class="fa fa-dot-circle-o"></i> Outputs</label>
         <select style="width: 70%" id="node-input-commandResponseMsgOutput">
-          <option value="output1">Send to output 1</option>
-          <option value="output2">Send to separate output</option>
+          <option value="output1">1 output: All messages to output 1</option>
+          <option value="output2">2 outputs: Schedule messages to output 1, command responses to output 2</option>
+          <option value="fanOut" >Fan out: Separate outputs for static, dynamic and command messages</option>
         </select>
     </div> 
     <div class="form-row cron-plus-form-row">
         <label>&nbsp;</label>
         <input type="checkbox" id="node-input-persistDynamic" style="display:inline-block; width:15px; vertical-align:baseline;" autocomplete="off">
-        <label style="width: 60% !important;" for="node-input-persistDynamic" title="Auto save and reload dynamic schedules">Persist dynamic schedules</span>
+        <label style="width: 30% !important;" for="node-input-persistDynamic" title="Auto save and reload dynamic schedules">Persist dynamic schedules</label>
     </div>
     <div id="node-cronplus-tab-static-schedules" class="form-row cron-plus-form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%; min-height: 200px">
         <label for="node-input-option-container-div" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
