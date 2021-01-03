@@ -22,6 +22,7 @@ FEATURES
   * NOTE: Map is 100% CDN dynamic and requires and internet connection. If there is no internet, the popup will provide information to help you get location coordinates from another source
   * ![cron-plus-map](https://user-images.githubusercontent.com/44235289/84031948-79ac3300-a98e-11ea-966c-b77200515030.gif)
 * Option to separate command responses from output 1 to separate 2nd output 
+* Fan out option to separate each static schedule to its own output (dynamic and command responses are sent on last 2 output pins) (as of V1.4.0)
 * Settable output variable (normally `msg.payload` but it is up to you)
 * Inject-like button to fire the node (available when only one schedule is added) 
 * View dynamically created schedules in the node editor UI
