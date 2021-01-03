@@ -636,7 +636,7 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
     updateSolarState(solarState);//only sending `stateObject` makes updateSolarState() compute dawn/dusk etc
     
     //now filter to only events of interest
-    var futureEvents = sorted.filter( (e) => e.timeOffset >= startDate );
+    var futureEvents = sorted.filter( (e) => e && e.timeOffset >= startDate );
     var wantedFutureEvents = [];
     for (let index = 0; index < futureEvents.length; index++) {
         const fe = futureEvents[index];
@@ -1015,42 +1015,46 @@ module.exports = function (RED) {
         function deleteAllTasks(node, filter){
             if(node.tasks){
                 for (let index = 0; index < node.tasks.length; index++) {
-                    let task = node.tasks[index];
-                    if(task){
-                        let skip = false;
-                        if(filter){
-                            if(filter == "static" && (task.isStatic == false || task.isDynamic == true)){
-                                skip = true;
-                            } else if(filter == "dynamic" && (task.isStatic == true || task.isDynamic == false)){
-                                skip = true;
+                    try {
+                        let task = node.tasks[index];
+                        if(task){
+                            let skip = false;
+                            if(filter){
+                                if(filter == "static" && (task.isStatic == false || task.isDynamic == true)){
+                                    skip = true;
+                                } else if(filter == "dynamic" && (task.isStatic == true || task.isDynamic == false)){
+                                    skip = true;
+                                }
+                            }                        
+                            if(!skip){
+                                _deleteTask(task);
+                                node.tasks[index] = null;
+                                node.tasks.splice(index, 1);
+                                index--;
                             }
-                        }                        
-                        if(!skip){
-                            task.stop();
-                            task.off("ended")
-                            task.off("started")
-                            task.off("stopped")
-                            task = null;
-                            node.tasks.splice(index, 1);
-                            index--;
-                        }
-                        
-                    }    
+                        }             
+                    } catch (error) { } 
                 }
             }
         }
         function deleteTask(node,name){
             let task = getTask(node,name);
             if(task){
-                task.stop();
-                task.off("ended")
-                task.off("started")
-                task.off("stopped")
-                node.tasks = node.tasks.filter(t => t.name != name);
+                _deleteTask(task);
+                node.tasks = node.tasks.filter(t => t && t.name != name);
                 task = null;
             }
         }
-        
+        function _deleteTask(task) {
+            try {
+                task.off('run');
+                task.off('ended');
+                task.off('started');
+                task.off('stopped');
+                task.stop();
+                task = null;
+            } catch (error) {}
+        }        
         function updateTask(node,options,msg){
             if(!options || typeof options != "object"){
                 node.warn("schedule settings are not valid",msg);
@@ -1184,7 +1188,7 @@ module.exports = function (RED) {
                     return;
                 }  
                 let filePath = getPersistFilePath();
-                let dynNodes = node.tasks.filter((e)=>e.isDynamic)
+                let dynNodes = node.tasks.filter((e)=>e && e.isDynamic)
                 let exp = (t) => exportTask(t,false);
                 let dynNodesExp = dynNodes.map(exp);
                 /*if(!dynNodesExp || !dynNodesExp.length){
@@ -1372,27 +1376,15 @@ module.exports = function (RED) {
             return arr;
         }
 
-        node.on('close', function (removed, done) {
+        node.on('close', function (done) {
             try {
                 serialise();
             } catch (error) {
                 node.error(error, msg)
             }
-            try {
-                 if (node.tasks) {
-                    node.tasks.forEach((task) => {
-                        task.stop()
-                    })
-                }  
-            } catch (error) { }
-
-            if(removed){
-                if(clockMonitor) clearInterval(clockMonitor);
-                stopAllTasks(this);
-            } else {
-                refreshTasks(this);
-            }
-            done();
+            deleteAllTasks(this);
+            if(clockMonitor) clearInterval(clockMonitor);
+            if(done && typeof done == "function") done();
         });
 
         this.on("input", function (msg, send, done) {
@@ -1444,7 +1436,9 @@ module.exports = function (RED) {
                 for (let i = 0; i < input.length; i++) {
                     let cmd = input[i];
                     let action = cmd.command || "";
-                    let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
+                    // let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
+                    let newMsg = RED.util.cloneMessage(msg);
+                    newMsg.payload = {command:cmd, result:{}};
                     let cmd_all = action.endsWith("-all");
                     let cmd_all_static = action.endsWith("-all-static");
                     let cmd_all_dynamic = action.endsWith("-all-dynamic");
@@ -1700,7 +1694,7 @@ module.exports = function (RED) {
                     res.json([]);
                     return
                 }
-                let dynNodes = node.tasks.filter((e)=>e.isDynamic)
+                let dynNodes = node.tasks.filter((e)=>e&&e.isDynamic)
                 let exp = (t) => exportTask(t,false);
                 let dynNodesExp = dynNodes.map(exp)
                 res.json(dynNodesExp);

@@ -25,7 +25,7 @@ FEATURES
 * Settable output variable (normally `msg.payload` but it is up to you)
 * Inject-like button to fire the node (available when only one schedule is added) 
 * View dynamically created schedules in the node editor UI
-* Additional info about the triggered schedule is always send in the output message in `msg.cronplus` 
+* Additional info about the triggered schedule is always sent in the output message in `msg.cronplus` 
   * NOTE: if the payload is to "Default Payload", then the content of `msg.cronplus` is moved to `msg.payload`
 * Node status updates to show the next event
   * NOTE: the status indicator will be shown as a "ring" for dynamic schedules or shown as a "dot" for static schedules
@@ -64,7 +64,7 @@ Run the following command in the root directory of your Node-RED install.
 
   Install from NPM 
 
-      npm install node-red-contrib-cron-plus 
+      npm install node-red-contrib-cron-plus
 
   Alternatively, install from a folder
 
@@ -77,6 +77,7 @@ Acknowledgements
 ---------------
 * Inspired by [node-red-contrib-cron](https://github.com/chameleonbr/node-red-contrib-cron)
 * Cron expression builder adapted for cron-plus from https://github.com/juliacscai/jquery-cron-quartz (not on NPM)
+* Big thanks for continued support by [@jaclark](https://github.com/jaclarke) for the excellent [cronosjs](https://github.com/jaclarke/cronosjs)
 
 Dependencies
 ------------
