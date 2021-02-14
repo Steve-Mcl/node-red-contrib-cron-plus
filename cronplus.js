@@ -1400,7 +1400,17 @@ module.exports = function (RED) {
                 done();
                 return;
             }
-
+            //is this an manual trigger?...
+            if(msg.topic == "trigger" && typeof msg.payload == "string"){
+                let t = getTask(node, msg.payload);
+                if(!t) {
+                    node.error(`Manual Trigger failed. Cannot find schedule named '${msg.payload}'`,msg);
+                    return;
+                }
+                sendMsg(node, t, Date.now(), true);
+                done();
+                return;
+            }
             let controlTopic = control_topics.find(ct => ct.command == msg.topic);
             var payload = msg.payload;
             if(controlTopic){
@@ -1449,6 +1459,11 @@ module.exports = function (RED) {
                         cmd_filter = "static"
                     }                    
                     switch (action) {
+                        case "trigger":
+                            let tt = getTask(node, cmd.name);
+                            if(!tt) throw new Error(`Manual Trigger failed. Cannot find schedule named '${cmd.name}'`);
+                            sendMsg(node, tt, Date.now(), true);
+                            break;
                         case "describe":
                             let exp = (cmd.expressionType === "solar") ? cmd.location : cmd.expression;
                             applyOptionDefaults(cmd);

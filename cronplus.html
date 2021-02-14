@@ -2224,6 +2224,7 @@ copies or substantial portions of the Software.
         <dt><i>topic</i> <span class="property-type">string</span></dt>
         <dd>Most of the commands can be provided in the topic with the name of schedule in the payload (where appropriate). <br>Supported command topics... 
                     <ul>
+                        <li>trigger</li>
                         <li>status</li>
                         <li>export</li>
                         <li>remove</li>
@@ -2324,6 +2325,7 @@ msg.payload = "name"; //  name of the schedule</pre>
                     <ul>
                         <li>command: (string|required) The operation to perform - this can be one of the following...
                             <ul>
+                                <li>"trigger"</li>
                                 <li>"status"</li>
                                 <li>"export"</li>
                                 <li>"remove"</li>
@@ -2337,6 +2339,7 @@ msg.payload = "name"; //  name of the schedule</pre>
                 </p>
                 <p><i>Notes...</i><br>
                     <ul>
+                        <li>trigger fires schedule named in <code>msg.payload</code> </li>
                         <li>status returns an object with the config and status of the named schedule</li>
                         <li>export returns an object with the config of the named schedule</li>
                         <li>remove will stop and remove the schedule. This option has no output.</li>
@@ -2349,6 +2352,11 @@ msg.payload = "name"; //  name of the schedule</pre>
                     </ul>
                 </p>
                 <p><i>Examples...</i><br>
+                    Example : Using a simple topic command to manually trigger a schedule named "schedule1"<br>
+                    <pre class="cron-plus-code">msg: {
+  "topic": "trigger",
+  "payload": "schedule1"
+}</pre>                    
                     Example : Using a simple topic command to export all dynamically added schedules...<br>
                     <pre class="cron-plus-code">msg: {
   "topic": "export-all-dynamic"
