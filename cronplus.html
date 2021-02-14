@@ -993,7 +993,6 @@ copies or substantial portions of the Software.
                     "OK": function(){
                         var val = $('#cron-plus-expression-builder').data('cronBuilder').getExpression();
                         var expressionField = $( "#cron-plus-expression-builder-dialog" ).data("opener");
-                        debugger
                         if(expressionField && expressionField.length) {
                             expressionField.combobox("value", val || "");
                             // expressionField.focus();
@@ -1012,7 +1011,6 @@ copies or substantial portions of the Software.
                 },
                 close: function() {
                     var expressionField = $( "#cron-plus-expression-builder-dialog" ).data("opener");
-                    debugger
                     if(expressionField && expressionField.data("customCombobox") && expressionField.data("customCombobox").input) {
                         // expressionField.combobox("value", val || "");
                         expressionField.data("customCombobox").input.focus();
@@ -1722,7 +1720,6 @@ copies or substantial portions of the Software.
         },
         oneditsave: function () {
             var node = this;
-            debugger
             var node_id = node.id;
             var options = $("#node-input-option-container").children();
             node.options = [];
