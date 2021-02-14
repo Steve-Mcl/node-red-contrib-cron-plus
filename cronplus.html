@@ -484,16 +484,33 @@ copies or substantial portions of the Software.
         mapPopup = window.L.popup();
 
         map.on('click', function (e) {
+            
             if(debug) console.log(e);
-            showMapPopup(e.latlng.lat, e.latlng.lng, map);
-            selectedLocation = e.latlng
+            var normaliseLat = function(x) {
+                while (x > 90.0 || x < -90.0) {
+                    if (x > 90.0) {   x = -(90.0 - (x - 90)); }
+                    if (x < -90.0) {   x = (90.0 - ((-x) - 90)); }
+                }
+                return x;
+            }
+            var normaliseLng = function(x) {
+                while (x > 180.0 || x < -180.0) {
+                    if (x > 180.0) {   x = -(180.0 - (x - 180)); }
+                    if (x < -180.0) {   x = (180.0 - ((-x) - 180)); }
+                }
+                return x;
+            }
+            selectedLocation = {};
+            selectedLocation.lat = normaliseLat(e.latlng.lat);
+            selectedLocation.lng = normaliseLng(e.latlng.lng);
+            var content =
+            '<div><span>Lat:</span> <span>' + selectedLocation.lat + '</span></div>' +
+                '<div><span>Lon:</span> <span>' + selectedLocation.lng + '</span></div>';
+            showMapPopup(content, e.latlng.lat, e.latlng.lng, map);
         });
 
 
-        function showMapPopup(lat, lon, map) {
-            var content =
-                '<div><span>Lat:</span> <span>' + lat + '</span></div>' +
-                '<div><span>Lon:</span> <span>' + lon + '</span></div>'
+        function showMapPopup(content, lat, lon, map) {
             mapPopup
                 .setLatLng([lat, lon])
                 .setContent(content)
