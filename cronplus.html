@@ -2081,11 +2081,12 @@ copies or substantial portions of the Software.
             <br>
             TIP: Timezone should be perceived from your own perspective. See the <a href="#understanding-timezone">Understanding Timezone</a> example below.
         </div>    
-        <h4>Command Resp</h4>
+        <h4>Outputs</h4>
         <div style="padding-left: 15px">
             <ul>
-                <li>Send to output 1 - all messages will be fired out of output 1 (schedules + command responses)</li>
-                <li>Send to separate output - schedule messages will be fired out of output 1, command responses will be fired out of output 2</li>
+                <li>1 output: All messages to output 1 (schedules + command responses)</li>
+                <li>2 outputs: Schedule messages to output 1, command responses to output 2</li>
+                <li>Fan out: Separate outputs for static, dynamic and command messages</li>
             </ul>
         </div>    
         <h4>Persist dynamic schedules</h4>
