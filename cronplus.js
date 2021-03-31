@@ -1082,12 +1082,12 @@ module.exports = function (RED) {
                 let isStatic = task && task.isStatic;
                 let opCount = 0, modified = false;
                 if(task){
-                    if(!isStatic) modified = true;
+                    modified = true;
                     opCount  = task.node_count || 0; 
                     deleteTask(node,opt.name);
                 }
                 let taskCount = node.tasks ? node.tasks.length : 0;
-                let t = createTask(node, opt, taskCount, isStatic);  
+                let t = createTask(node, opt, taskCount, !isDynamic);  
                 if(t){
                     if(modified) t.node_modified = true;
                     t.node_count = opCount;
