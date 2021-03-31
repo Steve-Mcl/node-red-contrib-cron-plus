@@ -51,17 +51,8 @@ const PERMITTED_SOLAR_EVENTS = [
 //commands not supported by topic are : add/update & describe
 const control_topics = [
     {command: "status", payloadIsName: true},
-    {command: "status-all", payloadIsName: false},
-    {command: "status-all-dynamic", payloadIsName: false},
-    {command: "status-all-static", payloadIsName: false},
     {command: "list", payloadIsName: true},
-    {command: "list-all", payloadIsName: false},
-    {command: "list-all-dynamic", payloadIsName: false},
-    {command: "list-all-static", payloadIsName: false},
     {command: "export", payloadIsName: true},
-    {command: "export-all", payloadIsName: false},
-    {command: "export-all-dynamic", payloadIsName: false},
-    {command: "export-all-static", payloadIsName: false},
     {command: "stop", payloadIsName: true},
     {command: "stop-all", payloadIsName: false},
     {command: "stop-all-dynamic", payloadIsName: false},
@@ -77,15 +68,25 @@ const control_topics = [
     {command: "clear", payloadIsName: false},
     {command: "remove", payloadIsName: true},
     {command: "delete", payloadIsName: true},
-    {command: "remove-all", payloadIsName: false},
-    {command: "remove-all-dynamic", payloadIsName: false},
-    {command: "remove-all-static", payloadIsName: false},
-    {command: "delete-all", payloadIsName: false},
-    {command: "delete-all-dynamic", payloadIsName: false},
-    {command: "delete-all-static", payloadIsName: false},
     {command: "debug", payloadIsName: true},
-    {command: "debug-all", payloadIsName: false},
 ]
+var addExtended_control_topics = function(baseCommand) {
+    control_topics.push({command: `${baseCommand}-all`, payloadIsName: false})
+    control_topics.push({command: `${baseCommand}-all-dynamic`, payloadIsName: false})
+    control_topics.push({command: `${baseCommand}-all-static`, payloadIsName: false})
+    control_topics.push({command: `${baseCommand}-active`, payloadIsName: false})
+    control_topics.push({command: `${baseCommand}-active-dynamic`, payloadIsName: false})
+    control_topics.push({command: `${baseCommand}-active-static`, payloadIsName: false})
+    control_topics.push({command: `${baseCommand}-inactive`, payloadIsName: false})
+    control_topics.push({command: `${baseCommand}-inactive-dynamic`, payloadIsName: false})
+    control_topics.push({command: `${baseCommand}-inactive-static`, payloadIsName: false})
+}
+addExtended_control_topics("status"); 
+addExtended_control_topics("export"); 
+addExtended_control_topics("list"); 
+addExtended_control_topics("remove"); 
+addExtended_control_topics("delete"); 
+addExtended_control_topics("debug"); 
 
 /**
  * Humanize a cron express
@@ -950,6 +951,34 @@ module.exports = function (RED) {
                 updateNextStatus(node);
             }
         }
+        function taskFilterMatch(task, filter) {
+            if(!task) return false;
+            const isActive = function(task) { return isTaskFinished(task) == false; /*task.isRunning == true;*/ }
+            const isInactive = function(task) { return isTaskFinished(task); /*task.isRunning == false;*/ }
+            const isStatic = function(task) { return (task.isStatic == true || task.isDynamic == false); }
+            const isDynamic = function(task) { return (task.isDynamic == true || task.isStatic == false); }
+            switch (filter) {
+                case "all":
+                    return true;
+                case "static":
+                    return isStatic(task);
+                case "dynamic":
+                    return isDynamic(task);
+                case "active":
+                    return isActive(task);
+                case "inactive":
+                    return isInactive(task);
+                case "active-dynamic":
+                    return isActive(task) && isDynamic(task);
+                case "active-static":
+                    return isActive(task) && isStatic(task);
+                case "inactive-dynamic":
+                    return isInactive(task) && isDynamic(task);
+                case "inactive-static":
+                    return isInactive(task) && isStatic(task);
+            }
+            return false;
+        }
         function stopTask(node,name,resetCounter){
             let task = getTask(node,name);
             if(task){
@@ -964,13 +993,7 @@ module.exports = function (RED) {
                     let task = node.tasks[index];
                     if(task){
                         let skip = false;
-                        if(filter){
-                            if(filter == "static" && (task.isStatic == false || task.isDynamic == true)){
-                                skip = true;
-                            } else if(filter == "dynamic" && (task.isStatic == true || task.isDynamic == false)){
-                                skip = true;
-                            }
-                        }          
+                        if(filter) skip = (taskFilterMatch(task, filter) === false);         
                         if(!skip){
                             task.stop();
                             if(resetCounter){ task.node_count = 0; }
@@ -995,13 +1018,7 @@ module.exports = function (RED) {
                 for (let index = 0; index < node.tasks.length; index++) {
                     let task = node.tasks[index];
                     let skip = false;
-                    if(filter){
-                        if(filter == "static" && (task.isStatic == false || task.isDynamic == true)){
-                            skip = true;
-                        } else if(filter == "dynamic" && (task.isStatic == true || task.isDynamic == false)){
-                            skip = true;
-                        }
-                    }
+                    if(filter) skip = (taskFilterMatch(task, filter) === false);
                     if(!skip && task){
                         if(isTaskFinished(task)){
                             task.node_count = 0;
@@ -1019,13 +1036,7 @@ module.exports = function (RED) {
                         let task = node.tasks[index];
                         if(task){
                             let skip = false;
-                            if(filter){
-                                if(filter == "static" && (task.isStatic == false || task.isDynamic == true)){
-                                    skip = true;
-                                } else if(filter == "dynamic" && (task.isStatic == true || task.isDynamic == false)){
-                                    skip = true;
-                                }
-                            }                        
+                            if(filter) skip = (taskFilterMatch(task, filter) === false);
                             if(!skip){
                                 _deleteTask(task);
                                 node.tasks[index] = null;
@@ -1454,25 +1465,49 @@ module.exports = function (RED) {
                     let cmd_all = action.endsWith("-all");
                     let cmd_all_static = action.endsWith("-all-static");
                     let cmd_all_dynamic = action.endsWith("-all-dynamic");
+                    let cmd_active = action.endsWith("-active");
+                    let cmd_inactive = action.endsWith("-inactive");
+                    let cmd_active_dynamic = action.includes("-active-dynamic");
+                    let cmd_active_static = action.includes("-active-static");
+                    let cmd_inactive_dynamic = action.includes("-inactive-dynamic");
+                    let cmd_inactive_static = action.includes("-inactive-static");
+
                     let cmd_filter = null;
+                    var actionParts = action.split("-");
+                    var mainAction = actionParts[0];
+                    if(actionParts.length > 1) mainAction += "-";
+                    
                     if(cmd_all_dynamic){
-                        cmd_filter = "dynamic"
+                        cmd_filter = "dynamic";
                     } else if(cmd_all_static) {
-                        cmd_filter = "static"
-                    }                    
-                    switch (action) {
-                        case "trigger":
+                        cmd_filter = "static";
+                    } else if(cmd_active) {
+                        cmd_filter = "active";
+                    } else if(cmd_inactive) {
+                        cmd_filter = "inactive";
+                    } else if(cmd_active_dynamic) {
+                        cmd_filter = "active-dynamic";
+                    } else if(cmd_active_static) {
+                        cmd_filter = "active-static";
+                    } else if(cmd_inactive_dynamic) {
+                        cmd_filter = "inactive-dynamic";
+                    } else if(cmd_inactive_static) {
+                        cmd_filter = "inactive-static";
+                    }
+
+                    switch (mainAction) {
+                        case "trigger": //single
                             let tt = getTask(node, cmd.name);
                             if(!tt) throw new Error(`Manual Trigger failed. Cannot find schedule named '${cmd.name}'`);
                             sendMsg(node, tt, Date.now(), true);
                             break;
-                        case "describe":
+                        case "describe": //single
                             let exp = (cmd.expressionType === "solar") ? cmd.location : cmd.expression;
                             applyOptionDefaults(cmd);
                             newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, {includeSolarStateOffset:true});
                             sendCommandResponse(newMsg);
                             break;
-                        case "status":
+                        case "status": //single
                             {
                                 let task = getTask(node,cmd.name);
                                 if(task){
@@ -1485,7 +1520,7 @@ module.exports = function (RED) {
                             }
                             updateNextStatus(node, true);
                             break;
-                        case "export":
+                        case "export": //single
                             {
                                 let task = getTask(node,cmd.name);
                                 if(task){
@@ -1496,46 +1531,33 @@ module.exports = function (RED) {
                                 sendCommandResponse(newMsg);
                             }
                             break;                            
-                        case "list-all":
-                        case "list-all-dynamic":
-                        case "list-all-static":
-                        case "status-all":
-                        case "status-all-dynamic":
-                        case "status-all-static":
+                        case "list-": //multiple
+                        case "status-": //multiple
                             {    
                                 let results = [];
                                 if(node.tasks){
                                     for (let index = 0; index < node.tasks.length; index++) {
                                         const task = node.tasks[index];
-                                        if( (cmd_all_dynamic && task.isDynamic) || 
-                                            (cmd_all_static && task.isStatic) || 
-                                            (!cmd_all_static && !cmd_all_dynamic)){
+                                        if( task && (cmd_all || taskFilterMatch(task, cmd_filter)) ) {
                                             let result = {};
                                             result.config = exportTask(task, true);
                                             result.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
                                             results.push(result);    
                                         }
-
                                     }
                                 }
                                 newMsg.payload.result = results;
                                 sendCommandResponse(newMsg);
                             }
                             break;
-                        case "export-all":
-                        case "export-all-dynamic":
-                        case "export-all-static":
+                        case "export-": //multiple
                             {
                                 let results = [];
                                 if(node.tasks){
                                     for (let index = 0; index < node.tasks.length; index++) {
                                         const task = node.tasks[index];
-                                        if(cmd_all_dynamic) {
-                                            if(task.isDynamic) results.push(exportTask(task, false));    
-                                        } else if(cmd_all_static){
-                                            if(!task.isDynamic) results.push(exportTask(task, false));    
-                                        } else {
-                                            results.push(exportTask(task, false));    
+                                        if( cmd_all || taskFilterMatch(task, cmd_filter) ) {
+                                            results.push(exportTask(task, false)); 
                                         }
                                     }
                                 }
@@ -1543,52 +1565,44 @@ module.exports = function (RED) {
                                 sendCommandResponse(newMsg);
                             }
                             break;                            
-                        case "add":
-                        case "update":
+                        case "add": //single
+                        case "update": //single
                             updateTask(node,cmd,msg);
                             updateNextStatus(node, true);
                             serialise();
                             break;
                         case "clear":
-                        case "remove-all":
-                        case "remove-all-dynamic":
-                        case "remove-all-static":
-                        case "delete-all":
-                        case "delete-all-dynamic":
-                        case "delete-all-static":
+                        case "remove-": //multiple
+                        case "delete-": //multiple
                             deleteAllTasks(node,cmd_filter);
                             updateNextStatus(node,true);
                             serialise();
                             break;
-                        case "remove":
-                        case "delete":
+                        case "remove": //single
+                        case "delete": //single
                             deleteTask(node,cmd.name);
                             updateNextStatus(node,true);
                             serialise();
                             break;
-                        case "start":
+                        case "start": //single
                             startTask(node,cmd.name);
                             updateNextStatus(node,true);
                             break;
-                        case "start-all":
-                        case "start-all-dynamic":
-                        case "start-all-static":
+                        case "start-": //multiple
                             startAllTasks(node, cmd_filter);
                             updateNextStatus(node,true);
                             break;
-                        case "stop":
-                        case "pause":
+                        case "stop": //single
+                        case "pause": //single
                             stopTask(node,cmd.name,cmd.command == "stop");
                             updateNextStatus(node,true);
                             break;
-                        case "stop-all":
-                        case "stop-all-dynamic":
-                        case "stop-all-static":
-                        case "pause-all":
-                        case "pause-all-dynamic":
-                        case "pause-all-static":
-                            stopAllTasks(node,cmd.command == "stop-all", cmd_filter);
-                            updateNextStatus(node,true);
+                        case "stop-": //multiple
+                        case "pause-":{
+                                let resetCounter = cmd.command.startsWith("stop-");
+                                stopAllTasks(node, resetCounter, cmd_filter);
+                                updateNextStatus(node,true);
+                            }
                             break;
                         case "debug":{
                                 let task = getTask(node,cmd.name)
@@ -1605,21 +1619,23 @@ module.exports = function (RED) {
                                 sendCommandResponse(newMsg);
                             }
                             break;
-                        case "debug-all":{    
+                        case "debug-":{     //multiple
                                 let results = [];
                                 if(node.tasks){
                                     for (let index = 0; index < node.tasks.length; index++) {
                                         const task = node.tasks[index];
-                                        let thisDebug = getTaskStatus(node, task, {includeSolarStateOffset:true});
-                                        thisDebug.name = task.name;
-                                        thisDebug.topic = task.node_topic;
-                                        thisDebug.expressionType = task.node_expressionType;
-                                        thisDebug.expression = task.node_expression;
-                                        thisDebug.location = task.node_location;
-                                        thisDebug.offset = task.node_offset;
-                                        thisDebug.solarType = task.node_solarType;
-                                        thisDebug.solarEvents = task.node_solarEvents;
-                                        results.push(thisDebug);    
+                                        if( cmd_all || taskFilterMatch(task, cmd_filter) ) {
+                                            let thisDebug = getTaskStatus(node, task, {includeSolarStateOffset:true});
+                                            thisDebug.name = task.name;
+                                            thisDebug.topic = task.node_topic;
+                                            thisDebug.expressionType = task.node_expressionType;
+                                            thisDebug.expression = task.node_expression;
+                                            thisDebug.location = task.node_location;
+                                            thisDebug.offset = task.node_offset;
+                                            thisDebug.solarType = task.node_solarType;
+                                            thisDebug.solarEvents = task.node_solarEvents;
+                                            results.push(thisDebug);
+                                        }
                                     }
                                 }
                                 newMsg.payload = results;
