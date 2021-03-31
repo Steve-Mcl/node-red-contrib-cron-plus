@@ -1294,8 +1294,10 @@ module.exports = function (RED) {
                 if (node.nextDate) {
                     let d = formatShortDateTimeWithTZ(node.nextDate, node.timeZone) || "Never";
                     node.status({ fill: "blue", shape: indicator, text: (node.nextEvent || "Next") + ": " + d });
-                } else {
+                } else if (node.tasks && node.tasks.length ) {
                     node.status({ fill: "grey", shape: indicator, text: "All stopped" });
+                } else {
+                    node.status({ }); //no tasks
                 }
             } else {
                 node.status({});
