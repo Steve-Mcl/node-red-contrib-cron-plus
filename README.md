@@ -32,9 +32,9 @@ FEATURES
   * NOTE: the status indicator will be shown as a "ring" for dynamic schedules or shown as a "dot" for static schedules
 * Full flexibility & dynamic control. 
   * Ability to control via simple topic commands. Examples include...
-    * remove, remove-all, remove-all-dynamic, remove-all-static
-    * list, list-all, list-all-dynamic, list-all-static
-    * export, export-all, export-all-dynamic, export-all-static
+    * remove, remove-all, remove-all-dynamic, remove-all-static, remove-active, remove-active-dynamic, remove-active-static, remove-inactive, remove-inactive-dynamic, remove-inactive-static
+    * list, list-all, list-all-dynamic, list-all-static, list-active, list-active-dynamic, list-active-static, list-inactive, list-inactive-dynamic, list-inactive-static
+    * export, export-all, export-all-dynamic, export-all-static, export-active, export-active-dynamic, export-active-static, export-inactive, export-inactive-dynamic, export-inactive-static
     * stop, stop-all, stop-all-dynamic, stop-all-static
     * start, start-all, start-all-dynamic, start-all-static
     * pause, pause-all, pause-all-dynamic, pause-all-static

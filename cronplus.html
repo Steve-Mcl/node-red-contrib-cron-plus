@@ -370,7 +370,6 @@ copies or substantial portions of the Software.
 }( jQuery ));
 
 
-
 (function(){
 
     var debug = false;
@@ -2116,7 +2115,7 @@ copies or substantial portions of the Software.
         </div>    
         <h4>Persist dynamic schedules</h4>
         <div style="padding-left: 15px">
-            Enabling this option causes dynamic schedules to be saved to file & re-loaded when the cron-plus node is loaded or re-deployed. <br>
+            Enabling this option causes dynamic schedules to be saved to file and re-loaded when the cron-plus node is loaded or re-deployed. <br>
             NOTES...
             <ul>
                 <li>Any time an update to any dynamic schedule occurs, all dynamic schedules are saved to file</li>
@@ -2125,7 +2124,7 @@ copies or substantial portions of the Software.
         </div>    
         <h4>Schedules</h4>
         <div style="padding-left: 15px">
-            A table of schedules. Entries here are considered static & will be reloaded when node-red starts or the cron-plus node is (re)deployed.
+            A table of schedules. Entries here are considered static and will be reloaded when node-red starts or the cron-plus node is (re)deployed.
         </div>
         <h4>Schedules - Name</h4>
         <div style="padding-left: 15px">
@@ -2258,12 +2257,12 @@ copies or substantial portions of the Software.
                         <li>stop</li>
                         <li>start</li>
             </ul>
-            This includes the <code>-all</code>, <code>-all-dynamic</code> and <code>-all-static</code> command topics (e.g. export-all, stop-all-dynamic, start-all-static)<br>
-            See <a href="#cron-plus-commands-info">command details</a> below.
+            This includes the <code>-all</code>, <code>-all-dynamic</code>, <code>-all-static</code>, <code>-active</code>,  <code>-active-dynamic</code>,  <code>-active-static</code>, <code>-inactive</code>, <code>-inactive-all-dynamic</code> and <code>-inactive-static</code> command topics (e.g. export-all, stop-all-dynamic, start-all-static, remove-inactive-dynamic)<br>
+            See <a href="#cron-plus-commands-info">commands</a> below for details.
         </dd>
     <dl class="message-properties">
         <dt><i>payload</i> <span class="property-type">string|object|Array</span></dt>
-        <dd>It is possible to dynamically add, remove & control schedules by injecting a payload into the node. The format of the payload object (or array of objects) depends on the operation. See below for details.</dd>
+        <dd>It is possible to dynamically add, remove and control schedules by injecting a payload into the node. The format of the payload object (or array of objects) depends on the operation. See below for details.</dd>
         <dd>
             <p><b>Adding one (or more) schedules</b><br>
                 Example...<br>
@@ -2338,7 +2337,7 @@ copies or substantial portions of the Software.
                 </ul>
             </p>
 
-            <p id="cron-plus-commands-info"><b>Getting status of a schedule or removing / stopping / pausing / starting a schedule</b><br>Example...<br>
+            <p id="cron-plus-commands-info"><b>Getting status of a schedule or removing / stopping / pausing / starting a schedule</b><br><br>
                 Topic Method...<br>
                 <pre class="cron-plus-code">msg.topic = "command"; // command name - *see details below*,
 msg.payload = "name"; //  name of the schedule</pre>
@@ -2360,21 +2359,27 @@ msg.payload = "name"; //  name of the schedule</pre>
                                 <li>"start"</li>
                             </ul>
                         </li>
-                        <li>name: (string|optional) The name of the schedule to affect (not required when using the -all filter)</li>
+                        <li>name: (string|optional) The name of the schedule to affect (not required when using the -all, -active or -inactive filters)</li>
                     </ul>
                 </p>
                 <p><i>Notes...</i><br>
                     <ul>
-                        <li>trigger fires schedule named in <code>msg.payload</code> </li>
-                        <li>status returns an object with the config and status of the named schedule</li>
-                        <li>export returns an object with the config of the named schedule</li>
-                        <li>remove will stop and remove the schedule. This option has no output.</li>
-                        <li>stop will stop the schedule specified by <code>name</code> and reset its internal counter. This option has no output.</li>
-                        <li>pause will stop the schedule specified by <code>name</code> but will not reset its internal counter. This option has no output.</li>
-                        <li>start will (re)start all schedules. Any schedule that reached its limit will start from the beginning. Paused schedules will resume. This option has no output.</li>
+                        <li><code>trigger</code> fires schedule named in <code>msg.payload</code> </li>
+                        <li><code>status</code> returns an object with the config and status of the named schedule</li>
+                        <li><code>export</code> returns an object with the config of the named schedule</li>
+                        <li><code>remove</code> will stop and remove the schedule. This option has no output.</li>
+                        <li><code>stop</code> will stop the schedule specified by <code>name</code> and reset its internal counter. This option has no output.</li>
+                        <li><code>pause</code> will stop the schedule specified by <code>name</code> but will not reset its internal counter. This option has no output.</li>
+                        <li><code>start</code> will (re)start all schedules. Any schedule that reached its limit will start from the beginning. Paused schedules will resume. This option has no output.</li>
                         <li>FILTER: adding <code>-all</code> to any of these commands will operate on all schedules. e.g. <code>status-all</code> will return the status of all schedules</li>
-                        <li>FILTER: adding <code>-all-dynamic</code> to any of these commands will only affect dynamic schedules e.g. <code>delete-all-dynamic</code> will delete all dynamic schedules</li>
-                        <li>FILTER: adding <code>-all-static</code> to any of these commands will only affect static schedules e.g. <code>stop-all-static</code> will stop all static schedules</li>
+                        <li>FILTER: adding <code>-all-dynamic</code> to any of these commands will only affect dynamic schedules e.g. <code>remove-all-dynamic</code> will remove all dynamic schedules</li>
+                        <li>FILTER: adding <code>-all-static</code> to any of these commands will only affect static schedules e.g. <code>stop-all-static</code></li>
+                        <li>FILTER: adding <code>-active</code> to status, export and remove commands will operate on all active schedules. e.g. <code>status-active</code> </li>
+                        <li>FILTER: adding <code>-active-static</code> to status, export and remove commands will operate on all static schedules that are active. e.g. <code>status-active-static</code></li>
+                        <li>FILTER: adding <code>-active-dynamic</code> to status, export and remove commands will operate on all dynamic schedules that are active. e.g. <code>status-active-dynamic</code></li>
+                        <li>FILTER: adding <code>-inactive</code> to status, export and remove commands will operate on all inactive schedules. e.g. <code>status-inactive</code> </li>
+                        <li>FILTER: adding <code>-inactive-static</code> to status, export and remove commands will operate on all static schedules that are inactive. e.g. <code>status-inactive-static</code></li>
+                        <li>FILTER: adding <code>-inactive-dynamic</code> to status, export and remove commands will operate on all dynamic schedules that are inactive. e.g. <code>status-inactive-dynamic</code></li>
                     </ul>
                 </p>
                 <p><i>Examples...</i><br>
@@ -2396,9 +2401,13 @@ msg.payload = "name"; //  name of the schedule</pre>
                     <pre class="cron-plus-code">payload: {
   "command": "pause-all"
 }</pre> 
+                    Example : Using a simple topic command to delete all dynamic schedules that have finished <br>
+                    <pre class="cron-plus-code">msg: {
+  "topic": "remove-inactive-dynamic"
+}</pre>                    
                 </p>
-            </p>                 
-            </p>                
+            </p>
+            </p>
 
                  
 
@@ -2443,7 +2452,7 @@ msg.payload = "name"; //  name of the schedule</pre>
                 <li>Adding a schedule with the same name as an existing schedule will replace the existing one</li>
                 <li>Adding a schedule with property <code>"limit":3</code> will cause that schedule to be stopped after the third trigger. It can be started again by injecting a payload of <code>{"command":"start" "name": "schedule name"}</code></li>
                 <li>Static (UI added) schedules can be also be updated by using the name specified in the UI</li>
-                <li>When a cron-plus-plus node is modified and deployed (or node-red is restarted), dynamic entries are discarded & must be injected again</li>
+                <li>When a cron-plus-plus node is modified and deployed (or node-red is restarted), dynamic entries are discarded and must be injected again</li>
                 <li>When a cron-plus-plus node outputs a msg in response to a command, <code>msg.commandResponse</code> will be <code>true</code> to indicate the message is in response to a command and not a scheduled event</li>
                 <li>When a cron-plus-plus node outputs a msg for a cron/solar event, <code>msg.scheduledEvent</code> will be <code>true</code> to indicate the message is due to a scheduled event and not a control response</li>
                 <li>The status indicator will be shown as a "ring" for dynamic schedules or shown as a "dot" for static schedules</li>
