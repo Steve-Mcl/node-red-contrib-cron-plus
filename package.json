@@ -36,8 +36,8 @@
   "homepage": "https://github.com/Steve-Mcl/node-red-contrib-cron-plus#readme",
   "dependencies": {
     "coord-parser": "^1.0.0",
-    "cronosjs": "^1.7.0",
-    "cronstrue": "^1.110.0",
+    "cronosjs": "^1.7.1",
+    "cronstrue": "^1.111.0",
     "pretty-ms": "^7.0.1",
     "suncalc2": "^1.8.1"
   },
