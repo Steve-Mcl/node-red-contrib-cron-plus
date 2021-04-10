@@ -719,19 +719,26 @@ const cronplusDir = "cronplusdata";
 
 
 module.exports = function (RED) {
-    userDir = RED.settings.userDir
-    persistPath = path.join(userDir, cronplusDir);
-    try {
-        if (!fs.existsSync(persistPath)){
-            fs.mkdirSync(persistPath);
-        }
-        persistAvailable = fs.existsSync(persistPath);
-    } catch (e) {
-        if ( e.code !== 'EEXIST' ) { 
-            RED.log.error(`cron-plus: Error creating persistence folder '${persistPath}'. ${e.message}`)
-            persistAvailable = false;
+    //when running tests, RED.settings.userDir & RED.settings.settingsFile (amongst others) are undefined 
+    var testMode = typeof RED.settings.userDir === "undefined" && typeof RED.settings.settingsFile === "undefined" 
+    if(testMode) {
+        persistAvailable = false;
+    } else {
+        userDir = RED.settings.userDir || "";
+        persistPath = path.join(userDir, cronplusDir);
+        try {
+            if (!fs.existsSync(persistPath)){
+                fs.mkdirSync(persistPath);
+            }
+            persistAvailable = fs.existsSync(persistPath);
+        } catch (e) {
+            if ( e.code !== 'EEXIST' ) { 
+                RED.log.error(`cron-plus: Error creating persistence folder '${persistPath}'. ${e.message}`)
+                persistAvailable = false;
+            }
         }
     }
+    
     function CronPlus(config) {
         RED.nodes.createNode(this, config);
         var node = this;
