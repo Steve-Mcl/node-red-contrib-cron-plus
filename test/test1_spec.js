@@ -179,7 +179,7 @@ describe('cron-plus Node', function(){
                    
                 }
                 
-                const dynamicOpChecker = function(payload, expectedCommand) {
+                const dynamicOpChecker = function(payload, expectedCommand, options) {
                     /*                                                
                         topic:'schedule1'
                         timeZone:'Europe/London'
@@ -227,6 +227,10 @@ describe('cron-plus Node', function(){
                                 statusChecker(result.status);
                             } else if(command.command == "status-all" || command.command == "status-all-dynamic" || command.command == "status-all-static") {
                                 should(Array.isArray(result)).be.true("check result should be an array");
+                                if(options.hasOwnProperty("expectedResultCount") ) {
+                                    result.should.have.property("length");
+                                    should(result.length).eql(options.expectedResultCount, "Check number of schedules in response");
+                                }
                                 for (const r of result) {
                                     r.should.have.property("config").which.is.an.Object();
                                     r.should.have.property("status").which.is.an.Object();
@@ -281,7 +285,8 @@ describe('cron-plus Node', function(){
 
                       
                         describe('check command responses', function () {
-                            results.commandResponseOutput.should.have.property("length", 6);
+                            results.commandResponseOutput.should.have.property("length");
+                            should(results.commandResponseOutput.length).eql(8, "Ensure length of command responses is correct");
                             
                             var msg5 = results.commandResponseOutput[0];
                             msg5.should.have.property("payload");
@@ -297,15 +302,25 @@ describe('cron-plus Node', function(){
 
                             var msg8 = results.commandResponseOutput[3];
                             msg8.should.have.property("payload");
-                            dynamicOpChecker(msg8.payload, "status-all");
+                            dynamicOpChecker(msg8.payload, "status-all", {expectedResultCount: 4} );
 
                             var msg9 = results.commandResponseOutput[4];
                             msg9.should.have.property("payload");
-                            dynamicOpChecker(msg9.payload, "status-all-dynamic");
+                            dynamicOpChecker(msg9.payload, "status-all-dynamic", {expectedResultCount: 1} );
 
                             var msg10 = results.commandResponseOutput[5];
                             msg10.should.have.property("payload");
-                            dynamicOpChecker(msg10.payload, "status-all-static");
+                            dynamicOpChecker(msg10.payload, "status-all-static", {expectedResultCount: 3} );
+
+                            //2nd last test checks the number of exported static schedules has reduced to 2 (since we "remove"d "schedule3")
+                            var msg11 = results.commandResponseOutput[6];
+                            msg11.should.have.property("payload");
+                            dynamicOpChecker(msg11.payload, "status-all-static", {expectedResultCount: 2} );
+
+                            //last test checks the number of exported schedules has reduced to 2 (since we "remove-all-dynamic" schedules)
+                            var msg12 = results.commandResponseOutput[7];
+                            msg12.should.have.property("payload");
+                            dynamicOpChecker(msg12.payload, "status-all", {expectedResultCount: 2} );
                         });
 
                         done();
@@ -327,16 +342,19 @@ describe('cron-plus Node', function(){
                 testNode.receive({ topic: "trigger", payload: "schedule3" }); //fire input of testNode
                 
                 //add a dynamic cron schedule
-                testNode.receive({ payload: {
-                    "command": "add",
-                    "name": "dynCron",
-                    "topic": "dynCron",
-                    "expression": "* * * * * * *",
-                    "expressionType": "cron",
-                    "payloadType": "default",
-                    "limit": 1 
-                  } }); 
-                //testNode.receive({ topic: "trigger", payload: "dynCron" }); //fire input of testNode
+                testNode.receive({ 
+                    payload: {
+                        "command": "add",
+                        "name": "dynCron",
+                        "topic": "dynCron",
+                        "expression": "* * * * * * *",
+                        "expressionType": "cron",
+                        "payloadType": "default",
+                        "limit": 1 
+                        } 
+                    }
+                ); 
+                testNode.receive({ topic: "trigger", payload: "dynCron" }); //fire input of testNode
 
                 testNode.receive({ payload: {
                     "command": "describe",
@@ -352,6 +370,10 @@ describe('cron-plus Node', function(){
                 testNode.receive({ topic: "status-all", payload: "" });
                 testNode.receive({ topic: "status-all-dynamic", payload: "" });
                 testNode.receive({ topic: "status-all-static", payload: "" });
+                testNode.receive({ topic: "remove", payload: "schedule3" });
+                testNode.receive({ topic: "status-all-static", payload: "" });
+                testNode.receive({ topic: "remove-all-dynamic", payload: "" });
+                testNode.receive({ topic: "status-all", payload: "" });
  
 
             } catch (error) {
@@ -359,13 +381,4 @@ describe('cron-plus Node', function(){
             }
         });        
     });
-
-    //TODO: Test the following...
-    /*
-    * all functions
-    * all output types
-    * byteswaps
-    * scalling operators
-    * dynamic spec
-    */
 });
