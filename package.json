@@ -4,7 +4,7 @@
   "description": "A flexible scheduler (cron, solar events, simple dates) node for Node-RED with full dynamic control and Timezone support",
   "main": "cronplus.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "mocha \"test/**/*_spec.js\"",
     "publish": "npm publish"
   },
   "repository": {
@@ -37,9 +37,15 @@
   "dependencies": {
     "coord-parser": "^1.0.0",
     "cronosjs": "^1.7.1",
-    "cronstrue": "^1.110.0",
+    "cronstrue": "^1.111.0",
     "pretty-ms": "^7.0.1",
     "suncalc2": "^1.8.1"
+  },
+  "devDependencies": {
+    "mocha": "^8.3.2",
+    "node-red": "^1.0.0",
+    "node-red-node-test-helper": "^0.2.7",
+    "should": "^13.2.3"
   },
   "maintainers": [
     {
