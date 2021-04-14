@@ -960,8 +960,8 @@ module.exports = function (RED) {
         }
         function taskFilterMatch(task, filter) {
             if(!task) return false;
-            const isActive = function(task) { return isTaskFinished(task) == false; /*task.isRunning == true;*/ }
-            const isInactive = function(task) { return isTaskFinished(task); /*task.isRunning == false;*/ }
+            const isActive = function(task) { return isTaskFinished(task) == false && task.isRunning == true; }
+            const isInactive = function(task) { return isTaskFinished(task) || task.isRunning == false }
             const isStatic = function(task) { return (task.isStatic == true || task.isDynamic == false); }
             const isDynamic = function(task) { return (task.isDynamic == true || task.isStatic == false); }
             switch (filter) {
