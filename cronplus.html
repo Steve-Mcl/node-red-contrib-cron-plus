@@ -1102,10 +1102,10 @@ copies or substantial portions of the Software.
                         var payload, payloadTT = "";
                         if(e.payload && isObject(e.payload)){
                             try {
-                                payload = JSON.stringify(e.payload);
-                                if(payload.length > 100) {
+                                payload = JSON.stringify(e.payload, undefined, 2);
+                                if(payload.length > 200) {
                                     payloadTT = payload;
-                                    payload = payload.substring(0,100) + "..."
+                                    payload = payload.substring(0,200) + "..."
                                 }
                             } catch (error) {
                                 payload = typeof e.payload;
@@ -1157,7 +1157,7 @@ copies or substantial portions of the Software.
                 height: "auto",
                 minHeight: 400,
                 minWidth: 300,
-                maxWidth: 1000,
+                // maxWidth: 1000,
                 modal: true,
                 buttons: {
                     "Refresh": function() {
