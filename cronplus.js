@@ -22,9 +22,9 @@ const SunCalc = require('suncalc2');
 const path = require('path');
 const fs = require('fs');
 
-SunCalc.addTime(-18,"nightEnd","nightStart");
-SunCalc.addTime(-6,"civilDawn","civilDusk");
-SunCalc.addTime(6,"morningGoldenHourEnd","eveningGoldenHourStart");
+SunCalc.addTime(-18, "nightEnd", "nightStart");
+SunCalc.addTime(-6, "civilDawn", "civilDusk");
+SunCalc.addTime(6, "morningGoldenHourEnd", "eveningGoldenHourStart");
 
 const PERMITTED_SOLAR_EVENTS = [
     "nightEnd",
@@ -221,7 +221,7 @@ function isDateSequence(data){
 function _describeExpression(expression, expressionType, timeZone, offset, solarType, solarEvents, time, opts){
     let now = time ? new Date(time) : new Date();
     opts = opts || {};
-    let result = { description:undefined,nextDate:undefined,nextDescription:undefined, prettyNext: "Never" };
+    let result = { description: undefined, nextDate: undefined, nextDescription: undefined, prettyNext: "Never" };
     let cronOpts = timeZone ? { timezone: timeZone } : undefined;
     let ds = null;
     let dsOk = false;
@@ -288,9 +288,9 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
                 }
             } else {
                 if(count == 1){
-                    result.description = "One time at " + formatShortDateTimeWithTZ(result.nextDate,timeZone) ;
+                    result.description = "One time at " + formatShortDateTimeWithTZ(result.nextDate, timeZone) ;
                 } else {
-                    result.description = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(result.nextDate,timeZone) ;
+                    result.description = count + " Date Sequences starting at " + formatShortDateTimeWithTZ(result.nextDate, timeZone) ;
                 }
                 result.nextDates = dsFutureDates.slice(0, 5);
             }            
@@ -405,7 +405,7 @@ function applyOptionDefaults(option, optionIndex) {
         } else {
             option.expressionType = "cron";//if empty, default to cron
         }
-    } else if (["cron","dates","solar"].indexOf(option.expressionType) < 0) {
+    } else if (["cron", "dates", "solar"].indexOf(option.expressionType) < 0) {
         //if expressionType is not cron or solar - it might be sunrise or sunset from an older version
         if (option.expressionType == "sunrise") {
             option.solarEvents = option.solarEvents || "sunrise";
@@ -459,7 +459,7 @@ function parseSolarTimes(opt){
     let offset = opt.offset ? parseInt(opt.offset) : 0;
     let date = opt.date ? new Date(opt.date) : new Date();
     let events = opt.solarType == "all" ? PERMITTED_SOLAR_EVENTS : opt.solarEvents;
-    let result = getSolarTimes(pos.lat,pos.lon,0,events,date,offset);
+    let result = getSolarTimes(pos.lat, pos.lon, 0, events, date, offset);
     let task = parseDateSequence(result.eventTimes.map((o) => o.timeOffset));
     task.solarEventTimes = result;
     return task;
@@ -543,7 +543,7 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
     // performance.measure('FirstScanEnd to SecondScanEnd', 'FirstScanEnd', 'SecondScanEnd');
 
     //sort the results to get a timeline
-    var sorted = result.sort((a,b) => {
+    var sorted = result.sort((a, b) => {
         if(a.time < b.time){
             return -1;
         }else if(a.time > b.time){
@@ -561,7 +561,7 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
             switch(event.event){
                 case "nightEnd":
                     state = "Astronomical Twilight";//todo: i18n
-                    updateSolarState(solarState,state,"rise",false,false,true,false,false,false,false);
+                    updateSolarState(solarState, state, "rise", false, false, true, false, false, false, false);
                     break;
                 // case "astronomicalDawn":
                 //     state = "Astronomical Twilight";//todo: i18n
@@ -569,41 +569,41 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
                 //     break;                    
                 case "nauticalDawn":
                     state = "Nautical Twilight";
-                    updateSolarState(solarState,state,"rise",false,false,false,true,false,false,false);
+                    updateSolarState(solarState, state, "rise", false, false, false, true, false, false, false);
                     break;
                 case "civilDawn":
                     state = "Civil Twilight";
-                    updateSolarState(solarState,state,"rise",false,false,false,false,true,true,false);
+                    updateSolarState(solarState, state, "rise", false, false, false, false, true, true, false);
                     break;
                 // case "morningGoldenHourStart":
                 //     updateSolarState(solarState,null,"rise",false,false,false,false,true,true,false);
                 //     break;                    
                 case "sunrise":
                     state = "Civil Twilight";
-                    updateSolarState(solarState,state,"rise",false,false,false,false,true,true,false);
+                    updateSolarState(solarState, state, "rise", false, false, false, false, true, true, false);
                     break;
                 case "sunriseEnd":
                     state = "Day";
-                    updateSolarState(solarState,state,"rise",true,false,false,false,false,true,false);
+                    updateSolarState(solarState, state, "rise", true, false, false, false, false, true, false);
                     break;
                 case "morningGoldenHourEnd":
                     state = "Day";
-                    updateSolarState(solarState,state,"rise",true,false,false,false,false,false,false);
+                    updateSolarState(solarState, state, "rise", true, false, false, false, false, false, false);
                     break;
                 case "solarNoon":
-                    updateSolarState(solarState,null,"fall");
+                    updateSolarState(solarState, null, "fall");
                     break;
                 case "eveningGoldenHourStart":
                     state = "Day";
-                    updateSolarState(solarState,state,"fall",true,false,false,false,false,false,true);
+                    updateSolarState(solarState, state, "fall", true, false, false, false, false, false, true);
                     break;
                 case "sunsetStart":
                     state = "Day";
-                    updateSolarState(solarState,state,"fall",true,false,false,false,false,false,true);
+                    updateSolarState(solarState, state, "fall", true, false, false, false, false, false, true);
                     break;
                 case "sunset":
                     state = "Civil Twilight";
-                    updateSolarState(solarState,state,"fall",false,false,false,false,true,false,true);
+                    updateSolarState(solarState, state, "fall", false, false, false, false, true, false, true);
                     break;
                 // case "eveningGoldenHourEnd":
                 //     state = "Nautical Twilight";
@@ -611,20 +611,20 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
                 //     break;
                 case "civilDusk":
                     state = "Nautical Twilight";
-                    updateSolarState(solarState,state,"fall",false,false,false,true,false,false,false);
+                    updateSolarState(solarState, state, "fall", false, false, false, true, false, false, false);
                     break;
                 case "nauticalDusk":
                     state = "Astronomical Twilight";
-                    updateSolarState(solarState,state,"fall",false,false,true,false,false,false,false);
+                    updateSolarState(solarState, state, "fall", false, false, true, false, false, false, false);
                     break;
                 // case "astronomicalDusk":
                 case "night":
                 case "nightStart":
                     state = "Night";
-                    updateSolarState(solarState,state,"fall",false,true,false,false,false,false,false);
+                    updateSolarState(solarState, state, "fall", false, true, false, false, false, false, false);
                     break;
                 case "nadir":
-                    updateSolarState(solarState,null,"rise");
+                    updateSolarState(solarState, null, "rise");
                     break;
             }
         } else {
@@ -830,7 +830,7 @@ module.exports = function (RED) {
             msg.topic = task.node_topic;
             msg.cronplus.triggerTimestamp = cronTimestamp;
             let se = task.node_expressionType == "solar" ? node.nextEvent : "";
-            msg.cronplus.status = getTaskStatus(node, task, { includeSolarStateOffset:true });
+            msg.cronplus.status = getTaskStatus(node, task, { includeSolarStateOffset: true });
             if(se) msg.cronplus.status.solarEvent = se;
             msg.cronplus.config = exportTask(task);
             if(manualTrigger) msg.manualTrigger = true;
@@ -877,7 +877,7 @@ module.exports = function (RED) {
             }
         };
 
-        function getTask(node,name){
+        function getTask(node, name){
             let task = node.tasks.find(function(task){
                 return task.name == name;
             });
@@ -947,7 +947,7 @@ module.exports = function (RED) {
                             task.stop();
                             task.start();
                         } else {
-                            updateTask(node,task.node_opt,null);
+                            updateTask(node, task.node_opt, null);
                         }
                         //task.runScheduledTasks();
                         //index--;
@@ -986,15 +986,15 @@ module.exports = function (RED) {
             }
             return false;
         }
-        function stopTask(node,name,resetCounter){
-            let task = getTask(node,name);
+        function stopTask(node, name, resetCounter){
+            let task = getTask(node, name);
             if(task){
                 task.stop();
                 if(resetCounter){ task.node_count = 0; }
             }
             return task;
         }
-        function stopAllTasks(node,resetCounter,filter){
+        function stopAllTasks(node, resetCounter, filter){
             if(node.tasks){
                 for (let index = 0; index < node.tasks.length; index++) {
                     let task = node.tasks[index];
@@ -1009,8 +1009,8 @@ module.exports = function (RED) {
                 }
             }
         }
-        function startTask(node,name){
-            let task = getTask(node,name);
+        function startTask(node, name){
+            let task = getTask(node, name);
             if(task){
                 if(isTaskFinished(task)){
                     task.node_count = 0;
@@ -1056,8 +1056,8 @@ module.exports = function (RED) {
                 }
             }
         }
-        function deleteTask(node,name){
-            let task = getTask(node,name);
+        function deleteTask(node, name){
+            let task = getTask(node, name);
             if(task){
                 _deleteTask(task);
                 node.tasks = node.tasks.filter(t => t && t.name != name);
@@ -1075,9 +1075,9 @@ module.exports = function (RED) {
             // eslint-disable-next-line no-empty
             } catch (error) {}
         }        
-        function updateTask(node,options,msg){
+        function updateTask(node, options, msg){
             if(!options || typeof options != "object"){
-                node.warn("schedule settings are not valid",msg);
+                node.warn("schedule settings are not valid", msg);
                 return null;
             }
 
@@ -1090,21 +1090,21 @@ module.exports = function (RED) {
                 try {
                     validateOpt(opt);                    
                 } catch (error) {
-                    node.warn(error,msg);
+                    node.warn(error, msg);
                     return;
                 }
             }
 
             for (let index = 0; index < options.length; index++) {
                 let opt = options[index];
-                let task = getTask(node,opt.name);
+                let task = getTask(node, opt.name);
                 let isDynamic = !task || task.isDynamic;
                 // let isStatic = task && task.isStatic;
                 let opCount = 0, modified = false;
                 if(task){
                     modified = true;
                     opCount  = task.node_count || 0; 
-                    deleteTask(node,opt.name);
+                    deleteTask(node, opt.name);
                 }
                 let taskCount = node.tasks ? node.tasks.length : 0;
                 let t = createTask(node, opt, taskCount, !isDynamic);  
@@ -1178,7 +1178,7 @@ module.exports = function (RED) {
                 sendMsg(node, task, timestamp);
                 process.nextTick(function(){
                     if( task.node_expressionType === "solar" ){
-                        updateTask(node,task.node_opt,null);
+                        updateTask(node, task.node_opt, null);
                     }
                 });
             })
@@ -1210,7 +1210,7 @@ module.exports = function (RED) {
                 }  
                 filePath = getPersistFilePath();
                 let dynNodes = node.tasks.filter((e)=>e && e.isDynamic);
-                let exp = (t) => exportTask(t,false);
+                let exp = (t) => exportTask(t, false);
                 let dynNodesExp = dynNodes.map(exp);
                 /*if(!dynNodesExp || !dynNodesExp.length){
                     //FUTURE TODO: Sanity check before deletion
@@ -1224,7 +1224,7 @@ module.exports = function (RED) {
                     schedules: dynNodesExp
                 };
                 let fileData = JSON.stringify(data);
-                fs.writeFileSync(filePath,fileData);
+                fs.writeFileSync(filePath, fileData);
             } catch (e) {
                 RED.log.error(`cron-plus: Error saving persistence data '${filePath}'. ${e.message}`);
             }
@@ -1264,7 +1264,7 @@ module.exports = function (RED) {
 
         function getPersistFilePath(){
             let fileName = `node-${node.id}.json`;
-            return path.join(persistPath,fileName);
+            return path.join(persistPath, fileName);
         }
 
         try {
@@ -1412,10 +1412,10 @@ module.exports = function (RED) {
         });
 
         this.on("input", function (msg, send, done) {
-            send = send || function() { node.send.apply(node,arguments); };
+            send = send || function() { node.send.apply(node, arguments); };
             done = done || function(err) {
                 if(err){
-                    node.error(err,msg);
+                    node.error(err, msg);
                 }
             };
             //is this an button press?...
@@ -1428,7 +1428,7 @@ module.exports = function (RED) {
             if(msg.topic == "trigger" && typeof msg.payload == "string"){
                 let t = getTask(node, msg.payload);
                 if(!t) {
-                    node.error(`Manual Trigger failed. Cannot find schedule named '${msg.payload}'`,msg);
+                    node.error(`Manual Trigger failed. Cannot find schedule named '${msg.payload}'`, msg);
                     return;
                 }
                 sendMsg(node, t, Date.now(), true);
@@ -1440,7 +1440,7 @@ module.exports = function (RED) {
             if(controlTopic){
                 if(controlTopic.payloadIsName){
                     if(!payload || typeof payload != "string"){
-                        node.error(`Invalid payload! Control topic '${msg.topic}' expects the name of the schedule to be in msg.payload`,msg);
+                        node.error(`Invalid payload! Control topic '${msg.topic}' expects the name of the schedule to be in msg.payload`, msg);
                         return;
                     } 
                     //emulate the cmd object
@@ -1472,7 +1472,7 @@ module.exports = function (RED) {
                     let action = cmd.command || "";
                     // let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
                     let newMsg = RED.util.cloneMessage(msg);
-                    newMsg.payload = { command:cmd, result:{} };
+                    newMsg.payload = { command: cmd, result: {} };
                     let cmd_all = action.endsWith("-all");
                     let cmd_all_static = action.endsWith("-all-static");
                     let cmd_all_dynamic = action.endsWith("-all-dynamic");
@@ -1530,16 +1530,16 @@ module.exports = function (RED) {
                             {
                                 let exp = (cmd.expressionType === "solar") ? cmd.location : cmd.expression;
                                 applyOptionDefaults(cmd);
-                                newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset:true });
+                                newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset: true });
                                 sendCommandResponse(newMsg);
                             }
                             break;
                         case "status": //single
                             {
-                                let task = getTask(node,cmd.name);
+                                let task = getTask(node, cmd.name);
                                 if(task){
                                     newMsg.payload.result.config = exportTask(task, true);
-                                    newMsg.payload.result.status = getTaskStatus(node, task, { includeSolarStateOffset:true });
+                                    newMsg.payload.result.status = getTaskStatus(node, task, { includeSolarStateOffset: true });
                                 } else {
                                     newMsg.error = `${cmd.name} not found`;
                                 }
@@ -1549,7 +1549,7 @@ module.exports = function (RED) {
                             break;
                         case "export": //single
                             {
-                                let task = getTask(node,cmd.name);
+                                let task = getTask(node, cmd.name);
                                 if(task){
                                     newMsg.payload.result = exportTask(task, false);
                                 } else {
@@ -1568,7 +1568,7 @@ module.exports = function (RED) {
                                         if( task && (cmd_all || taskFilterMatch(task, cmd_filter)) ) {
                                             let result = {};
                                             result.config = exportTask(task, true);
-                                            result.status = getTaskStatus(node, task, { includeSolarStateOffset:true });
+                                            result.status = getTaskStatus(node, task, { includeSolarStateOffset: true });
                                             results.push(result);    
                                         }
                                     }
@@ -1594,46 +1594,46 @@ module.exports = function (RED) {
                             break;                            
                         case "add": //single
                         case "update": //single
-                            updateTask(node,cmd,msg);
+                            updateTask(node, cmd, msg);
                             updateNextStatus(node, true);
                             serialise();//update persistent
                             break;
                         case "clear":
                         case "remove-": //multiple
                         case "delete-": //multiple
-                            deleteAllTasks(node,cmd_filter);
-                            updateNextStatus(node,true);
+                            deleteAllTasks(node, cmd_filter);
+                            updateNextStatus(node, true);
                             serialise();//update persistent
                             break;
                         case "remove": //single
                         case "delete": //single
-                            deleteTask(node,cmd.name);
-                            updateNextStatus(node,true);
+                            deleteTask(node, cmd.name);
+                            updateNextStatus(node, true);
                             serialise();//update persistent
                             break;
                         case "start": //single
-                            startTask(node,cmd.name);
-                            updateNextStatus(node,true);
+                            startTask(node, cmd.name);
+                            updateNextStatus(node, true);
                             break;
                         case "start-": //multiple
                             startAllTasks(node, cmd_filter);
-                            updateNextStatus(node,true);
+                            updateNextStatus(node, true);
                             break;
                         case "stop": //single
                         case "pause": //single
-                            stopTask(node,cmd.name,cmd.command == "stop");
-                            updateNextStatus(node,true);
+                            stopTask(node, cmd.name, cmd.command == "stop");
+                            updateNextStatus(node, true);
                             break;
                         case "stop-": //multiple
                         case "pause-":{
                                 let resetCounter = cmd.command.startsWith("stop-");
                                 stopAllTasks(node, resetCounter, cmd_filter);
-                                updateNextStatus(node,true);
+                                updateNextStatus(node, true);
                             }
                             break;
                         case "debug":{
-                                let task = getTask(node,cmd.name);
-                                let thisDebug = getTaskStatus(node, task, { includeSolarStateOffset:true });
+                                let task = getTask(node, cmd.name);
+                                let thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true });
                                 thisDebug.name = task.name;
                                 thisDebug.topic = task.node_topic;
                                 thisDebug.expressionType = task.node_expressionType;
@@ -1652,7 +1652,7 @@ module.exports = function (RED) {
                                     for (let index = 0; index < node.tasks.length; index++) {
                                         const task = node.tasks[index];
                                         if( cmd_all || taskFilterMatch(task, cmd_filter) ) {
-                                            let thisDebug = getTaskStatus(node, task, { includeSolarStateOffset:true });
+                                            let thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true });
                                             thisDebug.name = task.name;
                                             thisDebug.topic = task.node_topic;
                                             thisDebug.expressionType = task.node_expressionType;
@@ -1755,7 +1755,7 @@ module.exports = function (RED) {
                     return;
                 }
                 let dynNodes = node.tasks.filter((e)=>e && e.isDynamic);
-                let exp = (t) => exportTask(t,false);
+                let exp = (t) => exportTask(t, false);
                 let dynNodesExp = dynNodes.map(exp);
                 res.json(dynNodesExp);
             } else if(operation == "tz") {
