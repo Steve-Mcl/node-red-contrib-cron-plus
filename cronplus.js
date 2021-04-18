@@ -45,42 +45,42 @@ const PERMITTED_SOLAR_EVENTS = [
     // "astronomicalDusk",
     "nightStart",
     "nadir"
-]
+];
 
 //accepted commands using topic as the command & (in compatible cases, the payload is the schedule name)
 //commands not supported by topic are : add/update & describe
 const control_topics = [
-    {command: "status", payloadIsName: true},
-    {command: "list", payloadIsName: true},
-    {command: "export", payloadIsName: true},
-    {command: "stop", payloadIsName: true},
-    {command: "stop-all", payloadIsName: false},
-    {command: "stop-all-dynamic", payloadIsName: false},
-    {command: "stop-all-static", payloadIsName: false},
-    {command: "pause", payloadIsName: true},
-    {command: "pause-all", payloadIsName: false},
-    {command: "pause-all-dynamic", payloadIsName: false},
-    {command: "pause-all-static", payloadIsName: false},
-    {command: "start", payloadIsName: true},
-    {command: "start-all", payloadIsName: false},
-    {command: "start-all-dynamic", payloadIsName: false},
-    {command: "start-all-static", payloadIsName: false},
-    {command: "clear", payloadIsName: false},
-    {command: "remove", payloadIsName: true},
-    {command: "delete", payloadIsName: true},
-    {command: "debug", payloadIsName: true},
-]
+    { command: "status", payloadIsName: true },
+    { command: "list", payloadIsName: true },
+    { command: "export", payloadIsName: true },
+    { command: "stop", payloadIsName: true },
+    { command: "stop-all", payloadIsName: false },
+    { command: "stop-all-dynamic", payloadIsName: false },
+    { command: "stop-all-static", payloadIsName: false },
+    { command: "pause", payloadIsName: true },
+    { command: "pause-all", payloadIsName: false },
+    { command: "pause-all-dynamic", payloadIsName: false },
+    { command: "pause-all-static", payloadIsName: false },
+    { command: "start", payloadIsName: true },
+    { command: "start-all", payloadIsName: false },
+    { command: "start-all-dynamic", payloadIsName: false },
+    { command: "start-all-static", payloadIsName: false },
+    { command: "clear", payloadIsName: false },
+    { command: "remove", payloadIsName: true },
+    { command: "delete", payloadIsName: true },
+    { command: "debug", payloadIsName: true },
+];
 var addExtended_control_topics = function(baseCommand) {
-    control_topics.push({command: `${baseCommand}-all`, payloadIsName: false})
-    control_topics.push({command: `${baseCommand}-all-dynamic`, payloadIsName: false})
-    control_topics.push({command: `${baseCommand}-all-static`, payloadIsName: false})
-    control_topics.push({command: `${baseCommand}-active`, payloadIsName: false})
-    control_topics.push({command: `${baseCommand}-active-dynamic`, payloadIsName: false})
-    control_topics.push({command: `${baseCommand}-active-static`, payloadIsName: false})
-    control_topics.push({command: `${baseCommand}-inactive`, payloadIsName: false})
-    control_topics.push({command: `${baseCommand}-inactive-dynamic`, payloadIsName: false})
-    control_topics.push({command: `${baseCommand}-inactive-static`, payloadIsName: false})
-}
+    control_topics.push({ command: `${baseCommand}-all`, payloadIsName: false });
+    control_topics.push({ command: `${baseCommand}-all-dynamic`, payloadIsName: false });
+    control_topics.push({ command: `${baseCommand}-all-static`, payloadIsName: false });
+    control_topics.push({ command: `${baseCommand}-active`, payloadIsName: false });
+    control_topics.push({ command: `${baseCommand}-active-dynamic`, payloadIsName: false });
+    control_topics.push({ command: `${baseCommand}-active-static`, payloadIsName: false });
+    control_topics.push({ command: `${baseCommand}-inactive`, payloadIsName: false });
+    control_topics.push({ command: `${baseCommand}-inactive-dynamic`, payloadIsName: false });
+    control_topics.push({ command: `${baseCommand}-inactive-static`, payloadIsName: false });
+};
 addExtended_control_topics("status"); 
 addExtended_control_topics("export"); 
 addExtended_control_topics("list"); 
@@ -100,9 +100,9 @@ var humanizeCron = function (expression, locale) {
         if(locale) opt.locale = locale;
         return cronstrue.toString(expression, opt);
     } catch (error) {
-        return `Cannot parse expression '${expression}'`
+        return `Cannot parse expression '${expression}'`;
     }
-}
+};
 
 /**
  * Validate a schedule options. Returns true if OK otherwise throws an appropriate error
@@ -110,7 +110,7 @@ var humanizeCron = function (expression, locale) {
  * @param {boolean} permitDefaults allow certain items to be a default (missing value)
  * @returns {boolean}
  */
-function validateOpt(opt, permitDefaults=true) {
+function validateOpt(opt, permitDefaults = true) {
     if (!opt) {
         throw new Error(`Schedule options are undefined`);
     }
@@ -127,16 +127,16 @@ function validateOpt(opt, permitDefaults=true) {
             if(valid)
                 opt.expressionType = "cron";
         } catch (error) {
-            node.debug(error);
+            console.debug(error);
         }
         try {
             if(!valid){
-                valid = isDateSequence(opt.expression)
+                valid = isDateSequence(opt.expression);
                 if(valid)
                     opt.expressionType = "dates";
             }    
         } catch (error) {
-            node.debug(error);
+            console.debug(error);
         }
 
         if(!valid){
@@ -187,8 +187,8 @@ function validateOpt(opt, permitDefaults=true) {
     if (!opt.type) {
         throw new Error(`Schedule '${opt.name}' - type property missing`);
     }
-    let okTypes = ['default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']
-    let typeOK = okTypes.find( el => {return el == opt.type})
+    let okTypes = ['default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env'];
+    let typeOK = okTypes.find( el => {return el == opt.type;});
     if (!typeOK) {
         throw new Error(`Schedule '${opt.name}' - type property '${opt.type}' is not valid. Must be one of the following... ${okTypes.join(",")}`);
     }
@@ -201,11 +201,10 @@ function validateOpt(opt, permitDefaults=true) {
  */
 function isDateSequence(data){
     try {
-        let ds = parseDateSequence(data)
+        let ds = parseDateSequence(data);
         return (ds && ds.isDateSequence);    
-    } catch (error) {
-        
-    }
+    // eslint-disable-next-line no-empty
+    } catch (error) { }
     return false;
 }
 
@@ -222,7 +221,7 @@ function isDateSequence(data){
 function _describeExpression(expression, expressionType, timeZone, offset, solarType, solarEvents, time, opts){
     let now = time ? new Date(time) : new Date();
     opts = opts || {};
-    let result = {description:undefined,nextDate:undefined,nextDescription:undefined, prettyNext: "Never"};
+    let result = { description:undefined,nextDate:undefined,nextDescription:undefined, prettyNext: "Never" };
     let cronOpts = timeZone ? { timezone: timeZone } : undefined;
     let ds = null;
     let dsOk = false;
@@ -230,7 +229,7 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
     //let now = new Date();
 
     if(solarType == "all"){
-        solarEvents = PERMITTED_SOLAR_EVENTS.join(",")
+        solarEvents = PERMITTED_SOLAR_EVENTS.join(",");
     }
 
     if(expressionType == "solar"){
@@ -241,21 +240,21 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
             name: "dummy",
             solarType: solarType,
             solarEvents: solarEvents
-        }
+        };
         
         if(validateOpt(opt)){
             let pos = coordParser(opt.location);
             let offset = isNumber(opt.offset) ? parseInt(opt.offset) : 0;
-            let nowOffset =  new Date(now.getTime() - offset*60000)
-            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset)
+            let nowOffset =  new Date(now.getTime() - offset * 60000);
+            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset);
             if(opts.includeSolarStateOffset && offset != 0){
-                let ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0)
+                let ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0);
                 result.solarStateOffset = ssOffset.solarState;
             }
             result.offset = offset;
             result.now = now;
             result.nowOffset = nowOffset;
-            ds = parseDateSequence(result.eventTimes.map((event)=>event.timeOffset))
+            ds = parseDateSequence(result.eventTimes.map((event)=>event.timeOffset));
             dsOk = ds && ds.isDateSequence;
         }
     } else {
@@ -266,7 +265,7 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
             dsOk = ds.isDateSequence;
         }
         if(!exOk && !dsOk){
-            result.description = "Invalid expression"
+            result.description = "Invalid expression";
             return result;
         }
     }
@@ -299,7 +298,7 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
     } 
     
     if(exOk){
-        let ex = cronosjs.CronosExpression.parse(expression, cronOpts)
+        let ex = cronosjs.CronosExpression.parse(expression, cronOpts);
         let next = ex.nextDate();
         if (next) {
             let ms = next.valueOf() - now.valueOf();
@@ -307,7 +306,7 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
             try {
                 result.nextDates = ex.nextNDates(now, 5);
             } catch (error) {
-                node.debug(error);
+                console.debug(error);
             }
         }
         result.description = humanizeCron(expression);
@@ -341,9 +340,9 @@ function formatShortDateTimeWithTZ(date, tz) {
         second: "2-digit"
     };
     try {
-        dateString = new Intl.DateTimeFormat('default', o).format(new Date(date))    
+        dateString = new Intl.DateTimeFormat('default', o).format(new Date(date));    
     } catch (error) {
-        dateString = "Error. Check timezone setting"
+        dateString = "Error. Check timezone setting";
     }
         
     return dateString;
@@ -406,7 +405,7 @@ function applyOptionDefaults(option, optionIndex) {
         } else {
             option.expressionType = "cron";//if empty, default to cron
         }
-    } else if (["cron", "dates", "solar"].indexOf(option.expressionType) < 0) {
+    } else if (["cron","dates","solar"].indexOf(option.expressionType) < 0) {
         //if expressionType is not cron or solar - it might be sunrise or sunset from an older version
         if (option.expressionType == "sunrise") {
             option.solarEvents = option.solarEvents || "sunrise";
@@ -428,7 +427,7 @@ function applyOptionDefaults(option, optionIndex) {
     if (!option.location) option.location = "";
 }
 function parseDateSequence(expression){
-    let result = {isDateSequence: false, expression: expression};
+    let result = { isDateSequence: false, expression: expression };
     let dates = expression;
     if(typeof expression == "string"){
         let spl = expression.split(",");
@@ -440,11 +439,11 @@ function parseDateSequence(expression){
         }
         dates = spl.map(x => {
             if(isNumber(x)){
-                x = parseInt(x)
+                x = parseInt(x);
             }
             let d = new Date(x); 
             return d;
-        })
+        });
     }            
     let ds = new cronosjs.CronosTask(dates);
     if(ds && ds._sequence){
@@ -460,7 +459,7 @@ function parseSolarTimes(opt){
     let offset = opt.offset ? parseInt(opt.offset) : 0;
     let date = opt.date ? new Date(opt.date) : new Date();
     let events = opt.solarType == "all" ? PERMITTED_SOLAR_EVENTS : opt.solarEvents;
-    let result = getSolarTimes(pos.lat,pos.lon,0,events,date,offset)
+    let result = getSolarTimes(pos.lat,pos.lon,0,events,date,offset);
     let task = parseDateSequence(result.eventTimes.map((o) => o.timeOffset));
     task.solarEventTimes = result;
     return task;
@@ -468,12 +467,12 @@ function parseSolarTimes(opt){
 
 function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offset = 0){
     // performance.mark('Start');
-    var solarEventsPast=[...PERMITTED_SOLAR_EVENTS];
-    var solarEventsFuture=[...PERMITTED_SOLAR_EVENTS];
-    var solarEventsArr=[];
+    var solarEventsPast = [...PERMITTED_SOLAR_EVENTS];
+    var solarEventsFuture = [...PERMITTED_SOLAR_EVENTS];
+    var solarEventsArr = [];
 
     //get list of usable solar events into solarEventsArr
-    var solarEventsArrTemp=[];
+    var solarEventsArrTemp = [];
     if(typeof solarEvents === "string"){
         solarEventsArrTemp = solarEvents.split(",");
     } else if(Array.isArray(solarEvents)) {
@@ -492,8 +491,8 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
     elevation = isNumber(elevation) ? parseInt(elevation) : 0;//not used for now
     startDate = startDate ? new Date(startDate) : new Date();
 
-    var scanDate = new Date(startDate.toDateString()) //new Date(startDate); //scanDate = new Date(startDate.toDateString())
-    scanDate.setDate(scanDate.getDate() + 1)//fwd one day to catch times behind of scan day
+    var scanDate = new Date(startDate.toDateString()); //new Date(startDate); //scanDate = new Date(startDate.toDateString())
+    scanDate.setDate(scanDate.getDate() + 1);//fwd one day to catch times behind of scan day
     var loopMonitor = 0;
     var result = [];
 
@@ -510,7 +509,7 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
         for (let index = 0; index < solarEventsPast.length; index++) {
             const se = solarEventsPast[index];
             let seTime = timesIteration1[se]; 
-            let seTimeOffset = new Date(seTime.getTime() + offset*60000);
+            let seTimeOffset = new Date(seTime.getTime() + offset * 60000);
             if (isValidDateObject(seTimeOffset) && seTimeOffset <= startDate) {
                 result.push({ event: se, time: seTime, timeOffset: seTimeOffset });
                 solarEventsPast.splice(index, 1);//remove that item
@@ -520,8 +519,8 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
         scanDate.setDate(scanDate.getDate() - 1);
     }
 
-    scanDate = new Date(startDate.toDateString())
-    scanDate.setDate(scanDate.getDate() - 1)//back one day to catch times ahead of current day
+    scanDate = new Date(startDate.toDateString());
+    scanDate.setDate(scanDate.getDate() - 1);//back one day to catch times ahead of current day
     loopMonitor = 0;
     //now scan forwards to get future events
     while (loopMonitor < 183 && solarEventsFuture.length) {
@@ -531,7 +530,7 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
         for (let index = 0; index < solarEventsFuture.length; index++) {
             const se = solarEventsFuture[index];
             let seTime = timesIteration2[se];
-            let seTimeOffset = new Date(seTime.getTime() + offset*60000)
+            let seTimeOffset = new Date(seTime.getTime() + offset * 60000);
             if (isValidDateObject(seTimeOffset) && seTimeOffset > startDate) {
                 result.push({ event: se, time: seTime, timeOffset: seTimeOffset });
                 solarEventsFuture.splice(index, 1);//remove that item
@@ -645,9 +644,9 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
             wantedFutureEvents.push(fe);
         }
     }
-    var nextType = wantedFutureEvents[0].event
-    var nextTime = wantedFutureEvents[0].time
-    var nextTimeOffset = wantedFutureEvents[0].timeOffset
+    var nextType = wantedFutureEvents[0].event;
+    var nextTime = wantedFutureEvents[0].time;
+    var nextTimeOffset = wantedFutureEvents[0].timeOffset;
     // performance.mark('End')
     // performance.measure('SecondScanEnd to End', 'SecondScanEnd', 'End')
     // performance.measure('Start to End', 'Start', 'End')
@@ -660,7 +659,7 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
         eventTimes: wantedFutureEvents,
         //allTimes: sorted,
         //eventTimesByType: resultCategories
-    }
+    };
 
 
     function updateSolarState(stateObject, state, direction, day, night,
@@ -675,7 +674,7 @@ function getSolarTimes(lat, lng, elevation, solarEvents, startDate = null, offse
                 stateObject.astrologicalTwilight = astrologicalTwilight;
                 stateObject.nauticalTwilight = nauticalTwilight;
                 stateObject.civilTwilight = civilTwilight;
-                stateObject.goldenHour = morningGoldenHour || eveningGoldenHour
+                stateObject.goldenHour = morningGoldenHour || eveningGoldenHour;
                 stateObject.twilight = stateObject.astrologicalTwilight || stateObject.nauticalTwilight || stateObject.civilTwilight;
             }
             return;
@@ -697,7 +696,7 @@ function exportTask(task, includeStatus) {
         payload: task.node_payload,
         limit: task.node_limit || null,
         expressionType: task.node_expressionType,
-    }
+    };
     if(o.expressionType === "solar"){
         o.solarType = task.node_solarType;
         o.solarEvents = task.node_solarEvents;
@@ -720,7 +719,7 @@ const cronplusDir = "cronplusdata";
 
 module.exports = function (RED) {
     //when running tests, RED.settings.userDir & RED.settings.settingsFile (amongst others) are undefined 
-    var testMode = typeof RED.settings.userDir === "undefined" && typeof RED.settings.settingsFile === "undefined" 
+    var testMode = typeof RED.settings.userDir === "undefined" && typeof RED.settings.settingsFile === "undefined"; 
     if(testMode) {
         persistAvailable = false;
     } else {
@@ -733,7 +732,7 @@ module.exports = function (RED) {
             persistAvailable = fs.existsSync(persistPath);
         } catch (e) {
             if ( e.code !== 'EEXIST' ) { 
-                RED.log.error(`cron-plus: Error creating persistence folder '${persistPath}'. ${e.message}`)
+                RED.log.error(`cron-plus: Error creating persistence folder '${persistPath}'. ${e.message}`);
                 persistAvailable = false;
             }
         }
@@ -784,7 +783,7 @@ module.exports = function (RED) {
                     obj[key] = obj[key] || {},
                     obj);
                 lastObj[lastKey] = val;
-            }
+            };
             set(msg, field, value);
         };
 
@@ -792,7 +791,7 @@ module.exports = function (RED) {
             let t = getNextTask(node.tasks);
             if(t){
                 let indicator = t.isDynamic ? "ring" : "dot";
-                let nx = (t._expression || t._sequence)
+                let nx = (t._expression || t._sequence);
                 node.nextDate = nx.nextDate(now);
                 node.nextEvent = t.name;
                 node.nextIndicator = indicator;
@@ -804,7 +803,7 @@ module.exports = function (RED) {
                 node.nextEvent = "";
                 node.nextIndicator = "";
             }
-        }
+        };
 
         const updateDoneStatus = (node, task) => {
             let indicator = "dot";
@@ -824,14 +823,14 @@ module.exports = function (RED) {
                     updateNextStatus(node, true);
                 }, 4000);
             }
-        }
+        };
 
-        const sendMsg = (node, task, crontimestamp, manualTrigger) => {
-            msg = {cronplus: {}};
+        const sendMsg = (node, task, cronTimestamp, manualTrigger) => {
+            var msg = { cronplus: {} };
             msg.topic = task.node_topic;
-            msg.cronplus.triggerTimestamp = crontimestamp;
+            msg.cronplus.triggerTimestamp = cronTimestamp;
             let se = task.node_expressionType == "solar" ? node.nextEvent : "";
-            msg.cronplus.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
+            msg.cronplus.status = getTaskStatus(node, task, { includeSolarStateOffset:true });
             if(se) msg.cronplus.status.solarEvent = se;
             msg.cronplus.config = exportTask(task);
             if(manualTrigger) msg.manualTrigger = true;
@@ -876,12 +875,12 @@ module.exports = function (RED) {
             } catch (err) {
                 node.error(err, msg);
             }
-        }
+        };
 
         function getTask(node,name){
             let task = node.tasks.find(function(task){
                 return task.name == name;
-            })
+            });
             return task;
         }
 
@@ -889,7 +888,7 @@ module.exports = function (RED) {
             opts = opts || {};
             let sol = task.node_expressionType === "solar";
             let exp = sol ? task.node_location : task.node_expression;
-            let h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts)
+            let h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts);
             let nextDescription = null;
             let nextDate = null;
             let running = !isTaskFinished(task);
@@ -903,8 +902,8 @@ module.exports = function (RED) {
             try {
                 localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 if(!tz) tz = localTZ;
-            } catch (error) {                    
-            }
+            // eslint-disable-next-line no-empty
+            } catch (error) { }
 
             let r = {
                 type: task.isDynamic ? "dynamic" : "static",
@@ -919,7 +918,7 @@ module.exports = function (RED) {
                 serverTime: new Date(),
                 serverTimeZone: localTZ,
                 description: h.description
-            }
+            };
             if(sol) {
                 r.solarState = h.solarState;
                 if(h.offset) r.solarStateOffset = h.solarStateOffset;
@@ -954,16 +953,17 @@ module.exports = function (RED) {
                         //index--;
                     }
                 }
+                // eslint-disable-next-line no-empty
                 catch(e){ }
                 updateNextStatus(node);
             }
         }
         function taskFilterMatch(task, filter) {
             if(!task) return false;
-            const isActive = function(task) { return isTaskFinished(task) == false && task.isRunning == true; }
-            const isInactive = function(task) { return isTaskFinished(task) || task.isRunning == false }
-            const isStatic = function(task) { return (task.isStatic == true || task.isDynamic == false); }
-            const isDynamic = function(task) { return (task.isDynamic == true || task.isStatic == false); }
+            const isActive = function(task) { return isTaskFinished(task) == false && task.isRunning == true; };
+            const isInactive = function(task) { return isTaskFinished(task) || task.isRunning == false; };
+            const isStatic = function(task) { return (task.isStatic == true || task.isDynamic == false); };
+            const isDynamic = function(task) { return (task.isDynamic == true || task.isStatic == false); };
             switch (filter) {
                 case "all":
                     return true;
@@ -1051,6 +1051,7 @@ module.exports = function (RED) {
                                 index--;
                             }
                         }             
+                    // eslint-disable-next-line no-empty
                     } catch (error) { } 
                 }
             }
@@ -1071,6 +1072,7 @@ module.exports = function (RED) {
                 task.off('stopped');
                 task.stop();
                 task = null;
+            // eslint-disable-next-line no-empty
             } catch (error) {}
         }        
         function updateTask(node,options,msg){
@@ -1089,7 +1091,7 @@ module.exports = function (RED) {
                     validateOpt(opt);                    
                 } catch (error) {
                     node.warn(error,msg);
-                    return
+                    return;
                 }
             }
 
@@ -1097,7 +1099,7 @@ module.exports = function (RED) {
                 let opt = options[index];
                 let task = getTask(node,opt.name);
                 let isDynamic = !task || task.isDynamic;
-                let isStatic = task && task.isStatic;
+                // let isStatic = task && task.isStatic;
                 let opCount = 0, modified = false;
                 if(task){
                     modified = true;
@@ -1115,11 +1117,11 @@ module.exports = function (RED) {
         }
         
         function createTask(node, opt, index, static) {
-            opt = opt || {}
+            opt = opt || {};
             try {
-                node.log(`createTask - index: ${index}, static: ${static}, opt: ${JSON.stringify(opt)}`)
+                node.log(`createTask - index: ${index}, static: ${static}, opt: ${JSON.stringify(opt)}`);
             } catch (error) {
-                node.error(error)
+                node.error(error);
             }
             applyOptionDefaults(opt, index);
             try {
@@ -1128,7 +1130,7 @@ module.exports = function (RED) {
                 node.warn(error);
                 let indicator = static ? "dot" : "ring";
                 node.status({ fill: "red", shape: indicator, text: error.message });
-                return null
+                return null;
             }
             let cronOpts = node.timeZone ? { timezone: node.timeZone } : undefined;
             let task;
@@ -1145,7 +1147,7 @@ module.exports = function (RED) {
             }
             task.isDynamic = !static;
             task.isStatic = static;
-            task.name = ""+opt.name;
+            task.name = "" + opt.name;
             task.node_topic = opt.topic;
             task.node_expressionType = opt.expressionType;
             task.node_expression = opt.expression;
@@ -1161,7 +1163,7 @@ module.exports = function (RED) {
             task.node_limit = opt.limit || 0;
             task.stop();
             task.on('run', (timestamp) => {
-                node.debug(`running '${task.name}' ~ '${task.node_topic}'\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
+                node.debug(`running '${task.name}' ~ '${task.node_topic}'\n now time ${new Date()}\n crontime ${new Date(timestamp)}`);
                 let indicator = task.isDynamic ? "ring" : "dot";
                 node.status({ fill: "green", shape: indicator, text: "Running " + formatShortDateTimeWithTZ(timestamp, node.timeZone) });
                 if(isTaskFinished(task)){
@@ -1169,7 +1171,7 @@ module.exports = function (RED) {
                         //using nextTick is a work around for an issue (#3) in cronosjs where the job restarts itself after this event handler has exited
                         task.stop();
                         updateNextStatus(node);
-                    })
+                    });
                     return;
                 } 
                 task.node_count = task.node_count + 1;//++ stops at 2147483647
@@ -1178,35 +1180,36 @@ module.exports = function (RED) {
                     if( task.node_expressionType === "solar" ){
                         updateTask(node,task.node_opt,null);
                     }
-                })
+                });
             })
             .on('ended', () => {
-                node.debug(`ended '${task.name}' ~ '${task.node_topic}'`)
+                node.debug(`ended '${task.name}' ~ '${task.node_topic}'`);
                 updateNextStatus(node);
             })
             .on('started', () => {
-                node.debug(`started '${task.name}' ~ '${task.node_topic}'`)
+                node.debug(`started '${task.name}' ~ '${task.node_topic}'`);
                 process.nextTick(function(){
                     updateNextStatus(node);
-                })
+                });
             })
             .on('stopped', () => {
-                node.debug(`stopped '${task.name}' ~ '${task.node_topic}'`)
+                node.debug(`stopped '${task.name}' ~ '${task.node_topic}'`);
                 updateNextStatus(node);
             });
             task.stop();//prevent bug where calling start without first calling stop causes events to bunch up
-            task.start()
+            task.start();
             node.tasks.push(task);
             return task;
         }
 
         function serialise(){
+            let filePath = "";
             try {
                 if(!persistAvailable || !node.persistDynamic){
                     return;
                 }  
-                let filePath = getPersistFilePath();
-                let dynNodes = node.tasks.filter((e)=>e && e.isDynamic)
+                filePath = getPersistFilePath();
+                let dynNodes = node.tasks.filter((e)=>e && e.isDynamic);
                 let exp = (t) => exportTask(t,false);
                 let dynNodesExp = dynNodes.map(exp);
                 /*if(!dynNodesExp || !dynNodesExp.length){
@@ -1219,20 +1222,21 @@ module.exports = function (RED) {
                 let data = {
                     version: 1,
                     schedules: dynNodesExp
-                }
+                };
                 let fileData = JSON.stringify(data);
                 fs.writeFileSync(filePath,fileData);
             } catch (e) {
-                RED.log.error(`cron-plus: Error saving persistence data '${filePath}'. ${e.message}`)
+                RED.log.error(`cron-plus: Error saving persistence data '${filePath}'. ${e.message}`);
             }
         }
 
         function deserialise(){
+            let filePath = "";
             try {
                 if(!persistAvailable || !node.persistDynamic){
                     return;
                 }
-                let filePath = getPersistFilePath();
+                filePath = getPersistFilePath();
                 if(fs.existsSync(filePath)){
                     let fileData = fs.readFileSync(filePath);
                     let data = JSON.parse(fileData);
@@ -1240,7 +1244,7 @@ module.exports = function (RED) {
                         return; //nothing to add
                     }
                     if(data.version != 1){
-                        throw new Error("Invalid version - cannot load dynamic schedules")
+                        throw new Error("Invalid version - cannot load dynamic schedules");
                     }
                     if(!data.schedules || !data.schedules.length){
                         return; //nothing to add
@@ -1251,15 +1255,15 @@ module.exports = function (RED) {
                         createTask(node, opt, iOpt, false);
                     }
                 } else {
-                    RED.log.log(`cron-plus: no persistence data found for node '${node.id}'.`)
+                    RED.log.log(`cron-plus: no persistence data found for node '${node.id}'.`);
                 }        
             } catch (error) {
-                RED.log.error(`cron-plus: Error loading persistence data '${filePath}'. ${e.message}`)
+                RED.log.error(`cron-plus: Error loading persistence data '${filePath}'. ${error.message}`);
             }            
         }
 
         function getPersistFilePath(){
-            let fileName = `node-${node.id}.json`
+            let fileName = `node-${node.id}.json`;
             return path.join(persistPath,fileName);
         }
 
@@ -1290,7 +1294,7 @@ module.exports = function (RED) {
 
         } catch (err) {
             if (node.tasks) {
-                node.tasks.forEach(task => task.stop())
+                node.tasks.forEach(task => task.stop());
             }
             node.status({ fill: "red", shape: "dot", text: "Error creating schedule" });
             node.error(err);
@@ -1334,7 +1338,7 @@ module.exports = function (RED) {
                 let runningTasks = tasks.filter(function(task){
                     let finished = isTaskFinished(task);
                     return task.isRunning && (task._expression || task._sequence) && !finished;
-                })
+                });
                 if(!runningTasks || !runningTasks.length){
                     return null;
                 }
@@ -1349,8 +1353,8 @@ module.exports = function (RED) {
                         // let p, c; 
                         if(!prev) return current;
                         if(!current) return prev;
-                        let px = (prev._expression || prev._sequence)
-                        let cx = (current._expression || current._sequence)
+                        let px = (prev._expression || prev._sequence);
+                        let cx = (current._expression || current._sequence);
                         return (px.nextDate(now) < cx.nextDate(now)) ? prev : current;
                     });
                 }
@@ -1390,7 +1394,7 @@ module.exports = function (RED) {
                     idx = cmdOutputPin;
                     break;
             }
-            var arr = Array(outputCount||(idx+1));
+            var arr = Array(outputCount || (idx + 1));
             arr.fill(null);
             arr[idx] = msg;
             return arr;
@@ -1400,7 +1404,7 @@ module.exports = function (RED) {
             try {
                 serialise();
             } catch (error) {
-                node.error(error, msg)
+                node.error(error);
             }
             deleteAllTasks(this);
             if(clockMonitor) clearInterval(clockMonitor);
@@ -1408,7 +1412,7 @@ module.exports = function (RED) {
         });
 
         this.on("input", function (msg, send, done) {
-            send = send || function() { node.send.apply(node,arguments) }
+            send = send || function() { node.send.apply(node,arguments); };
             done = done || function(err) {
                 if(err){
                     node.error(err,msg);
@@ -1443,11 +1447,11 @@ module.exports = function (RED) {
                     payload = {
                         command: controlTopic.command,
                         name: payload
-                    }
+                    };
                 } else {
                     payload = {
                         command: controlTopic.command
-                    }
+                    };
                 }
             }
 
@@ -1462,13 +1466,13 @@ module.exports = function (RED) {
                 }
                 var sendCommandResponse = function(msg){
                     send(generateSendMsg(node, msg, "command-response"));
-                }
+                };
                 for (let i = 0; i < input.length; i++) {
                     let cmd = input[i];
                     let action = cmd.command || "";
                     // let newMsg = {topic: msg.topic, payload:{command:cmd, result:{}}};
                     let newMsg = RED.util.cloneMessage(msg);
-                    newMsg.payload = {command:cmd, result:{}};
+                    newMsg.payload = { command:cmd, result:{} };
                     let cmd_all = action.endsWith("-all");
                     let cmd_all_static = action.endsWith("-all-static");
                     let cmd_all_dynamic = action.endsWith("-all-dynamic");
@@ -1504,22 +1508,26 @@ module.exports = function (RED) {
 
                     switch (mainAction) {
                         case "trigger": //single
-                            let tt = getTask(node, cmd.name);
-                            if(!tt) throw new Error(`Manual Trigger failed. Cannot find schedule named '${cmd.name}'`);
-                            sendMsg(node, tt, Date.now(), true);
+                            {
+                                let tt = getTask(node, cmd.name);
+                                if(!tt) throw new Error(`Manual Trigger failed. Cannot find schedule named '${cmd.name}'`);
+                                sendMsg(node, tt, Date.now(), true);
+                            }
                             break;
                         case "describe": //single
-                            let exp = (cmd.expressionType === "solar") ? cmd.location : cmd.expression;
-                            applyOptionDefaults(cmd);
-                            newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, {includeSolarStateOffset:true});
-                            sendCommandResponse(newMsg);
+                            {
+                                let exp = (cmd.expressionType === "solar") ? cmd.location : cmd.expression;
+                                applyOptionDefaults(cmd);
+                                newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset:true });
+                                sendCommandResponse(newMsg);
+                            }
                             break;
                         case "status": //single
                             {
                                 let task = getTask(node,cmd.name);
                                 if(task){
                                     newMsg.payload.result.config = exportTask(task, true);
-                                    newMsg.payload.result.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
+                                    newMsg.payload.result.status = getTaskStatus(node, task, { includeSolarStateOffset:true });
                                 } else {
                                     newMsg.error = `${cmd.name} not found`;
                                 }
@@ -1548,7 +1556,7 @@ module.exports = function (RED) {
                                         if( task && (cmd_all || taskFilterMatch(task, cmd_filter)) ) {
                                             let result = {};
                                             result.config = exportTask(task, true);
-                                            result.status = getTaskStatus(node, task, {includeSolarStateOffset:true});
+                                            result.status = getTaskStatus(node, task, { includeSolarStateOffset:true });
                                             results.push(result);    
                                         }
                                     }
@@ -1576,20 +1584,20 @@ module.exports = function (RED) {
                         case "update": //single
                             updateTask(node,cmd,msg);
                             updateNextStatus(node, true);
-                            serialise();
+                            serialise();//update persistent
                             break;
                         case "clear":
                         case "remove-": //multiple
                         case "delete-": //multiple
                             deleteAllTasks(node,cmd_filter);
                             updateNextStatus(node,true);
-                            serialise();
+                            serialise();//update persistent
                             break;
                         case "remove": //single
                         case "delete": //single
                             deleteTask(node,cmd.name);
                             updateNextStatus(node,true);
-                            serialise();
+                            serialise();//update persistent
                             break;
                         case "start": //single
                             startTask(node,cmd.name);
@@ -1612,8 +1620,8 @@ module.exports = function (RED) {
                             }
                             break;
                         case "debug":{
-                                let task = getTask(node,cmd.name)
-                                let thisDebug = getTaskStatus(node, task, {includeSolarStateOffset:true});
+                                let task = getTask(node,cmd.name);
+                                let thisDebug = getTaskStatus(node, task, { includeSolarStateOffset:true });
                                 thisDebug.name = task.name;
                                 thisDebug.topic = task.node_topic;
                                 thisDebug.expressionType = task.node_expressionType;
@@ -1632,7 +1640,7 @@ module.exports = function (RED) {
                                     for (let index = 0; index < node.tasks.length; index++) {
                                         const task = node.tasks[index];
                                         if( cmd_all || taskFilterMatch(task, cmd_filter) ) {
-                                            let thisDebug = getTaskStatus(node, task, {includeSolarStateOffset:true});
+                                            let thisDebug = getTaskStatus(node, task, { includeSolarStateOffset:true });
                                             thisDebug.name = task.name;
                                             thisDebug.topic = task.node_topic;
                                             thisDebug.expressionType = task.node_expressionType;
@@ -1682,7 +1690,7 @@ module.exports = function (RED) {
             if(operation == "expressionTip"){
                 let timeZone = req.body.timeZone ? req.body.timeZone : undefined;
                 let expressionType = req.body.expressionType ? req.body.expressionType : undefined;
-                var opts = {expression: req.body.expression};
+                var opts = { expression: req.body.expression };
                 if(timeZone) opts.timezone = timeZone;
                 if(expressionType) {
                     opts.expressionType = expressionType;
@@ -1694,7 +1702,7 @@ module.exports = function (RED) {
                     }
                 }
                 let exp = (opts.expressionType === "solar") ? opts.location : opts.expression;
-                let h = _describeExpression(exp, opts.expressionType, opts.timezone, opts.offset, opts.solarType, opts.solarEvents, null)
+                let h = _describeExpression(exp, opts.expressionType, opts.timezone, opts.offset, opts.solarType, opts.solarEvents, null);
                 let r = null;
                 if(opts.expressionType == "solar"){
                     let times = h.eventTimes && h.eventTimes.slice(1); 
@@ -1732,11 +1740,11 @@ module.exports = function (RED) {
                 let node = RED.nodes.getNode(req.params.id); 
                 if(!node){
                     res.json([]);
-                    return
+                    return;
                 }
-                let dynNodes = node.tasks.filter((e)=>e&&e.isDynamic)
+                let dynNodes = node.tasks.filter((e)=>e && e.isDynamic);
                 let exp = (t) => exportTask(t,false);
-                let dynNodesExp = dynNodes.map(exp)
+                let dynNodesExp = dynNodes.map(exp);
                 res.json(dynNodesExp);
             } else if(operation == "tz") {
                 res.json(timeZones);
@@ -1744,7 +1752,7 @@ module.exports = function (RED) {
     
         } catch (err) {
             res.sendStatus(500);
-            console.error(err)
+            console.error(err);
         }
     });
 
@@ -2102,4 +2110,4 @@ const timeZones = [
     { "code": "TO", "latLon": "-2110-17510", "tz": "Pacific/Tongatapu", "UTCOffset": "+13:00", "UTCDSTOffset": "+14:00" },
     { "code": "UM", "latLon": "18554", "tz": "Pacific/Wake", "UTCOffset": "+12:00", "UTCDSTOffset": "+12:00" },
     { "code": "WF", "latLon": "-1318-17610", "tz": "Pacific/Wallis", "UTCOffset": "+12:00", "UTCDSTOffset": "+12:00" },
-]
+];

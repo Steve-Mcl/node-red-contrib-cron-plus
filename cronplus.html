@@ -16,6 +16,8 @@ copies or substantial portions of the Software.
 -->
 
 <script type="text/javascript">
+/* global RED, $, jQuery */
+/* global cartodb, L */
 
 (function($) {
     "use strict";
@@ -46,7 +48,7 @@ copies or substantial portions of the Software.
         SOFTWARE.
     */
 
-    var cronInputs={
+    var cronInputs = {
         period: '<div class="cron-select-period"><label></label><select class="cron-period-select"></select></div>',
         startTime: '<div class="cron-input cron-start-time">Start time <select class="cron-clock-hour"></select>:<select class="cron-clock-minute"></select></div>',
         container: '<div class="cron-input"></div>',
@@ -57,18 +59,18 @@ copies or substantial portions of the Software.
         hourly: {
             tag: 'cron-hourly',
             inputs: [ '<p><input type="radio" name="hourlyType" value="every"> Every <select class="cron-hourly-select"></select> hour(s)</p>',
-                '<p><input type="radio" name="hourlyType" value="clock"> Every day at <select class="cron-hourly-hour"></select>:<select class="cron-hourly-minute"></select></p>']
+                '<p><input type="radio" name="hourlyType" value="clock"> Every day at <select class="cron-hourly-hour"></select>:<select class="cron-hourly-minute"></select></p>' ]
         },
         daily: {
             tag: 'cron-daily',
             inputs: [ '<p><input type="radio" name="dailyType" value="every"> Every <select class="cron-daily-select"></select> day(s)</p>',
-                '<p><input type="radio" name="dailyType" value="clock"> Every week day</p>']
+                '<p><input type="radio" name="dailyType" value="clock"> Every week day</p>' ]
         },
         weekly: {
             tag: 'cron-weekly',
-            inputs: [ '<p><input type="checkbox" name="dayOfWeekMon"> Monday  <input type="checkbox" name="dayOfWeekTue"> Tuesday  '+ 
+            inputs: [ '<p><input type="checkbox" name="dayOfWeekMon"> Monday  <input type="checkbox" name="dayOfWeekTue"> Tuesday  ' + 
                 '<input type="checkbox" name="dayOfWeekWed"> Wednesday  <input type="checkbox" name="dayOfWeekThu"> Thursday</p>', 
-                '<p><input type="checkbox" name="dayOfWeekFri"> Friday  <input type="checkbox" name="dayOfWeekSat"> Saturday  '+ 
+                '<p><input type="checkbox" name="dayOfWeekFri"> Friday  <input type="checkbox" name="dayOfWeekSat"> Saturday  ' + 
                 '<input type="checkbox" name="dayOfWeekSun"> Sunday</p>' ]
         },
         monthly: {
@@ -85,27 +87,27 @@ copies or substantial portions of the Software.
         }
     };
 
-    var periodOpts=arrayToOptions(["Minutes", "Hourly", "Daily", "Weekly", "Monthly", "Yearly"]);
-    var minuteOpts=rangeToOptions(1, 59);
-    var hourOpts=rangeToOptions(1, 24);
-    var dayOpts=rangeToOptions(1, 31);
-    var minuteClockOpts=rangeToOptions(0, 59, true);
-    var hourClockOpts=rangeToOptions(0, 23, true);
-    var dayInMonthOpts=rangeToOptions(1, 31);
-    var monthOpts=arrayToOptions(["January","February","March","April","May","June","July","August","September","October","November","December"],
+    var periodOpts = arrayToOptions(["Minutes", "Hourly", "Daily", "Weekly", "Monthly", "Yearly"]);
+    var minuteOpts = rangeToOptions(1, 59);
+    var hourOpts = rangeToOptions(1, 24);
+    var dayOpts = rangeToOptions(1, 31);
+    var minuteClockOpts = rangeToOptions(0, 59, true);
+    var hourClockOpts = rangeToOptions(0, 23, true);
+    var dayInMonthOpts = rangeToOptions(1, 31);
+    var monthOpts = arrayToOptions(["January","February","March","April","May","June","July","August","September","October","November","December"],
                                     [1,2,3,4,5,6,7,8,9,10,11,12]);
-    var monthNumOpts=rangeToOptions(1, 12);
-    var nthWeekOpts=arrayToOptions(["First", "Second", "Third", "Forth", "Last"], [1,2,3,4,"L"]);
-    var dayOfWeekOpts=arrayToOptions(["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday", "Sunday"], ["MON","TUE","WED","THU","FRI","SAT", "SUN"]);
+    var monthNumOpts = rangeToOptions(1, 12);
+    var nthWeekOpts = arrayToOptions(["First", "Second", "Third", "Forth", "Last"], [1,2,3,4,"L"]);
+    var dayOfWeekOpts = arrayToOptions(["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday", "Sunday"], ["MON","TUE","WED","THU","FRI","SAT", "SUN"]);
     
     
     // Convert an array of values to options to append to select input
     function arrayToOptions(opts, values) {
-        var inputOpts='';
+        var inputOpts = '';
         for (var i = 0; i < opts.length; i++) {
-            var value=opts[i];
-            if(values!=null) value=values[i];
-            inputOpts += "<option value='"+value+"'>" + opts[i] + "</option>\n";
+            var value = opts[i];
+            if(values != null) value = values[i];
+            inputOpts += "<option value='" + value + "'>" + opts[i] + "</option>\n";
             
         }
         return inputOpts;
@@ -113,11 +115,11 @@ copies or substantial portions of the Software.
     
     // Convert an integer range to options to append to select input
     function rangeToOptions(start, end, isClock) {
-        var inputOpts='', label;
+        var inputOpts = '', label;
         for (var i = start; i <= end; i++) {
             if(isClock && i < 10) label = "0" + i;
             else label = i;
-            inputOpts += "<option value='"+i+"'>" + label + "</option>\n";
+            inputOpts += "<option value='" + i + "'>" + label + "</option>\n";
         }
         return inputOpts;
     }
@@ -125,14 +127,14 @@ copies or substantial portions of the Software.
     // Add input elements to UI as defined in cronInputs
     function addInputElements($baseEl, inputObj, onFinish) {
         $(cronInputs.container).addClass(inputObj.tag).appendTo($baseEl);
-        $baseEl.children("."+inputObj.tag).append(inputObj.inputs);
+        $baseEl.children("." + inputObj.tag).append(inputObj.inputs);
         if(typeof onFinish === "function") onFinish();
     }
     
-    var eventHandlers={
+    var eventHandlers = {
         periodSelect: function() {
-            var period=($(this).val());
-            var $selector=$(this).parent();
+            var period = ($(this).val());
+            var $selector = $(this).parent();
             $selector.siblings('div.cron-input').hide();
             $selector.siblings().find("select option").removeAttr("selected");
             $selector.siblings().find("select option:first").attr("selected", "selected");
@@ -146,14 +148,14 @@ copies or substantial portions of the Software.
                     $selector.siblings('div.cron-start-time').hide();
                     break;
                 case 'Hourly':
-                    var $hourlyEl=$selector.siblings('div.cron-hourly');
+                    var $hourlyEl = $selector.siblings('div.cron-hourly');
                     $hourlyEl.show()
                         .find("input[name=hourlyType][value=every]").prop('checked', true);
                     $hourlyEl.find("select.cron-hourly-hour").val('12');
                     $selector.siblings('div.cron-start-time').hide();
                     break;
                 case 'Daily':
-                    var $dailyEl=$selector.siblings('div.cron-daily');
+                    var $dailyEl = $selector.siblings('div.cron-daily');
                     $dailyEl.show()
                         .find("input[name=dailyType][value=every]").prop('checked', true);
                     break;
@@ -163,12 +165,12 @@ copies or substantial portions of the Software.
                         .find("input[type=checkbox]").prop('checked', false);
                     break;
                 case 'Monthly':
-                    var $monthlyEl=$selector.siblings('div.cron-monthly');
+                    var $monthlyEl = $selector.siblings('div.cron-monthly');
                     $monthlyEl.show()
                         .find("input[name=monthlyType][value=byDay]").prop('checked', true);
                     break;
                 case 'Yearly':
-                    var $yearlyEl=$selector.siblings('div.cron-yearly');
+                    var $yearlyEl = $selector.siblings('div.cron-yearly');
                     $yearlyEl.show()
                         .find("input[name=yearlyType][value=byDay]").prop('checked', true);
                     break;                    
@@ -181,8 +183,8 @@ copies or substantial portions of the Software.
         var base = this;
         
         // Access to jQuery and DOM versions of element
-        base.$el=$(el);
-        base.el=el;
+        base.$el = $(el);
+        base.el = el;
         
         // Reverse reference to the DOM object
         base.$el.data('cronBuilder', base);
@@ -244,104 +246,116 @@ copies or substantial portions of the Software.
             base.$el.find("select.cron-period-select")
                 .triggerHandler("change");
             
-        }
+        };
         
         base.getExpression = function() {
             //var b = c.data("block");
             var sec = 0; // ignoring seconds by default
             var year = "*"; // every year by default
             var dow = "?";
-            var month ="*", dom = "*";
-            var min=base.$el.find("select.cron-clock-minute").val();
-            var hour=base.$el.find("select.cron-clock-hour").val();
+            var month = "*", dom = "*";
+            var min = base.$el.find("select.cron-clock-minute").val();
+            var hour = base.$el.find("select.cron-clock-hour").val();
             var period = base.$el.find("select.cron-period-select").val();
             switch (period) {
                 case 'Minutes':
-                    var $selector=base.$el.find("div.cron-minutes");
-                    var nmin=$selector.find("select.cron-minutes-select").val();
-                    if(nmin > 1) min ="0/"+nmin;
-                    else min="*";
-                    hour="*";
+                    {
+                        let $selector = base.$el.find("div.cron-minutes");
+                        let nmin = $selector.find("select.cron-minutes-select").val();
+                        if(nmin > 1) min = "0/" + nmin;
+                        else min = "*";
+                        hour = "*";
+                    }
                     break;
                     
                 case 'Hourly':
-                    var $selector=base.$el.find("div.cron-hourly");
-                    if($selector.find("input[name=hourlyType][value=every]").is(":checked")){
-                        min=0;
-                        hour="*";
-                        var nhour=$selector.find("select.cron-hourly-select").val();
-                        if(nhour > 1) hour ="0/"+nhour;
-                    } else {
-                        min=$selector.find("select.cron-hourly-minute").val();
-                        hour=$selector.find("select.cron-hourly-hour").val();
+                    {
+                        let $selector = base.$el.find("div.cron-hourly");
+                        if($selector.find("input[name=hourlyType][value=every]").is(":checked")){
+                            min = 0;
+                            hour = "*";
+                            var nhour = $selector.find("select.cron-hourly-select").val();
+                            if(nhour > 1) hour = "0/" + nhour;
+                        } else {
+                            min = $selector.find("select.cron-hourly-minute").val();
+                            hour = $selector.find("select.cron-hourly-hour").val();
+                        }
                     }
                     break;
     
                 case 'Daily':
-                    var $selector=base.$el.find("div.cron-daily");
-                    if($selector.find("input[name=dailyType][value=every]").is(":checked")){
-                        var ndom=$selector.find("select.cron-daily-select").val();
-                        if(ndom > 1) dom ="1/"+ndom;
-                    } else {
-                        dom="?";
-                        dow="MON-FRI";
+                    {
+                        let $selector = base.$el.find("div.cron-daily");
+                        if($selector.find("input[name=dailyType][value=every]").is(":checked")){
+                            var ndom = $selector.find("select.cron-daily-select").val();
+                            if(ndom > 1) dom = "1/" + ndom;
+                        } else {
+                            dom = "?";
+                            dow = "MON-FRI";
+                        }
                     }
                     break;
     
                 case 'Weekly':
-                    var $selector=base.$el.find("div.cron-weekly");
-                    var ndow=[];
-                    if($selector.find("input[name=dayOfWeekMon]").is(":checked"))
-                        ndow.push("MON");
-                    if($selector.find("input[name=dayOfWeekTue]").is(":checked"))
-                        ndow.push("TUE");
-                    if($selector.find("input[name=dayOfWeekWed]").is(":checked"))
-                        ndow.push("WED");
-                    if($selector.find("input[name=dayOfWeekThu]").is(":checked"))
-                        ndow.push("THU");
-                    if($selector.find("input[name=dayOfWeekFri]").is(":checked"))
-                        ndow.push("FRI");
-                    if($selector.find("input[name=dayOfWeekSat]").is(":checked"))
-                        ndow.push("SAT");
-                    if($selector.find("input[name=dayOfWeekSun]").is(":checked"))
-                        ndow.push("SUN");
-                    dow="*";
-                    dom="?";
-                    if(ndow.length < 7 && ndow.length > 0) dow=ndow.join(",");
+                    {
+                        let $selector = base.$el.find("div.cron-weekly");
+                        let ndow = [];
+                        if($selector.find("input[name=dayOfWeekMon]").is(":checked"))
+                            ndow.push("MON");
+                        if($selector.find("input[name=dayOfWeekTue]").is(":checked"))
+                            ndow.push("TUE");
+                        if($selector.find("input[name=dayOfWeekWed]").is(":checked"))
+                            ndow.push("WED");
+                        if($selector.find("input[name=dayOfWeekThu]").is(":checked"))
+                            ndow.push("THU");
+                        if($selector.find("input[name=dayOfWeekFri]").is(":checked"))
+                            ndow.push("FRI");
+                        if($selector.find("input[name=dayOfWeekSat]").is(":checked"))
+                            ndow.push("SAT");
+                        if($selector.find("input[name=dayOfWeekSun]").is(":checked"))
+                            ndow.push("SUN");
+                        dow = "*";
+                        dom = "?";
+                        if(ndow.length < 7 && ndow.length > 0) dow = ndow.join(",");
+                    }
                     break;
     
                 case 'Monthly':
-                    var $selector=base.$el.find("div.cron-monthly");
-                    var nmonth;
-                    var mnd;
-                    if($selector.find("input[name=monthlyType][value=byDay]").is(":checked")){
-                        month="*";
-                        nmonth=$selector.find("select.cron-monthly-month").val();
-                        dom=$selector.find("select.cron-monthly-day").val();
-                        dow="?";
-                    } else {
-                        mnd = $selector.find("select.cron-monthly-nth-day").val();
-                        dow=$selector.find("select.cron-monthly-day-of-week").val()
-                            + (mnd == "L" ? "L" : "#"+mnd);
-                        nmonth=$selector.find("select.cron-monthly-month-by-week").val();
-                        dom="?";
+                    {
+                        let $selector = base.$el.find("div.cron-monthly");
+                        let nmonth;
+                        let mnd;
+                        if($selector.find("input[name=monthlyType][value=byDay]").is(":checked")){
+                            month = "*";
+                            nmonth = $selector.find("select.cron-monthly-month").val();
+                            dom = $selector.find("select.cron-monthly-day").val();
+                            dow = "?";
+                        } else {
+                            mnd = $selector.find("select.cron-monthly-nth-day").val();
+                            dow = $selector.find("select.cron-monthly-day-of-week").val()
+                                + (mnd == "L" ? "L" : "#" + mnd);
+                            nmonth = $selector.find("select.cron-monthly-month-by-week").val();
+                            dom = "?";
+                        }
+                        if(nmonth > 1) month = "1/" + nmonth;
                     }
-                    if(nmonth > 1) month ="1/"+nmonth;
                     break;
     
                 case 'Yearly':
-                    var $selector=base.$el.find("div.cron-yearly");
-                    var ynd;
-                    if($selector.find("input[name=yearlyType][value=byDay]").is(":checked")){
-                        dom=$selector.find("select.cron-yearly-day").val();
-                        month=$selector.find("select.cron-yearly-month").val();
-                        dow="?";
-                    } else {
-                        ynd = $selector.find("select.cron-yearly-nth-day").val();
-                        dow=$selector.find("select.cron-yearly-day-of-week").val()
-                            + (ynd == "L" ? "L" : "#"+ynd);
-                        month=$selector.find("select.cron-yearly-month-by-week").val();
-                        dom="?";
+                    {
+                        let $selector = base.$el.find("div.cron-yearly");
+                        let ynd;
+                        if($selector.find("input[name=yearlyType][value=byDay]").is(":checked")){
+                            dom = $selector.find("select.cron-yearly-day").val();
+                            month = $selector.find("select.cron-yearly-month").val();
+                            dow = "?";
+                        } else {
+                            ynd = $selector.find("select.cron-yearly-nth-day").val();
+                            dow = $selector.find("select.cron-yearly-day-of-week").val()
+                                + (ynd == "L" ? "L" : "#" + ynd);
+                            month = $selector.find("select.cron-yearly-month-by-week").val();
+                            dom = "?";
+                        }
                     }
                     break;
     
@@ -357,7 +371,6 @@ copies or substantial portions of the Software.
     // Plugin default options
     $.cronBuilder.defaultOptions = {
         selectorLabel: "Select period: "
-        
     };    
 
     // Plugin definition 
@@ -375,36 +388,37 @@ copies or substantial portions of the Software.
     var debug = false;
     var map, mapPopup, selectedLocation, selectedLocationInput;
 
-    var filesAdded=[] //list of files already added 
+    var filesAdded = []; //list of files already added 
     function checkLoadJsCssFile(filename, filetype, callback){
-        if (filesAdded.indexOf(filename)===-1){
+        if (filesAdded.indexOf(filename) === -1){
             loadJsCssFile(filename, filetype, function(){
                 filesAdded.push(filename);
                 if(callback) callback();
-            })
+            });
         } else {
             if (callback) callback();
         }
     }
 
     function loadJsCssFile(filename, filetype, callback){
-        if (filetype=="js"){ //if filename is a external JavaScript file
-            var fileRef=document.createElement('script')
-            fileRef.setAttribute("type","text/javascript")
-            fileRef.setAttribute("src", filename)
+        var fileRef;
+        if (filetype == "js"){ //if filename is a external JavaScript file
+            fileRef = document.createElement('script');
+            fileRef.setAttribute("type","text/javascript");
+            fileRef.setAttribute("src", filename);
         }
-        else if (filetype=="css"){ //if filename is an external CSS file
-            var fileRef=document.createElement("link")
-            fileRef.setAttribute("rel", "stylesheet")
-            fileRef.setAttribute("type", "text/css")
-            fileRef.setAttribute("href", filename)
+        else if (filetype == "css"){ //if filename is an external CSS file
+            fileRef = document.createElement("link");
+            fileRef.setAttribute("rel", "stylesheet");
+            fileRef.setAttribute("type", "text/css");
+            fileRef.setAttribute("href", filename);
         }
-        if (typeof fileRef!="undefined")
-            document.getElementsByTagName("head")[0].appendChild(fileRef)
+        if (typeof fileRef != "undefined")
+            document.getElementsByTagName("head")[0].appendChild(fileRef);
 
         fileRef.onload = function() {
             if (callback) callback();
-        }
+        };
     }
   
     function safeFloat(value, def) {
@@ -451,7 +465,7 @@ copies or substantial portions of the Software.
         }
     }
 
-    function showSidebarHelpPanel(){
+    function showSidebarHelpPanel(){ 
         if(RED.sidebar.help) {
             RED.sidebar.help.show();//  >= V1.1.0
         } else {
@@ -479,14 +493,14 @@ copies or substantial portions of the Software.
         var latlon = srcInput.val();
         if(latlon){
             var splitChar = " ";
-            if(latlon.includes(",")) splitChar = ","
-            var arrLatlon = latlon.split(" ");
+            if(latlon.includes(",")) splitChar = ",";
+            var arrLatlon = latlon.split(splitChar);
             if(arrLatlon.length >= 2){
                 lat = arrLatlon[0];
                 lon = arrLatlon[1];
             }
         }
-        if(debug) console.log("createMap", lat, lon)
+        if(debug) console.log("createMap", lat, lon);
         var zoom = 3;//by default, zoomed out
         var showPopupOnOpen = false;
         if (lat != undefined && lon != undefined) {
@@ -495,9 +509,9 @@ copies or substantial portions of the Software.
         }
         lat = safeFloat(lat, 50.0);
         lon = safeFloat(lon, 0.0);
-        if(debug) console.log("lat/lon", lat, lon)
+        if(debug) console.log("lat/lon", lat, lon);
         selectedLocation = window.L.latLng(lat, lon);
-        if(debug) console.log("selectedLocation", selectedLocation.lat, selectedLocation.lng)
+        if(debug) console.log("selectedLocation", selectedLocation.lat, selectedLocation.lng);
 
         // create leaflet map
         map = window.L.map('cron-plus-map', {
@@ -516,14 +530,14 @@ copies or substantial portions of the Software.
                     if (x < -90.0) {   x = (90.0 - ((-x) - 90)); }
                 }
                 return x;
-            }
+            };
             var normaliseLng = function(x) {
                 while (x > 180.0 || x < -180.0) {
                     if (x > 180.0) {   x = -(180.0 - (x - 180)); }
                     if (x < -180.0) {   x = (180.0 - ((-x) - 180)); }
                 }
                 return x;
-            }
+            };
             selectedLocation = {};
             selectedLocation.lat = normaliseLat(e.latlng.lat);
             selectedLocation.lng = normaliseLng(e.latlng.lng);
@@ -567,33 +581,34 @@ copies or substantial portions of the Software.
                     showMapPopup(selectedLocation.lat, selectedLocation.lng, map);
                 }
 
+                // eslint-disable-next-line no-unused-vars
                 layer.on('featureClick', function (e, latlng, pos, data, layer) {
                     if(debug) console.log("click", latlng, data);
                 });
-                $( "#cron-plus-map-dialog" ).dialog("option", "position", {my: "center", at: "center", of: window});
+                $( "#cron-plus-map-dialog" ).dialog("option", "position", { my: "center", at: "center", of: window });
             });
 
     }
 
 
     function updateEditorLayout(){
-        if(debug) console.log("cronplus-updateEditorLayout")
+        if(debug) console.log("cronplus-updateEditorLayout");
         var dlg = $("#dialog-form");
         var height = dlg.height() - 5;
         var expandRow = dlg.find('.form-row-auto-height');
         if(expandRow && expandRow.length){
             let childRows = dlg.find('.form-row:not(.form-row-auto-height)');
-            for (var i=0; i<childRows.size(); i++) {
+            for (var i = 0; i < childRows.size(); i++) {
                 var cr = $(childRows[i]);
                 if(cr.is(":visible"))
                     height -= cr.outerHeight(true);
             }
-            expandRow.css("height",height+"px");
+            expandRow.css("height",height + "px");
         } 
     }
 
     function JSONtoTable(data, header, placeholder, options) {
-        if(debug) console.log("JSONtoTable")
+        if(debug) console.log("JSONtoTable");
         options = options || {};
         if(!data || !data.length){
             $('<div class="ui-dialog-title"/>' + (options.emptyMessage || 'no data') + '<div>').appendTo(placeholder);
@@ -645,16 +660,16 @@ copies or substantial portions of the Software.
             }
 
             ["Right","Left"].forEach(function(d) {
-                var m = that.element.css("margin"+d);
-                that.uiSelect.css("margin"+d,m);
-                that.input.css("margin"+d,1);
+                var m = that.element.css("margin" + d);
+                that.uiSelect.css("margin" + d,m);
+                that.input.css("margin" + d,1);
             });
 
             this.uiSelect.addClass("red-ui-typedInput-container");
 
             this.input.on('change', function() {
                 that.validate();
-            })
+            });
 
             this.button = $('<button tabindex="0" class="red-ui-typedInput-option-expand" style="display:inline-block;width: 20px"><span class="red-ui-typedInput-option-caret"><i class="red-ui-typedInput-icon fa fa-caret-down"></i></span></button>').appendTo(this.uiSelect);
             // this.buttonLabel = $('<span class="red-ui-typedInput-option-label"></span>').prependTo(this.button);
@@ -675,7 +690,7 @@ copies or substantial portions of the Software.
             this.menu = this._createMenu(this.options.menu);
         },
         _createMenu: function(options) {
-            if(debug) console.log("combobox -> _createMenu  options:", options)
+            if(debug) console.log("combobox -> _createMenu  options:", options);
             var that = this;
             this.disarmClick = false;
             options = options || {};
@@ -685,25 +700,25 @@ copies or substantial portions of the Software.
             var menuItems = options.menu || [];
             menuItems.forEach(function(opt) {
                 if (typeof opt === 'string') {
-                    opt = {value:opt,label:opt};
+                    opt = { value:opt,label:opt };
                 }
                 var op = $('<a href="#"></a>').attr("value",opt.value).appendTo(menu);
                 if (opt.label) {
                     op.text(opt.label);
                 }
                 if (opt.title) {
-                    op.prop('title', opt.title)
+                    op.prop('title', opt.title);
                 }
                 if (opt.icon) {
                     if (opt.icon.indexOf("<") === 0) {
                         $(opt.icon).prependTo(op);
                     } else if (opt.icon.indexOf("/") !== -1) {
-                        $('<img>',{src:mapDeprecatedIcon(opt.icon),style:"margin-right: 4px; height: 18px;"}).prependTo(op);
+                        $('<img>',{ src:opt.icon,style:"margin-right: 4px; height: 18px;" }).prependTo(op);
                     } else {
-                        $('<i>',{class:"red-ui-typedInput-icon "+opt.icon}).prependTo(op);
+                        $('<i>',{ class:"red-ui-typedInput-icon " + opt.icon }).prependTo(op);
                     }
                 } else {
-                    op.css({paddingLeft: "18px"});
+                    op.css({ paddingLeft: "18px" });
                 }
                 if (!opt.icon && !opt.label) {
                     op.text(opt.value);
@@ -720,7 +735,7 @@ copies or substantial portions of the Software.
                         if(callback){
                             that.value(callback(opt.value));
                         } else {
-                            that.value(opt.value)
+                            that.value(opt.value);
                         }
                     }
                     
@@ -742,7 +757,7 @@ copies or substantial portions of the Software.
                     that._hideMenu(menu);
                 }
                 evt.stopPropagation();
-            })
+            });
             return menu;
 
         },
@@ -767,7 +782,7 @@ copies or substantial portions of the Software.
         _showMenu: function(menu,relativeTo) {
             if (this.disarmClick) {
                 this.disarmClick = false;
-                return
+                return;
             }
             var that = this;
             //var pos = relativeTo.offset();
@@ -776,21 +791,21 @@ copies or substantial portions of the Software.
             var height = this.uiSelect.height();
             var menuHeight = menu.height();
             var menuWidth = menu.width();
-            var top = (height+pos.top);
+            var top = (height + pos.top);
             var left = pos.left;
-            if (left+menuWidth > $(window).width()) {
-                left -= (left+menuWidth)-$(window).width()+5;
+            if (left + menuWidth > $(window).width()) {
+                left -= (left + menuWidth) - $(window).width() + 5;
             }
-            if (top+menuHeight > $(window).height()) {
-                top -= (top+menuHeight)-$(window).height()+5;
+            if (top + menuHeight > $(window).height()) {
+                top -= (top + menuHeight) - $(window).height() + 5;
             }
             if (top < 0) {
-                menu.height(menuHeight+top)
+                menu.height(menuHeight + top);
                 top = 0;
             }
             menu.css({
-                top: top+"px",
-                left: (left)+"px",
+                top: top + "px",
+                left: (left) + "px",
             });
             menu.slideDown(100);
             this._delay(function() {
@@ -803,7 +818,7 @@ copies or substantial portions of the Software.
                         that.disarmClick = true;
                         event.preventDefault();
                     }
-                })
+                });
             });
         },
         _destroy: function () {
@@ -872,7 +887,7 @@ copies or substantial portions of the Software.
             commandResponseMsgOutput: { value: "output1" },
             outputs: { value: 1 },
             options: {
-                value:[{payload: '', topic : '', expression : ''}], 
+                value:[{ payload: '', topic : '', expression : '' }], 
                 validate:function(value) { 
                     var dupCheck = {};
                     // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").removeClass("input-error");
@@ -887,17 +902,17 @@ copies or substantial portions of the Software.
                             }
                             if(!value[i].name) {
                                 console.warn("cron-plus: validation error - schedule name missing");
-                                $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").addClass("input-error");
+                                $("#node-input-option-container > li:nth-child(" + (i + 1) + ")  .node-input-option-name").addClass("input-error");
                                 return false;
                             } else {
-                                $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").removeClass("input-error");
+                                $("#node-input-option-container > li:nth-child(" + (i + 1) + ")  .node-input-option-name").removeClass("input-error");
                             }                 
                             if(dupCheck[value[i].name]) {
                                 console.warn("cron-plus: validation error - duplicate schedule named '" + value[i].name + "'");
-                                $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").addClass("input-error");
+                                $("#node-input-option-container > li:nth-child(" + (i + 1) + ")  .node-input-option-name").addClass("input-error");
                                 return false;
                             } else {
-                                $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").removeClass("input-error");
+                                $("#node-input-option-container > li:nth-child(" + (i + 1) + ")  .node-input-option-name").removeClass("input-error");
                             }
                             dupCheck[value[i].name] = true;
                             if (!value[i].expressionType || value[i].expressionType === "cron") {
@@ -925,20 +940,18 @@ copies or substantial portions of the Software.
             },
         },
         label: function () {
-            return this.name || "cron-plus"
+            return this.name || "cron-plus";
         },
         outputLabels: function(index) {
             var node = this;
             var fanOut = node.commandResponseMsgOutput === "fanOut" ? true : false;
             var hasCommandOutputPin = (node.commandResponseMsgOutput === "output2" || fanOut) ? true : false;
             var optionCount = node.options ? node.options.length : 0;
-            var staticOutputPinIndex = 0;
             var dynOutputPinIndex = 0;
             var cmdOutputPinIndex = hasCommandOutputPin ? 1 : 0;
             if (fanOut) {
-                staticOutputPinIndex = index;
                 dynOutputPinIndex = optionCount;
-                cmdOutputPinIndex = optionCount+1;
+                cmdOutputPinIndex = optionCount + 1;
             }
             if (!fanOut && !hasCommandOutputPin) return "All messages and events";
             if (!fanOut && hasCommandOutputPin && index == 0) return "Static and Dynamic schedule messages";
@@ -970,8 +983,8 @@ copies or substantial portions of the Software.
             $( "#node-input-commandResponseMsgOutput" ).val(node.commandResponseMsgOutput);
 
             var getIdealDialogHeight = function(){
-                return Math.min(800, ($(document).height() < 600) ? $(document).width() - 30 : $(document).height() - 100)
-            }
+                return Math.min(800, ($(document).height() < 600) ? $(document).width() - 30 : $(document).height() - 100);
+            };
 
             //create map popup dialog
             $( "#cron-plus-map-dialog" ).dialog({
@@ -1003,18 +1016,20 @@ copies or substantial portions of the Software.
                     effect: "blind",
                     duration: 500
                 },
+                // eslint-disable-next-line no-unused-vars
                 open: function(event) {
                     $(this).css('padding', '0px 0px 0px 0px');
                     $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary');
                     $( "#cron-plus-map-dialog" ).dialog( "option", "height", getIdealDialogHeight() );
-                    $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", {my: "center", at: "center", of: window});
+                    $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", { my: "center", at: "center", of: window });
                 },
                 hide: {
                     effect: "explode",
                     duration: 500
                 },
+                // eslint-disable-next-line no-unused-vars
                 close: function( event, ui ) {
-                    if(debug) console.log("destroying map")
+                    if(debug) console.log("destroying map");
                     if(map) map.remove();
                 }
             });
@@ -1045,6 +1060,7 @@ copies or substantial portions of the Software.
                     effect: "blind",
                     duration: 500
                 },
+                // eslint-disable-next-line no-unused-vars
                 open: function(event) {
                     // $(this).css('padding', '0px 0px 0px 0px');
                     $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary');
@@ -1081,20 +1097,20 @@ copies or substantial portions of the Software.
                     datatype: 'json'
                 })
                 .done(function (response) {
-                    if(debug) console.log("cronplus/" + nodeId + "/getDynamic => response:",response)
+                    if(debug) console.log("cronplus/" + nodeId + "/getDynamic => response:",response);
                     var titles = [
-                        {"key":"item", "header":"Item"},
-                        {"key":"expressionType", "header":"Type"},
+                        { "key":"item", "header":"Item" },
+                        { "key":"expressionType", "header":"Type" },
                         // {"key":"name", "header":"Name"},
                         // {"key":"topic", "header":"Topic"},
                         // {"key":"payloadType", "header":"Payload Type"},
                         // {"key":"payload", "header":"Payload"},
-                        {"key":"info", "header":"Info"},
-                        {"key":"details", "header":"Details"},
+                        { "key":"info", "header":"Info" },
+                        { "key":"details", "header":"Details" },
                     ];
                     //tidy up date for display
                     var tableData = response.map(function(e,i){
-                        e.item = i+1;
+                        e.item = i + 1;
                         if(e.type){
                             e.payloadType == e.type;
                         }
@@ -1105,7 +1121,7 @@ copies or substantial portions of the Software.
                                 payload = JSON.stringify(e.payload, undefined, 2);
                                 if(payload.length > 200) {
                                     payloadTT = payload;
-                                    payload = payload.substring(0,200) + "..."
+                                    payload = payload.substring(0,200) + "...";
                                 }
                             } catch (error) {
                                 payload = typeof e.payload;
@@ -1147,14 +1163,14 @@ copies or substantial portions of the Software.
             }
             var dnRepositionResize = function(){
                 var w = ($(document).width() < 800) ? "95%" : "80%";
-                if(debug) console.log("dialog-open-drawDynamicSchedulesTable done - should now center and resize width", w)
+                if(debug) console.log("dialog-open-drawDynamicSchedulesTable done - should now center and resize width", w);
                 $("#cron-plus-dynamic-nodes-dialog").dialog("option", "width", w);
-                $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", {my: "center", at: "center", of: window});
-            }
+                $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", { my: "center", at: "center", of: window });
+            };
             $( "#cron-plus-dynamic-nodes-dialog" ).dialog({
                 autoOpen: false,
                 height: getIdealDialogHeight(),
-                height: "auto",
+                // height: "auto",
                 minHeight: 400,
                 minWidth: 300,
                 // maxWidth: 1000,
@@ -1172,6 +1188,7 @@ copies or substantial portions of the Software.
                     effect: "fade",
                     duration: 250
                 },
+                // eslint-disable-next-line no-unused-vars
                 open: function(event) {
                     $(this).css('padding', '0px 0px 0px 0px');
                     $('.ui-dialog-buttonpane').find('button:contains("Close")').addClass('primary');
@@ -1229,7 +1246,7 @@ copies or substantial portions of the Software.
                         
             })
             .fail(function (jqXHR, textStatus, errorThrown) { 
-                console.error(jqXHR,textStatus,errorThrown)
+                console.error(jqXHR,textStatus,errorThrown);
             });
 
                 
@@ -1251,20 +1268,20 @@ copies or substantial portions of the Software.
                     second: "2-digit"
                 };
                 try {
-                    dateString = new Intl.DateTimeFormat('default', o).format(new Date(date))
+                    dateString = new Intl.DateTimeFormat('default', o).format(new Date(date));
                 } catch (error) {
-                    dateString = "Error. Check timezone setting"
+                    dateString = "Error. Check timezone setting";
                 }
                 return dateString;
-            }
+            };
             var makeSolarChoice = function(value, label, tooltip){
                 return { 
                     label: label, 
                     value: value || label, 
                     title: tooltip,
                     multiple: true
-                }
-            }
+                };
+            };
         
             var solarChoices = [
                 makeSolarChoice("nightEnd", "night end / astronomical dawn", "night ends, astronomical twilight starts (-18°)"), //needed? same as astronomicalDawn
@@ -1350,10 +1367,10 @@ copies or substantial portions of the Software.
                 function buildExpressionTip(title, desc, text, type){
                     var helpFuncHtml = '';
                     var helpFunc = type == "solar" ? "showSolarHelp" : "showCronHelp";
-                    helpFuncHtml = '<span style="float: right"><button class="cron-plus-info-button" click="'+helpFunc+'();">help <i class="fa fa-external-link"></i></button></span>';
+                    helpFuncHtml = '<span style="float: right"><button class="cron-plus-info-button" click="' + helpFunc + '();">help <i class="fa fa-external-link"></i></button></span>';
                     return '<div style="min-height:190px"><span style="font-size: 12px; font-weight: bold">' + title + '</span>' + helpFuncHtml +
                             '<hr><div>' + desc + '</div>' +
-                            '<pre  class="cron-plus-form-tip">' + text + '</pre></div>'
+                            '<pre  class="cron-plus-form-tip">' + text + '</pre></div>';
                 }
                 function initTooltip(selector, type, pos){                    
                     selector.off("mouseenter").tooltip({
@@ -1361,20 +1378,20 @@ copies or substantial portions of the Software.
                         tooltipClass: "cron-plus-expression-tip",
                         position: pos,
                         content: function () { 
-                            return buildExpressionTip("Expression...", "Getting description...","",type) 
+                            return buildExpressionTip("Expression...", "Getting description...","",type); 
                         } ,
                         disabled: true
                     }).off('focusout').off('mouseleave').mouseleave(function(e){
-                        if(debug) console.log("initTooltip--mouseleave")
+                        if(debug) console.log("initTooltip--mouseleave");
                         if (selector.is(':focus')) {
-                            if(debug) console.log("initTooltip--mouseleave selector:is(':focus')")
+                            if(debug) console.log("initTooltip--mouseleave selector:is(':focus')");
                             e.preventDefault();
                             e.stopImmediatePropagation();
                             //selector.tooltip('open');
                             return false;
                         }
                     }).on("blur", function (e) {
-                        if(debug) console.log("initTooltip-->on-blur.  relatedTarget:", e.relatedTarget)
+                        if(debug) console.log("initTooltip-->on-blur.  relatedTarget:", e.relatedTarget);
                         if(e.relatedTarget && e.relatedTarget.className == "cron-plus-info-button"){
                             if(debug) console.log('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-info-button"');
                             if(type == "cron")
@@ -1389,7 +1406,7 @@ copies or substantial portions of the Software.
                         }
                         $(this).tooltip("close").tooltip("disable");
                     }).on("focusin change keyup", function (e) {
-                        if(debug) console.log("initTooltip--focusin change keyup",e )
+                        if(debug) console.log("initTooltip--focusin change keyup",e );
                         var $this = $(this);
                         var expression = $this.val();
                         let $timeZone = $("#node-input-timeZone");
@@ -1408,7 +1425,7 @@ copies or substantial portions of the Software.
                             disabled: false,
                             show: { effect: "fade" },
                             content: function (callback) {
-                                if(debug) console.log("initTooltip-->content")
+                                if(debug) console.log("initTooltip-->content");
                                 expression = $this.val();
                                 var solarType = $solarEvents.typedInput("type");
                                 var solarEvents = $solarEvents.typedInput("value");
@@ -1422,9 +1439,9 @@ copies or substantial portions of the Software.
                                     title_html = '<b>solar events</b> at <span class="cron-plus-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
                                     if(offset != undefined && offset != null && offset != "0" && offset != 0){
                                         title_html += '<b>';
-                                        if(offset > 0) title_html += ' +'
+                                        if(offset > 0) title_html += ' +';
                                         title_html += offset + ' minute';
-                                        if(offset != "1" && offset != "-1") title_html += 's'
+                                        if(offset != "1" && offset != "-1") title_html += 's';
                                         title_html += '</b>';
                                     }
                                     e.offset = offset;
@@ -1432,7 +1449,7 @@ copies or substantial portions of the Software.
                                     e.solarType = solarType;
                                     e.solarEvents = solarEvents;
                                 } else {
-                                    var title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0,50) + (expression.length > 50 ? "..." : "") + '</span>';
+                                    title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0,50) + (expression.length > 50 ? "..." : "") + '</span>';
                                     e.expression = expression;
                                 }
 
@@ -1443,13 +1460,13 @@ copies or substantial portions of the Software.
                                     datatype: 'json'
                                 })
                                 .done(function (data) {
-                                    if(debug) console.log("initTooltip-->Ajax done, data...",data)
+                                    if(debug) console.log("initTooltip-->Ajax done, data...",data);
                                     let nextInfo = "";
                                     let desc = data.description;
                                     if (data.prettyNext) {
                                         nextInfo = "Next event: " + data.prettyNext;
                                         if (data.nextDates && data.nextDates.length) {
-                                            nextInfo = nextInfo + " then..."
+                                            nextInfo = nextInfo + " then...";
                                             var makeTR = function(x){
                                                 var v = x, s = '<i class="fa fa-clock-o"></i>';
                                                 if(typeof x === "object" && x.timeOffset){
@@ -1458,8 +1475,8 @@ copies or substantial portions of the Software.
                                                 }
                                                 let fd = formatDateTimeWithTZ(v, timeZone);
                                                 v = fd ? fd : undefined;
-                                                return "<tr><td>" + s + "</td><td>" + v + "</td></tr>"
-                                            }
+                                                return "<tr><td>" + s + "</td><td>" + v + "</td></tr>";
+                                            };
                                             var map1 = data.nextDates.map(makeTR);
                                             nextInfo += "<table class=>" + map1.join("\n") + "</table>"; 
                                         }
@@ -1470,14 +1487,14 @@ copies or substantial portions of the Software.
                                             $this.tooltip("option", "position", pos);
                                             $this.tooltip("enable").tooltip("open");
                                             $this.tooltip("option", "position", pos);
-                                        },200)
+                                        },200);
                                         return buildExpressionTip(title_html, desc, nextInfo, expressionType);
-                                    } 
+                                    }; 
                                     callback(okContent);
                                     $this.tooltip("option", "position", pos);
                                 })
                                 .fail(function (jqXHR, textStatus, errorThrown) {
-                                    console.error(jqXHR, textStatus, errorThrown)
+                                    console.error(jqXHR, textStatus, errorThrown);
                                     var errContent = buildExpressionTip("Error...", "Cannot get description from node-red","", expressionType);
                                     callback(errContent);
                                 });
@@ -1488,31 +1505,31 @@ copies or substantial portions of the Software.
                 
                 
                 var container, nameField, topicField, payloadField;
-                var expressionTypeField, expressionField, solarEventsField, locationGroup, offsetField
+                var expressionTypeField, expressionField, solarEventsField, locationGroup, offsetField;
                 //build options row
-                container = $('<li/>',{style:"margin:0px 0px 5px 0px; padding:0px;"});
+                container = $('<li/>',{ style:"margin:0px 0px 5px 0px; padding:0px;" });
                 var row = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
                 var row2 = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
                 
-                var div = row.append( '<div/>' )
+                var div = row.append( '<div/>' );
 
-                var span = $('<span/>',{style:"float:right; margin-right:5px;"}).appendTo(div);
-                var deleteButton = $('<a/>',{href:"#",class:"editor-button editor-button-small", style:"margin-top:27px; margin-left:5px;"}).appendTo(span);
-                $('<i/>',{class:"fa fa-remove"}).appendTo(deleteButton);
+                var span = $('<span/>',{ style:"float:right; margin-right:5px;" }).appendTo(div);
+                var deleteButton = $('<a/>',{ href:"#",class:"editor-button editor-button-small", style:"margin-top:27px; margin-left:5px;" }).appendTo(span);
+                $('<i/>',{ class:"fa fa-remove" }).appendTo(deleteButton);
 
                 //generate the name field                              
-                var nameClass ="node-input-option-name" + ((!option.name || dupCheck[option.name]) ? " input-error" : "");
-                nameField = $('<input/>',{class:nameClass,type:"text",style:"margin-left:0px; width:calc(28% - 16px);", placeholder: 'name', title: "name", value:option.name}).appendTo(div);
+                var nameClass = "node-input-option-name" + ((!option.name || dupCheck[option.name]) ? " input-error" : "");
+                nameField = $('<input/>',{ class:nameClass,type:"text",style:"margin-left:0px; width:calc(28% - 16px);", placeholder: 'name', title: "name", value:option.name }).appendTo(div);
                 dupCheck[option.name] = true;
 
                 //generate the topic field
-                var topicClass ="node-input-option-topic" + ((!option.topic) ? " input-error" : "");
-                topicField = $('<input/>',{class:topicClass,type:"text",style:"margin-left:5px; width:calc(32% - 16px);", placeholder: 'topic', title: "topic", value:option.topic}).appendTo(div);
+                var topicClass = "node-input-option-topic" + ((!option.topic) ? " input-error" : "");
+                topicField = $('<input/>',{ class:topicClass,type:"text",style:"margin-left:5px; width:calc(32% - 16px);", placeholder: 'topic', title: "topic", value:option.topic }).appendTo(div);
                 
                 //generate the payload field
-                payloadField = $('<input/>',{class:"node-input-option-payload",type:"text",style:"margin-left:5px; width:calc(40% - 25px);", placeholder: 'payload', value:option.payload || ""}).appendTo(div);
+                payloadField = $('<input/>',{ class:"node-input-option-payload",type:"text",style:"margin-left:5px; width:calc(40% - 25px);", placeholder: 'payload', value:option.payload || "" }).appendTo(div);
                 payloadField.typedInput({
-                    default:option.payloadType||'default',
+                    default:option.payloadType || 'default',
                     types:[{
                         icon: "fa fa-envelope",
                         value:"default",
@@ -1522,10 +1539,10 @@ copies or substantial portions of the Software.
                 });
                 //generate a dropdown for trigger type
                 var expressionType = option.expressionType || "cron";
-                expressionTypeField = $('<select/>',{class:"node-input-option-expressionType",type:"text",placeholder:"cron"}).css({"width":"calc(28% - 16px)","margin-right":"5px"}).appendTo(row2);
-                $('<option />', {value: "cron", text: "cron"}).appendTo(expressionTypeField);
-                $('<option />', {value: "dates", text: "date sequence"}).appendTo(expressionTypeField);
-                $('<option />', {value: "solar", text: "solar events"}).appendTo(expressionTypeField);
+                expressionTypeField = $('<select/>',{ class:"node-input-option-expressionType",type:"text",placeholder:"cron" }).css({ "width":"calc(28% - 16px)","margin-right":"5px" }).appendTo(row2);
+                $('<option />', { value: "cron", text: "cron" }).appendTo(expressionTypeField);
+                $('<option />', { value: "dates", text: "date sequence" }).appendTo(expressionTypeField);
+                $('<option />', { value: "solar", text: "solar events" }).appendTo(expressionTypeField);
                 expressionTypeField.val(expressionType);
                 expressionTypeField.prop("title", "Expression Type");   
                 
@@ -1548,35 +1565,36 @@ copies or substantial portions of the Software.
                         { label: "Every minute, on the 1st weekday of the month (* * 1W * *)", value: "* * 1W * *" },
                         { label: "Every minute, on the third Tue of the month (* * * * Tue#3)", value: "* * * * Tue#3" },
                         { label: "At 12:00 PM, on the last Monday of the month (0 12 * * MONL)", value: "0 12 * * MONL" },
-                    ]
+                    ];
 
-                expressionField = $('<input/>',{class:expressionClass,type:"text",style:"margin-left:0px; width:calc(72% - 36px);", placeholder: '* * * * * * *', list: "cron-expression-example-list",title:"cron expression", value:option.expression}).appendTo(row2);
+                expressionField = $('<input/>',{ class:expressionClass,type:"text",style:"margin-left:0px; width:calc(72% - 36px);", placeholder: '* * * * * * *', list: "cron-expression-example-list",title:"cron expression", value:option.expression }).appendTo(row2);
                 expressionField.appendTo(row2);
    
                 //setup the expression combo
                 expressionField.combobox({
                     menu: {
                         menu: expressionMenuData,
-                        options: {beforeSelect: function(opt) {
+                        options: { beforeSelect: function(opt) {
                             if(opt && opt.value == "EEB") {
                                 $( "#cron-plus-expression-builder-dialog" ).data("opener", expressionField);
                                 $( "#cron-plus-expression-builder-dialog" ).dialog( "open" );
                                 return true; //return true to let widget know - we have handled this
                             }
-                        }},
+                        } },
                     },
                     validate: function(value){
                         return (!!value) && value.length >= 9 ;//better validation required?
                     }
-                })
+                });
                 try {
                     expressionField.combobox().button.prop("title", "Expression examples...");
                     expressionField.combobox("instance").button.prop("title", "Expression examples...");                
+                // eslint-disable-next-line no-empty
                 } catch (error) {}
                 expressionField.combobox("value", option.expression || "");
 
                 //generate the solar events field
-                solarEventsField = $('<input/>',{class:"node-input-option-solarEvents",type:"text",style:"margin-left:0px; width:calc(32% - 16px);", placeholder: 'select solar events', value: option.solarEvents || ""}).appendTo(row2);
+                solarEventsField = $('<input/>',{ class:"node-input-option-solarEvents",type:"text",style:"margin-left:0px; width:calc(32% - 16px);", placeholder: 'select solar events', value: option.solarEvents || "" }).appendTo(row2);
                 solarEventsField.typedInput({
                     default:"all",
                     types: [                    
@@ -1599,7 +1617,7 @@ copies or substantial portions of the Software.
                             showLabel:true 
                         }
                     ]
-                })
+                });
                 solarEventsField.typedInput("type", option.solarType || "all");
                 solarEventsField.typedInput("value", option.solarEvents || "");//added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
                 //generate location 
@@ -1625,7 +1643,7 @@ copies or substantial portions of the Software.
                         $(".cron-plus-map-not-loaded").show();
                         $(".cron-plus-map-loading").hide();
                         $("#cron-plus-map").hide();
-                        let proto = location.protocol === 'https:' ? location.protocol : "http:"
+                        let proto = location.protocol === 'https:' ? location.protocol : "http:";
                         checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css","css", function(){
                             checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js","js", function(){
                                 createMap(selectedLocationInput);
@@ -1648,7 +1666,7 @@ copies or substantial portions of the Software.
                 });
 
                 //offset fields
-                offsetField = $('<input/>',{class: "node-input-option-offset", type:"number", min:-1439, max:1439,style:"margin-left:7px; width:calc(15% - 16px);", value:option.offset || 0, placeholder: "offset"}).appendTo(row2);
+                offsetField = $('<input/>',{ class: "node-input-option-offset", type:"number", min:-1439, max:1439,style:"margin-left:7px; width:calc(15% - 16px);", value:option.offset || 0, placeholder: "offset" }).appendTo(row2);
                 offsetField.prop("title", "Minutes Offset +/- 1439");  
                 
                 //init tooltips
@@ -1659,38 +1677,38 @@ copies or substantial portions of the Software.
                     var f = $(this);
                     var fg = locationGroup;
                     if (f.val() && fg.hasClass('input-error')) {
-                        fg.removeClass('input-error')
+                        fg.removeClass('input-error');
                     } else if (!f.val()) {
-                        fg.addClass('input-error')
+                        fg.addClass('input-error');
                     }
                 });
             
                 nameField.keyup(function() {
                     if ($(this).val() && $(this).hasClass('input-error')) {
-                        $(this).removeClass('input-error')
+                        $(this).removeClass('input-error');
                     } else if (!$(this).val()) {
-                        $(this).addClass('input-error')
+                        $(this).addClass('input-error');
                     }
                 });                      
             
                 locationField.change(function() {
                     if ($(this).val() && locationGroup.hasClass("input-error")) {
-                        locationGroup.removeClass('input-error')
+                        locationGroup.removeClass('input-error');
                     } else if (!$(this).val()) {
-                        locationGroup.removeClass('input-error')
+                        locationGroup.removeClass('input-error');
                     }
                 });                      
             
                 topicField.keyup(function() {
                     if ($(this).val() && $(this).hasClass('input-error')) {
-                        $(this).removeClass('input-error')
+                        $(this).removeClass('input-error');
                     } else if (!$(this).val()) {
-                        $(this).addClass('input-error')
+                        $(this).addClass('input-error');
                     }
                 });                      
 
                 deleteButton.click(function() {
-                    container.css({"background":"#fee"});
+                    container.css({ "background":"#fee" });
                     container.fadeOut(300, function() {
                         $(this).remove();
                     });
@@ -1732,7 +1750,7 @@ copies or substantial portions of the Software.
                 $("#node-input-option-container").append(container);
             }
 
-            $("#node-input-outputField").typedInput({types:[{label:"msg.", value:"str"}]});
+            $("#node-input-outputField").typedInput({ types:[{ label:"msg.", value:"str" }] });
 
             $("#node-input-add-option").click(function() {
                 generateOption($("#node-input-option-container").children().length, {});
@@ -1743,12 +1761,12 @@ copies or substantial portions of the Software.
                 $( "#cron-plus-dynamic-nodes-dialog" ).dialog( "open" );
             });
 
-            for (var i=0; i<this.options.length; i++) {
+            for (var i = 0; i < this.options.length; i++) {
                 var option = this.options[i];
                 try {
                     generateOption(i,option);
                 } catch (error) {
-                    console.warn("generateOption caused an error: ", option, error)
+                    console.warn("generateOption caused an error: ", option, error);
                 }
             }
 
@@ -1761,9 +1779,9 @@ copies or substantial portions of the Software.
         },
         oneditsave: function () {
             var node = this;
-            var node_id = node.id;
             var options = $("#node-input-option-container").children();
             node.options = [];
+            // eslint-disable-next-line no-unused-vars
             options.each(function(i) {
                 var option = $(this);
                 var o = {
@@ -1789,7 +1807,6 @@ copies or substantial portions of the Software.
             var o = $("#node-input-commandResponseMsgOutput").val();
             node.commandResponseMsgOutput = ["output1", "output2", "fanOut"].indexOf(o) >= 0 ? o : "output1";
             var fanOut = node.commandResponseMsgOutput == "fanOut";
-            var optionCount = (options && options.length > 0) ? options.length : 0;
             node.outputs = node.commandResponseMsgOutput === "output1" ? 1 : 2;
             if (fanOut && options && options.length) {
                 node.outputs = options.length + 2; // in fanout mode, we add a separate output for dynamic schedules & command responses
@@ -1805,7 +1822,7 @@ copies or substantial portions of the Software.
                 return false;
             },
             enabled: function () {
-                return !this.changed
+                return !this.changed;
             },
             onclick: function () {
                 var node = this;
@@ -1820,9 +1837,11 @@ copies or substantial portions of the Software.
                 $.ajax({
                     url: "cronplusinject/" + node.id,
                     type: "POST",
+                    // eslint-disable-next-line no-unused-vars
                     success: function (response) {
                         RED.notify(node._("inject.success", { label: label }), { type: "success", id: "inject" });
                     },
+                    // eslint-disable-next-line no-unused-vars
                     error: function (jqXHR, textStatus, errorThrown) {
                         if (jqXHR.status == 404) {
                             RED.notify(node._("common.notification.error", { message: node._("common.notification.errors.not-deployed") }), "error");
@@ -1844,7 +1863,7 @@ copies or substantial portions of the Software.
             if(RED.settings.version && RED.settings.version.split(".")[0] < 1){
                 var tics = $(".red-ui-typedInput-container");
                 if(tics && tics.length){
-                    var idx = 0
+                    var idx = 0;
                     for (idx = 0; idx < tics.length; idx++) {
                         var element = $(tics[idx]);
                         if(element && element.length && element.is(":visible") ){
