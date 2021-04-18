@@ -94,11 +94,11 @@ copies or substantial portions of the Software.
     var minuteClockOpts = rangeToOptions(0, 59, true);
     var hourClockOpts = rangeToOptions(0, 23, true);
     var dayInMonthOpts = rangeToOptions(1, 31);
-    var monthOpts = arrayToOptions(["January","February","March","April","May","June","July","August","September","October","November","December"],
-                                    [1,2,3,4,5,6,7,8,9,10,11,12]);
+    var monthOpts = arrayToOptions(["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+                                    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     var monthNumOpts = rangeToOptions(1, 12);
-    var nthWeekOpts = arrayToOptions(["First", "Second", "Third", "Forth", "Last"], [1,2,3,4,"L"]);
-    var dayOfWeekOpts = arrayToOptions(["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday", "Sunday"], ["MON","TUE","WED","THU","FRI","SAT", "SUN"]);
+    var nthWeekOpts = arrayToOptions(["First", "Second", "Third", "Forth", "Last"], [1, 2, 3, 4, "L"]);
+    var dayOfWeekOpts = arrayToOptions(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]);
     
     
     // Convert an array of values to options to append to select input
@@ -191,7 +191,7 @@ copies or substantial portions of the Software.
         
         // Initialization
         base.init = function() {
-            base.options = $.extend({},$.cronBuilder.defaultOptions, options);
+            base.options = $.extend({}, $.cronBuilder.defaultOptions, options);
         
             
             base.$el.append(cronInputs.period);
@@ -404,7 +404,7 @@ copies or substantial portions of the Software.
         var fileRef;
         if (filetype == "js"){ //if filename is a external JavaScript file
             fileRef = document.createElement('script');
-            fileRef.setAttribute("type","text/javascript");
+            fileRef.setAttribute("type", "text/javascript");
             fileRef.setAttribute("src", filename);
         }
         else if (filetype == "css"){ //if filename is an external CSS file
@@ -603,7 +603,7 @@ copies or substantial portions of the Software.
                 if(cr.is(":visible"))
                     height -= cr.outerHeight(true);
             }
-            expandRow.css("height",height + "px");
+            expandRow.css("height", height + "px");
         } 
     }
 
@@ -648,21 +648,21 @@ copies or substantial portions of the Software.
             this.uiSelect = this.elementDiv.wrap( "<div>" ).parent();
             var attrStyle = this.element.attr('style');            
             this.uiWidth = this.input.outerWidth();            
-            this.input.css("paddingLeft",5);
+            this.input.css("paddingLeft", 5);
             
             var m;
             if ((m = /width\s*:\s*(calc\s*\(.*\)|\d+(%|px))/i.exec(attrStyle)) !== null) {
-                this.input.css('width','calc(100% - 4px)');
+                this.input.css('width', 'calc(100% - 4px)');
                 this.uiSelect.width(m[1]);
                 this.uiWidth = null;
             } else {
                 this.uiSelect.width(this.uiWidth);
             }
 
-            ["Right","Left"].forEach(function(d) {
+            ["Right", "Left"].forEach(function(d) {
                 var m = that.element.css("margin" + d);
-                that.uiSelect.css("margin" + d,m);
-                that.input.css("margin" + d,1);
+                that.uiSelect.css("margin" + d, m);
+                that.input.css("margin" + d, 1);
             });
 
             this.uiSelect.addClass("red-ui-typedInput-container");
@@ -700,9 +700,9 @@ copies or substantial portions of the Software.
             var menuItems = options.menu || [];
             menuItems.forEach(function(opt) {
                 if (typeof opt === 'string') {
-                    opt = { value:opt,label:opt };
+                    opt = { value: opt, label: opt };
                 }
-                var op = $('<a href="#"></a>').attr("value",opt.value).appendTo(menu);
+                var op = $('<a href="#"></a>').attr("value", opt.value).appendTo(menu);
                 if (opt.label) {
                     op.text(opt.label);
                 }
@@ -713,9 +713,9 @@ copies or substantial portions of the Software.
                     if (opt.icon.indexOf("<") === 0) {
                         $(opt.icon).prependTo(op);
                     } else if (opt.icon.indexOf("/") !== -1) {
-                        $('<img>',{ src:opt.icon,style:"margin-right: 4px; height: 18px;" }).prependTo(op);
+                        $('<img>', { src: opt.icon, style: "margin-right: 4px; height: 18px;" }).prependTo(op);
                     } else {
-                        $('<i>',{ class:"red-ui-typedInput-icon " + opt.icon }).prependTo(op);
+                        $('<i>', { class: "red-ui-typedInput-icon " + opt.icon }).prependTo(op);
                     }
                 } else {
                     op.css({ paddingLeft: "18px" });
@@ -764,9 +764,9 @@ copies or substantial portions of the Software.
         _showDropdownMenu: function() {
             if (this.menu) {
                 this.menu.css({
-                    minWidth:this.uiSelect.width()
+                    minWidth: this.uiSelect.width()
                 });
-                this._showMenu(this.menu,this.button);
+                this._showMenu(this.menu, this.button);
             }
         },
         _hideMenu: function(menu) {
@@ -779,7 +779,7 @@ copies or substantial portions of the Software.
             //this.button.trigger("focus");
 
         },
-        _showMenu: function(menu,relativeTo) {
+        _showMenu: function(menu, relativeTo) {
             if (this.disarmClick) {
                 this.disarmClick = false;
                 return;
@@ -887,8 +887,8 @@ copies or substantial portions of the Software.
             commandResponseMsgOutput: { value: "output1" },
             outputs: { value: 1 },
             options: {
-                value:[{ payload: '', topic : '', expression : '' }], 
-                validate:function(value) { 
+                value: [{ payload: '', topic: '', expression: '' }], 
+                validate: function(value) { 
                     var dupCheck = {};
                     // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").removeClass("input-error");
                     // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-topic").removeClass("input-error");
@@ -1097,19 +1097,19 @@ copies or substantial portions of the Software.
                     datatype: 'json'
                 })
                 .done(function (response) {
-                    if(debug) console.log("cronplus/" + nodeId + "/getDynamic => response:",response);
+                    if(debug) console.log("cronplus/" + nodeId + "/getDynamic => response:", response);
                     var titles = [
-                        { "key":"item", "header":"Item" },
-                        { "key":"expressionType", "header":"Type" },
+                        { "key": "item", "header": "Item" },
+                        { "key": "expressionType", "header": "Type" },
                         // {"key":"name", "header":"Name"},
                         // {"key":"topic", "header":"Topic"},
                         // {"key":"payloadType", "header":"Payload Type"},
                         // {"key":"payload", "header":"Payload"},
-                        { "key":"info", "header":"Info" },
-                        { "key":"details", "header":"Details" },
+                        { "key": "info", "header": "Info" },
+                        { "key": "details", "header": "Details" },
                     ];
                     //tidy up date for display
-                    var tableData = response.map(function(e,i){
+                    var tableData = response.map(function(e, i){
                         e.item = i + 1;
                         if(e.type){
                             e.payloadType == e.type;
@@ -1121,7 +1121,7 @@ copies or substantial portions of the Software.
                                 payload = JSON.stringify(e.payload, undefined, 2);
                                 if(payload.length > 200) {
                                     payloadTT = payload;
-                                    payload = payload.substring(0,200) + "...";
+                                    payload = payload.substring(0, 200) + "...";
                                 }
                             } catch (error) {
                                 payload = typeof e.payload;
@@ -1151,14 +1151,14 @@ copies or substantial portions of the Software.
                         e.details = details.join("");
                         return e;
                     });       
-                    JSONtoTable(tableData, titles, $table, { class:"cron-plus-table", width: "100%", emptyMessage: "No dynamic schedules!" });    
+                    JSONtoTable(tableData, titles, $table, { class: "cron-plus-table", width: "100%", emptyMessage: "No dynamic schedules!" });    
                     $table.show();
                     $spinner.hide();
                     if(callback) callback();
                 })
                 .fail(function (jqXHR, textStatus, errorThrown) { 
                     if(callback) callback(errorThrown); 
-                    console.error(jqXHR,textStatus,errorThrown);
+                    console.error(jqXHR, textStatus, errorThrown);
                 });
             }
             var dnRepositionResize = function(){
@@ -1178,7 +1178,7 @@ copies or substantial portions of the Software.
                 buttons: {
                     "Refresh": function() {
                         var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id");
-                        drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader", dnRepositionResize);
+                        drawDynamicSchedulesTable(node_id, "#cron-plus-dynamic-nodes-table-placeholder", "#cron-plus-dynamic-nodes-loader", dnRepositionResize);
                     },
                     "Close": function(){
                         $( "#cron-plus-dynamic-nodes-dialog" ).dialog( "close" );
@@ -1194,14 +1194,14 @@ copies or substantial portions of the Software.
                     $('.ui-dialog-buttonpane').find('button:contains("Close")').addClass('primary');
                     var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id");
                     dnRepositionResize();
-                    drawDynamicSchedulesTable(node_id,"#cron-plus-dynamic-nodes-table-placeholder","#cron-plus-dynamic-nodes-loader", dnRepositionResize);
+                    drawDynamicSchedulesTable(node_id, "#cron-plus-dynamic-nodes-table-placeholder", "#cron-plus-dynamic-nodes-loader", dnRepositionResize);
                 },
                 hide: {
                     effect: "fade",
                     duration: 250
                 }
             });
-            $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id",node.id);
+            $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id", node.id);
             dnRepositionResize();
 
             var tzData;
@@ -1246,7 +1246,7 @@ copies or substantial portions of the Software.
                         
             })
             .fail(function (jqXHR, textStatus, errorThrown) { 
-                console.error(jqXHR,textStatus,errorThrown);
+                console.error(jqXHR, textStatus, errorThrown);
             });
 
                 
@@ -1293,7 +1293,7 @@ copies or substantial portions of the Software.
                 makeSolarChoice("sunriseEnd", "sunrise end", "bottom edge of the sun touches the horizon (-0.3°)"),
                 makeSolarChoice("morningGoldenHourEnd", "morning golden hour ends", "when the sun is 6 degrees above the horizon (6°)"),
                 makeSolarChoice("solarNoon", "solar noon", "sun is at its highest position"),
-                makeSolarChoice("eveningGoldenHourStart", "evening golden hour start","when the sun is 6 degrees above the horizon (6°)"),
+                makeSolarChoice("eveningGoldenHourStart", "evening golden hour start", "when the sun is 6 degrees above the horizon (6°)"),
                 makeSolarChoice("sunsetStart", "sunset start", "bottom edge of the sun touches the horizon (-0.3°)"),
                 makeSolarChoice("sunset", "sunset", "civil twilight starts, sun disappears below the horizon (-0.833°)"),
                 // makeSolarChoice("eveningGoldenHourEnd", "evening golden hour end","golden hour ends (-6°)"), //needed? same as civilDusk
@@ -1325,7 +1325,7 @@ copies or substantial portions of the Software.
                 //     version = 1;
                 // }                
                 optionIndex = optionIndex == null ? 0 : optionIndex;
-                if (["cron","dates","solar"].indexOf(option.expressionType) < 0){
+                if (["cron", "dates", "solar"].indexOf(option.expressionType) < 0){
                     //if expressionType is not cron or solar - it may be sunrise or sunset
                     if(option.expressionType == "sunrise"){
                         option.solarEvents = option.solarEvents || "sunrise";
@@ -1378,8 +1378,8 @@ copies or substantial portions of the Software.
                         tooltipClass: "cron-plus-expression-tip",
                         position: pos,
                         content: function () { 
-                            return buildExpressionTip("Expression...", "Getting description...","",type); 
-                        } ,
+                            return buildExpressionTip("Expression...", "Getting description...", "", type); 
+                        },
                         disabled: true
                     }).off('focusout').off('mouseleave').mouseleave(function(e){
                         if(debug) console.log("initTooltip--mouseleave");
@@ -1406,7 +1406,7 @@ copies or substantial portions of the Software.
                         }
                         $(this).tooltip("close").tooltip("disable");
                     }).on("focusin change keyup", function (e) {
-                        if(debug) console.log("initTooltip--focusin change keyup",e );
+                        if(debug) console.log("initTooltip--focusin change keyup", e );
                         var $this = $(this);
                         var expression = $this.val();
                         let $timeZone = $("#node-input-timeZone");
@@ -1436,7 +1436,7 @@ copies or substantial portions of the Software.
                                 let e = { expressionType: expressionType };
                                 if (timeZone) e.timeZone = timeZone;
                                 if (expressionType == "solar"){
-                                    title_html = '<b>solar events</b> at <span class="cron-plus-expression">' + expression.slice(0,100) + (expression.length > 100 ? "..." : "") + '</span>';
+                                    title_html = '<b>solar events</b> at <span class="cron-plus-expression">' + expression.slice(0, 100) + (expression.length > 100 ? "..." : "") + '</span>';
                                     if(offset != undefined && offset != null && offset != "0" && offset != 0){
                                         title_html += '<b>';
                                         if(offset > 0) title_html += ' +';
@@ -1449,7 +1449,7 @@ copies or substantial portions of the Software.
                                     e.solarType = solarType;
                                     e.solarEvents = solarEvents;
                                 } else {
-                                    title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0,50) + (expression.length > 50 ? "..." : "") + '</span>';
+                                    title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0, 50) + (expression.length > 50 ? "..." : "") + '</span>';
                                     e.expression = expression;
                                 }
 
@@ -1460,7 +1460,7 @@ copies or substantial portions of the Software.
                                     datatype: 'json'
                                 })
                                 .done(function (data) {
-                                    if(debug) console.log("initTooltip-->Ajax done, data...",data);
+                                    if(debug) console.log("initTooltip-->Ajax done, data...", data);
                                     let nextInfo = "";
                                     let desc = data.description;
                                     if (data.prettyNext) {
@@ -1487,7 +1487,7 @@ copies or substantial portions of the Software.
                                             $this.tooltip("option", "position", pos);
                                             $this.tooltip("enable").tooltip("open");
                                             $this.tooltip("option", "position", pos);
-                                        },200);
+                                        }, 200);
                                         return buildExpressionTip(title_html, desc, nextInfo, expressionType);
                                     }; 
                                     callback(okContent);
@@ -1495,7 +1495,7 @@ copies or substantial portions of the Software.
                                 })
                                 .fail(function (jqXHR, textStatus, errorThrown) {
                                     console.error(jqXHR, textStatus, errorThrown);
-                                    var errContent = buildExpressionTip("Error...", "Cannot get description from node-red","", expressionType);
+                                    var errContent = buildExpressionTip("Error...", "Cannot get description from node-red", "", expressionType);
                                     callback(errContent);
                                 });
                             } 
@@ -1507,39 +1507,39 @@ copies or substantial portions of the Software.
                 var container, nameField, topicField, payloadField;
                 var expressionTypeField, expressionField, solarEventsField, locationGroup, offsetField;
                 //build options row
-                container = $('<li/>',{ style:"margin:0px 0px 5px 0px; padding:0px;" });
+                container = $('<li/>', { style: "margin:0px 0px 5px 0px; padding:0px;" });
                 var row = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
                 var row2 = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
                 
                 var div = row.append( '<div/>' );
 
-                var span = $('<span/>',{ style:"float:right; margin-right:5px;" }).appendTo(div);
-                var deleteButton = $('<a/>',{ href:"#",class:"editor-button editor-button-small", style:"margin-top:27px; margin-left:5px;" }).appendTo(span);
-                $('<i/>',{ class:"fa fa-remove" }).appendTo(deleteButton);
+                var span = $('<span/>', { style: "float:right; margin-right:5px;" }).appendTo(div);
+                var deleteButton = $('<a/>', { href: "#", class: "editor-button editor-button-small", style: "margin-top:27px; margin-left:5px;" }).appendTo(span);
+                $('<i/>', { class: "fa fa-remove" }).appendTo(deleteButton);
 
                 //generate the name field                              
                 var nameClass = "node-input-option-name" + ((!option.name || dupCheck[option.name]) ? " input-error" : "");
-                nameField = $('<input/>',{ class:nameClass,type:"text",style:"margin-left:0px; width:calc(28% - 16px);", placeholder: 'name', title: "name", value:option.name }).appendTo(div);
+                nameField = $('<input/>', { class: nameClass, type: "text", style: "margin-left:0px; width:calc(28% - 16px);", placeholder: 'name', title: "name", value: option.name }).appendTo(div);
                 dupCheck[option.name] = true;
 
                 //generate the topic field
                 var topicClass = "node-input-option-topic" + ((!option.topic) ? " input-error" : "");
-                topicField = $('<input/>',{ class:topicClass,type:"text",style:"margin-left:5px; width:calc(32% - 16px);", placeholder: 'topic', title: "topic", value:option.topic }).appendTo(div);
+                topicField = $('<input/>', { class: topicClass, type: "text", style: "margin-left:5px; width:calc(32% - 16px);", placeholder: 'topic', title: "topic", value: option.topic }).appendTo(div);
                 
                 //generate the payload field
-                payloadField = $('<input/>',{ class:"node-input-option-payload",type:"text",style:"margin-left:5px; width:calc(40% - 25px);", placeholder: 'payload', value:option.payload || "" }).appendTo(div);
+                payloadField = $('<input/>', { class: "node-input-option-payload", type: "text", style: "margin-left:5px; width:calc(40% - 25px);", placeholder: 'payload', value: option.payload || "" }).appendTo(div);
                 payloadField.typedInput({
-                    default:option.payloadType || 'default',
-                    types:[{
+                    default: option.payloadType || 'default',
+                    types: [{
                         icon: "fa fa-envelope",
-                        value:"default",
-                        label:"Default Payload",
+                        value: "default",
+                        label: "Default Payload",
                         hasValue: false 
                     }, 'flow', 'global', 'str', 'num', 'bool', 'json', 'jsonata', 'bin', 'date', 'env']
                 });
                 //generate a dropdown for trigger type
                 var expressionType = option.expressionType || "cron";
-                expressionTypeField = $('<select/>',{ class:"node-input-option-expressionType",type:"text",placeholder:"cron" }).css({ "width":"calc(28% - 16px)","margin-right":"5px" }).appendTo(row2);
+                expressionTypeField = $('<select/>', { class: "node-input-option-expressionType", type: "text", placeholder: "cron" }).css({ "width": "calc(28% - 16px)", "margin-right": "5px" }).appendTo(row2);
                 $('<option />', { value: "cron", text: "cron" }).appendTo(expressionTypeField);
                 $('<option />', { value: "dates", text: "date sequence" }).appendTo(expressionTypeField);
                 $('<option />', { value: "solar", text: "solar events" }).appendTo(expressionTypeField);
@@ -1567,7 +1567,7 @@ copies or substantial portions of the Software.
                         { label: "At 12:00 PM, on the last Monday of the month (0 12 * * MONL)", value: "0 12 * * MONL" },
                     ];
 
-                expressionField = $('<input/>',{ class:expressionClass,type:"text",style:"margin-left:0px; width:calc(72% - 36px);", placeholder: '* * * * * * *', list: "cron-expression-example-list",title:"cron expression", value:option.expression }).appendTo(row2);
+                expressionField = $('<input/>', { class: expressionClass, type: "text", style: "margin-left:0px; width:calc(72% - 36px);", placeholder: '* * * * * * *', list: "cron-expression-example-list", title: "cron expression", value: option.expression }).appendTo(row2);
                 expressionField.appendTo(row2);
    
                 //setup the expression combo
@@ -1594,27 +1594,27 @@ copies or substantial portions of the Software.
                 expressionField.combobox("value", option.expression || "");
 
                 //generate the solar events field
-                solarEventsField = $('<input/>',{ class:"node-input-option-solarEvents",type:"text",style:"margin-left:0px; width:calc(32% - 16px);", placeholder: 'select solar events', value: option.solarEvents || "" }).appendTo(row2);
+                solarEventsField = $('<input/>', { class: "node-input-option-solarEvents", type: "text", style: "margin-left:0px; width:calc(32% - 16px);", placeholder: 'select solar events', value: option.solarEvents || "" }).appendTo(row2);
                 solarEventsField.typedInput({
-                    default:"all",
+                    default: "all",
                     types: [                    
                         {
-                            value:"selected",
-                            label:"Selected Solar Events", 
+                            value: "selected",
+                            label: "Selected Solar Events", 
                             title: "Selected Solar Events", 
-                            icon:"fa fa-list",
-                            showLabel:false,
-                            multiple:true,
-                            options:solarChoices,
-                            default: ["sunrise","sunset"]
+                            icon: "fa fa-list",
+                            showLabel: false,
+                            multiple: true,
+                            options: solarChoices,
+                            default: ["sunrise", "sunset"]
                         },
                         {
-                            value:"all",
-                            label:"All Solar Events",
+                            value: "all",
+                            label: "All Solar Events",
                             title: "All Solar Events",
                             icon: "fa fa-sun-o",
                             hasValue: false,
-                            showLabel:true 
+                            showLabel: true 
                         }
                     ]
                 });
@@ -1644,8 +1644,8 @@ copies or substantial portions of the Software.
                         $(".cron-plus-map-loading").hide();
                         $("#cron-plus-map").hide();
                         let proto = location.protocol === 'https:' ? location.protocol : "http:";
-                        checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css","css", function(){
-                            checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js","js", function(){
+                        checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css", "css", function(){
+                            checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js", "js", function(){
                                 createMap(selectedLocationInput);
                             });
                         });
@@ -1666,12 +1666,12 @@ copies or substantial portions of the Software.
                 });
 
                 //offset fields
-                offsetField = $('<input/>',{ class: "node-input-option-offset", type:"number", min:-1439, max:1439,style:"margin-left:7px; width:calc(15% - 16px);", value:option.offset || 0, placeholder: "offset" }).appendTo(row2);
+                offsetField = $('<input/>', { class: "node-input-option-offset", type: "number", min: -1439, max: 1439, style: "margin-left:7px; width:calc(15% - 16px);", value: option.offset || 0, placeholder: "offset" }).appendTo(row2);
                 offsetField.prop("title", "Minutes Offset +/- 1439");  
                 
                 //init tooltips
-                initTooltip(locationField,"solar", { my: "right top", at: "right bottom+5", of: offsetField, collision: "flipfit" });
-                initTooltip(expressionField,"cron", { my: "right top", at: "right bottom+5", of: expressionField /*expDropButton*/, collision: "flipfit" });
+                initTooltip(locationField, "solar", { my: "right top", at: "right bottom+5", of: offsetField, collision: "flipfit" });
+                initTooltip(expressionField, "cron", { my: "right top", at: "right bottom+5", of: expressionField /*expDropButton*/, collision: "flipfit" });
 
                 locationField.keyup(function() {
                     var f = $(this);
@@ -1708,7 +1708,7 @@ copies or substantial portions of the Software.
                 });                      
 
                 deleteButton.click(function() {
-                    container.css({ "background":"#fee" });
+                    container.css({ "background": "#fee" });
                     container.fadeOut(300, function() {
                         $(this).remove();
                     });
@@ -1724,7 +1724,7 @@ copies or substantial portions of the Software.
                             expressionField.combobox("hide");
                             solarEventsField.typedInput("show");
                             //solarEventsField.typedInput().css("display","inline-block");
-                            solarEventsField.css("display","inline-block");
+                            solarEventsField.css("display", "inline-block");
                             break;
                         case "dates":
                             expressionField.combobox("show");
@@ -1750,7 +1750,7 @@ copies or substantial portions of the Software.
                 $("#node-input-option-container").append(container);
             }
 
-            $("#node-input-outputField").typedInput({ types:[{ label:"msg.", value:"str" }] });
+            $("#node-input-outputField").typedInput({ types: [{ label: "msg.", value: "str" }] });
 
             $("#node-input-add-option").click(function() {
                 generateOption($("#node-input-option-container").children().length, {});
@@ -1764,7 +1764,7 @@ copies or substantial portions of the Software.
             for (var i = 0; i < this.options.length; i++) {
                 var option = this.options[i];
                 try {
-                    generateOption(i,option);
+                    generateOption(i, option);
                 } catch (error) {
                     console.warn("generateOption caused an error: ", option, error);
                 }
@@ -1772,7 +1772,7 @@ copies or substantial portions of the Software.
 
             $( "#node-input-option-container" ).sortable({
                 axis: "y",
-                handle:".node-input-option-handle",
+                handle: ".node-input-option-handle",
                 cursor: "move"
             });
             updateEditorLayout();
@@ -1793,8 +1793,8 @@ copies or substantial portions of the Software.
                     expression: option.find(".node-input-option-expression").val(),
                     location: option.find(".node-input-option-location").val(),
                     offset: option.find(".node-input-option-offset").val(),
-                    solarType : option.find(".node-input-option-solarEvents").typedInput("type") || "all",
-                    solarEvents : option.find(".node-input-option-solarEvents").typedInput("value")
+                    solarType: option.find(".node-input-option-solarEvents").typedInput("type") || "all",
+                    solarEvents: option.find(".node-input-option-solarEvents").typedInput("value")
                 };
                 if (option.find(".node-input-option-value").typedInput('type') === "num") {
                     o.payload = Number(o.value);
@@ -1867,7 +1867,7 @@ copies or substantial portions of the Software.
                     for (idx = 0; idx < tics.length; idx++) {
                         var element = $(tics[idx]);
                         if(element && element.length && element.is(":visible") ){
-                            element.css("display","inline-block");
+                            element.css("display", "inline-block");
                         }
                     }
                 } 
