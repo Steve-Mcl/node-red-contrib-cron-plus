@@ -1514,6 +1514,18 @@ module.exports = function (RED) {
                                 sendMsg(node, tt, Date.now(), true);
                             }
                             break;
+                        case "trigger-": //multiple
+                            {    
+                                if(node.tasks){
+                                    for (let index = 0; index < node.tasks.length; index++) {
+                                        const task = node.tasks[index];
+                                        if( task && (cmd_all || taskFilterMatch(task, cmd_filter)) ) {
+                                            sendMsg(node, task, Date.now(), true);   
+                                        }
+                                    }
+                                }
+                            }
+                            break;
                         case "describe": //single
                             {
                                 let exp = (cmd.expressionType === "solar") ? cmd.location : cmd.expression;
