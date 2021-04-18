@@ -14,7 +14,8 @@ describe('cron-plus Node', function () {
     afterEach(done => { helper.unload().then(() => helper.stopServer(done)); });
 
 
-    it('should inject from cron expression', function (done) {
+    it('should inject within 1 sec from cron expression * * * * * * *', function (done) {
+        this.timeout(1000); //timeout with an error if done() isn't called in time
         var flow = [
             { "id": "t1n1", "type": "cronplus", "name": "every1sec", "outputField": "payload", "timeZone": "", "persistDynamic": false, "commandResponseMsgOutput": "output1", "outputs": 1, "options": [{ "name": "schedule1", "topic": "schedule1", "payloadType": "num", "payload": "100", "expressionType": "cron", "expression": "* * * * * * *", "location": "", "offset": "0", "solarType": "all", "solarEvents": "sunrise,sunset" }], "wires": [["t1n2"]] },
             { "id": "t1n2", "type": "helper" }
@@ -83,7 +84,7 @@ describe('cron-plus Node', function () {
         });
     }
 
-    describe('basic tests', function () {
+    //describe('basic tests', function () {
         basicTest("topic1", "payload", "num", 10, "number", 10);
         basicTest("topic2", "result", "str", "10", "string", "10");
         basicTest("topic3", "payload.value", "bool", true, "boolean", true);
@@ -91,7 +92,7 @@ describe('cron-plus Node', function () {
         basicTest("topic4", "my.nested.payload", "json", val_json, "object", JSON.parse(val_json));
         var val_buf = "[1,2,3,4,5]";
         basicTest("topic5", "payload", "bin", val_buf, "object", Buffer.from(JSON.parse(val_buf)));
-    });
+    //});
 
 
     //test set 3 - test dynamic capabilities
@@ -105,7 +106,7 @@ describe('cron-plus Node', function () {
             {
                 "id": nodeName, "type": "cronplus", "name": "", "outputField": "payload", "timeZone": "", "persistDynamic": false, "commandResponseMsgOutput": "fanOut", "outputs": 5, "options": [
                     { "name": "schedule1", "topic": "schedule1", "payloadType": "default", "payload": "", "expressionType": "cron", "expression": "0 * * * * * *", "location": "", "offset": "0" },
-                    { "name": "schedule2", "topic": "schedule2", "payloadType": "default", "payload": "", "expressionType": "dates", "expression": [Date.now() + 60000, Date.now() + 120000,], "location": "", "offset": "0" },
+                    { "name": "schedule2", "topic": "schedule2", "payloadType": "default", "payload": "", "expressionType": "dates", "expression": [Date.now() + 60000, Date.now() + 120000, ], "location": "", "offset": "0" },
                     { "name": "schedule3", "topic": "schedule3", "payloadType": "default", "payload": "", "expressionType": "solar", "expression": "0 * * * * * *", "location": "55.0 -1.418", "offset": "0", "solarType": "all", "solarEvents": "sunrise,sunset" }
                 ], "wires": [["helperNode1"], ["helperNode2"], ["helperNode3"], ["helperNode4"], ["helperNode5"]]
             }
@@ -135,8 +136,8 @@ describe('cron-plus Node', function () {
                 testNode.should.have.property('id', cronNodeName);
 
                 const configChecker = function (config) {
-                    it('should be a valid config object ', function (done) {
-                        try {
+                    // it('should be a valid config object ', function (done) {
+                    //     try {
                             should(config).not.be.Null();
                             config.should.have.keys('topic', 'name', 'payload');
                             config.should.have.property("payloadType", 'default');
@@ -146,11 +147,11 @@ describe('cron-plus Node', function () {
                             } else {
                                 config.should.have.property("expression");
                             }
-                            done();
-                        } catch (error) {
-                            done(error);
-                        }
-                    });
+                    //        done();
+                    //     } catch (error) {
+                    //         done(error);
+                    //     }
+                    // });
                 };
 
                 const statusChecker = function (status, expectedType) {
@@ -168,8 +169,8 @@ describe('cron-plus Node', function () {
                         timeZone:'Europe/London'
                         type:'static'
                     */
-                    it('should be a valid status object ', function (done) {
-                        try {
+                    // it('should be a valid status object ', function (done) {
+                    //     try {
                             status.should.have.property("count").which.is.a.Number();
                             status.should.have.property("description").which.is.a.String();
                             status.should.have.property("isRunning").which.is.a.Boolean();
@@ -179,15 +180,15 @@ describe('cron-plus Node', function () {
                             } else {
                                 should(status.type).be.oneOf("static", "dynamic");
                             }
-                            done();
-                        } catch (error) {
-                            done(error);
-                        }
-                    });
+                    //        done();
+                    //     } catch (error) {
+                    //         done(error);
+                    //     }
+                    // });
 
                 };
 
-                const commandOpChecker = function (msg, test) {
+                const commandChecker = function (msg, test) {
                     /*                                                
                         topic:'schedule1'
                         timeZone:'Europe/London'
@@ -199,10 +200,10 @@ describe('cron-plus Node', function () {
                         expressionType:'solar'
                         command:'describe'
                     */
-                    describe(test.description, function () {
+                    // context("cron-plus command check", function () {
 
 
-                        it("should be valid", function (done) {
+                        it("should " + test.description, function (done) {
                             try {
                                 msg.should.have.property("payload").which.is.an.Object();
                                 var payload = msg.payload;
@@ -272,7 +273,7 @@ describe('cron-plus Node', function () {
                                 done(error);
                             }
                         });
-                    });
+                    //});
                 };
                 const staticScheduleTest = (msg) => {
                     msg.should.have.property("payload");
@@ -406,7 +407,7 @@ describe('cron-plus Node', function () {
                 ];
 
 
-
+                var commandResults = [];
                 helperNode1.on("input", function (msg) {
                     staticScheduleTest(msg);
                 });
@@ -420,16 +421,22 @@ describe('cron-plus Node', function () {
                     dynamicScheduleTest(msg);
                 });
                 helperNode5.on("input", function (msg) {
-                    var test = commandTests[msg._testIndex];
-                    if (test && test.expected) {
-                        commandOpChecker(msg, test);
-                    }
+                    
+                    commandResults.push(msg);
                     if (msg._testIndex >= (commandTests.length - 1)) {
+                        describe("cron-plus command checks", function () {
+                            for (const m of commandResults) {
+                                let test = commandTests[m._testIndex];
+                                if (test && test.expected) {
+                                    commandChecker(m, test);
+                                } 
+                            }
+                        });
                         done();
                     }
                 });
 
-                //fire 5 messages into the cron node
+                //fire messages into the cron node
                 testNode.receive({ topic: "trigger", payload: "schedule1" }); //fire input of testNode
                 testNode.receive({ topic: "trigger", payload: "schedule2" }); //fire input of testNode
                 testNode.receive({ topic: "trigger", payload: "schedule3" }); //fire input of testNode
