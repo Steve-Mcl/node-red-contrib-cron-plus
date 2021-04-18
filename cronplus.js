@@ -50,6 +50,7 @@ const PERMITTED_SOLAR_EVENTS = [
 //accepted commands using topic as the command & (in compatible cases, the payload is the schedule name)
 //commands not supported by topic are : add/update & describe
 const control_topics = [
+    { command: "trigger", payloadIsName: true },
     { command: "status", payloadIsName: true },
     { command: "list", payloadIsName: true },
     { command: "export", payloadIsName: true },
@@ -81,6 +82,7 @@ var addExtended_control_topics = function(baseCommand) {
     control_topics.push({ command: `${baseCommand}-inactive-dynamic`, payloadIsName: false });
     control_topics.push({ command: `${baseCommand}-inactive-static`, payloadIsName: false });
 };
+addExtended_control_topics("trigger"); 
 addExtended_control_topics("status"); 
 addExtended_control_topics("export"); 
 addExtended_control_topics("list"); 
@@ -1424,17 +1426,7 @@ module.exports = function (RED) {
                 done();
                 return;
             }
-            //is this an manual trigger?...
-            if(msg.topic == "trigger" && typeof msg.payload == "string"){
-                let t = getTask(node, msg.payload);
-                if(!t) {
-                    node.error(`Manual Trigger failed. Cannot find schedule named '${msg.payload}'`, msg);
-                    return;
-                }
-                sendMsg(node, t, Date.now(), true);
-                done();
-                return;
-            }
+
             let controlTopic = control_topics.find(ct => ct.command == msg.topic);
             var payload = msg.payload;
             if(controlTopic){
