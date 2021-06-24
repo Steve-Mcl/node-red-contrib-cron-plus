@@ -181,8 +181,12 @@ function validateOpt(opt, permitDefaults = true) {
     } else {
         throw new Error(`Schedule '${opt.name}' - invalid schedule type '${opt.expressionType}'. Expected expressionType to be 'cron', 'dates' or 'solar'`);
     }
-    opt.payload = permitDefaults ? opt.payload || "payload" : opt.payload;
-    if (!opt.payload) {
+    if(permitDefaults) {
+        opt.payload = ((opt.payload == null || opt.payload == "") && opt.payloadType == "num") ? 0 : opt.payload;
+        opt.payload = ((opt.payload == null || opt.payload == "") && opt.payloadType == "str") ? "" : opt.payload;
+        opt.payload = ((opt.payload == null || opt.payload == "") && opt.payloadType == "bool") ? false : opt.payload;
+    }
+    if (opt.payload == null) {
         throw new Error(`Schedule '${opt.name}' - payload property missing`);
     }
     opt.type = permitDefaults ? opt.type || "date" : opt.type;
