@@ -186,7 +186,7 @@ function validateOpt(opt, permitDefaults = true) {
         opt.payload = ((opt.payload == null || opt.payload == "") && opt.payloadType == "str") ? "" : opt.payload;
         opt.payload = ((opt.payload == null || opt.payload == "") && opt.payloadType == "bool") ? false : opt.payload;
     }
-    if (opt.payload == null) {
+    if (!opt.payloadType == "default" && opt.payload == null) {
         throw new Error(`Schedule '${opt.name}' - payload property missing`);
     }
     opt.type = permitDefaults ? opt.type || "date" : opt.type;
@@ -245,7 +245,9 @@ function _describeExpression(expression, expressionType, timeZone, offset, solar
             offset: offset || 0,
             name: "dummy",
             solarType: solarType,
-            solarEvents: solarEvents
+            solarEvents: solarEvents,
+            payloadType: "default",
+            payload: ""
         };
         
         if(validateOpt(opt)){
