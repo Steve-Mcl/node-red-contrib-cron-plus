@@ -22,9 +22,13 @@
     "sunset"
   ],
   "node-red": {
+    "version": ">=0.20.0",
     "nodes": {
       "cronplus": "cronplus.js"
     }
+  },
+  "engines": {
+    "node" : ">=8.0.0"
   },
   "author": {
     "name": "Steve-Mcl"
