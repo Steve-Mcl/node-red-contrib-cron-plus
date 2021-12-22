@@ -339,7 +339,7 @@ function formatShortDateTimeWithTZ(date, tz) {
     let o = {
         timeZone: tz ? tz : undefined,
         timeZoneName: "short",
-        hour12: false,
+        hourCycle: 'h23',
         year: "numeric",
         month: "short",
         day: "2-digit",
