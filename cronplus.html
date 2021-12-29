@@ -1347,7 +1347,7 @@ copies or substantial portions of the Software.
                     }   
                 }
                 option.name = option.name || "schedule" + (optionIndex + 1);
-                option.topic = option.topic || option.name;
+                option.topic = option.topic || "topic" + (optionIndex + 1);
                 option.payloadType = option.payloadType || option.type || "default";
                 delete option.type;                
                 if (option.expressionType == "cron" && !option.expression) option.expression = "0 * * * * * *";
