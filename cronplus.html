@@ -1370,12 +1370,12 @@ copies or substantial portions of the Software.
                     helpFuncHtml = '<span style="float: right"><button class="cron-plus-info-button" click="' + helpFunc + '();">help <i class="fa fa-external-link"></i></button></span>';
                     return '<div style="min-height:190px"><span style="font-size: 12px; font-weight: bold">' + title + '</span>' + helpFuncHtml +
                             '<hr><div>' + desc + '</div>' +
-                            '<pre  class="cron-plus-form-tip">' + text + '</pre></div>';
+                            '<pre  class="cron-plus-form-tip form-tips">' + text + '</pre></div>';
                 }
                 function initTooltip(selector, type, pos){                    
                     selector.off("mouseenter").tooltip({
                         show: { effect: "fade" },
-                        tooltipClass: "cron-plus-expression-tip",
+                        tooltipClass: "cron-plus-expression-tip form-tips",
                         position: pos,
                         content: function () { 
                             return buildExpressionTip("Expression...", "Getting description...", "", type); 
@@ -1918,7 +1918,7 @@ copies or substantial portions of the Software.
             width: 120px !important;
         }
         .cron-plus-expression-tip {
-            background: #ffe;
+            /* background: #ffe; */
             width: 100%;
             max-width: 500px;
             /* <!-- min-height: 350px; --> */
@@ -1927,7 +1927,8 @@ copies or substantial portions of the Software.
             font-size: 10px;
         }
         .cron-plus-form-tip {
-            background: #ffe;
+            background: var(--red-ui-primary-background); 
+            /* background: #ffe;  */
             padding: 6px 6px;
             vertical-align: middle;
             font-size: 12px;
@@ -1941,7 +1942,8 @@ copies or substantial portions of the Software.
         }
         span .cron-plus-form-tip {
             border-radius: 2px;
-            border: 1px solid #ddd;
+            /* border: 1px solid #ddd; */
+            border: 1px solid var(--red-ui-secondary-background);
             border-radius: 4px;
             display: inline-block;
         }
@@ -1954,12 +1956,15 @@ copies or substantial portions of the Software.
             padding-left: 5px;
             padding-right: 5px;
             text-align: left;
-            color: #666;
-            background: #ffe;
+            /* color: #666; */
+            /* background: #ffe; */
+            /* background: var(--red-ui-secondary-background);  */
             height: 30px;
             vertical-align: middle;
-            border-top: 1px solid #f0f0f0;
-            border-bottom: 1px solid #f0f0f0
+            /* border-top: 1px solid #f0f0f0;
+            border-bottom: 1px solid #f0f0f0 */
+            /* border-top: 1px solid var(--red-ui-primary-text-color); */
+            border-bottom: 1px solid var(--red-ui-primary-text-color)
         }
         #cron-plus-map {
             /* height: 300px; */
@@ -1993,6 +1998,7 @@ copies or substantial portions of the Software.
             border: none!important;
             padding: 0!important;
             cursor: pointer!important;
+            color: var(--red-ui-primary-text-color);
         }
         .cron-plus-solar-events-table {
             font-size: smaller;
@@ -2296,6 +2302,13 @@ copies or substantial portions of the Software.
   },
   {
     "command": "add",
+    "name": "new years eve 2030",
+    "expression": "2030-01-01",
+    "expressionType": "dates",
+    "payloadType": "default"
+  },
+  {
+    "command": "add",
     "name": "alarm1",
     "expressionType": "solar",
     "solarType": "selected",
@@ -2315,7 +2328,7 @@ copies or substantial portions of the Software.
                         <li>command: (string|required) The operation to perform - in this case "add"</li>
                         <li>name: (string|required) This will identify schedule</li>
                         <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
-                        <li>expression: (string|optional) A CRON expression, a date, a comma separated list of dates or an array of dates</li>
+                        <li>expression: (string|required) A CRON expression, a date, a comma separated list of dates or an array of dates</li>
                         <li>expressionType: (string|optional) specify the schedule type. (if omitted, "cron" is the default)</li>
                         <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
@@ -2327,7 +2340,7 @@ copies or substantial portions of the Software.
                         <li>command: (string|required) The operation to perform - in this case "add"</li>
                         <li>name: (string|required) This will identify schedule</li>
                         <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
-                        <li>expression: (string|optional) A CRON expression, a date, a comma separated list of dates or an array of dates</li>
+                        <li>expression: (string|array|required) A date, a comma separated list of dates or an array of dates</li>
                         <li>expressionType: (string|required) specify the schedule type - in this case "dates"</li>
                         <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
