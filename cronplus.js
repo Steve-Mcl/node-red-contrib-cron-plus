@@ -1115,7 +1115,8 @@ module.exports = function (RED) {
                     deleteTask(node, opt.name);
                 }
                 let taskCount = node.tasks ? node.tasks.length : 0;
-                let t = createTask(node, opt, taskCount, !isDynamic);  
+                let taskIndex = task && node.fanOut ? (task.node_index || 0) : taskCount;
+                let t = createTask(node, opt, taskIndex, !isDynamic);  
                 if(t){
                     if(modified) t.node_modified = true;
                     t.node_count = opCount;
