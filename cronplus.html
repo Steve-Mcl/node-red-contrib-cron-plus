@@ -1897,38 +1897,38 @@ copies or substantial portions of the Software.
         }        
 
         table.cron-plus-table {
-            border: solid 1px #aaa;
+            border: solid 1px var(--red-ui-secondary-background);
             border-collapse: collapse;
             border-spacing: 0;
         }
         table.cron-plus-table th {
-            background-color: #000;
-            border: solid 1px #aaa;
+            background-color: var(--red-ui-primary-background);
+            border: solid 1px var(--red-ui-secondary-background);
             color: #fff;
             text-align: left;
         }
         table.cron-plus-table > tr > td {
             font-family: monospace;
             font-size: 10pt;
-            border: solid 1px #aaa;
-            color: #333;
-            background: #eee;
+            border: solid 1px var(--red-ui-secondary-background);
+            color: var(--red-ui-primary-text-color);
+            background: var(--red-ui-primary-background);
         }
         .cron-plus-form-row > label {
             width: 120px !important;
         }
         .cron-plus-expression-tip {
-            /* background: #ffe; */
+            background: var(--red-ui-primary-background);
+            color: var(--red-ui-primary-text-color);
             width: 100%;
             max-width: 500px;
-            /* <!-- min-height: 350px; --> */
             max-height: 300px;
-            overflow:auto;
+            overflow: auto;
             font-size: 10px;
         }
         .cron-plus-form-tip {
-            background: var(--red-ui-primary-background); 
-            /* background: #ffe;  */
+            background: var(--red-ui-primary-background);
+            color: var(--red-ui-primary-text-color);
             padding: 6px 6px;
             vertical-align: middle;
             font-size: 12px;
@@ -1942,7 +1942,6 @@ copies or substantial portions of the Software.
         }
         span .cron-plus-form-tip {
             border-radius: 2px;
-            /* border: 1px solid #ddd; */
             border: 1px solid var(--red-ui-secondary-background);
             border-radius: 4px;
             display: inline-block;
@@ -1956,14 +1955,8 @@ copies or substantial portions of the Software.
             padding-left: 5px;
             padding-right: 5px;
             text-align: left;
-            /* color: #666; */
-            /* background: #ffe; */
-            /* background: var(--red-ui-secondary-background);  */
             height: 30px;
             vertical-align: middle;
-            /* border-top: 1px solid #f0f0f0;
-            border-bottom: 1px solid #f0f0f0 */
-            /* border-top: 1px solid var(--red-ui-primary-text-color); */
             border-bottom: 1px solid var(--red-ui-primary-text-color)
         }
         #cron-plus-map {
@@ -1984,10 +1977,11 @@ copies or substantial portions of the Software.
         }
         .cron-plus-coordinates{
             font-family: monospace;
-            background: #ffe;
+            background: var(--red-ui-primary-text-color);
+            color: var(--red-ui-primary-background);
             padding-left: 5px;
             padding-right: 5px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--red-ui-secondary-background);
         }
         pre .cron-plus-code {
             white-space: pre;
