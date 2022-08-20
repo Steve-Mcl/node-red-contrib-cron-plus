@@ -49,58 +49,100 @@ describe('cron-plus Node', function () {
      * @param {Any} returnType the expected type
      * @param {Any} returnVal the expected value
      */
-    function basicTest (topic, outputField, payloadType, payloadValue, returnType, returnVal) {
+    function basicTest (topic, outputField, payloadType, payloadValue, returnType, returnVal, opts) {
         it('should inject value of type ' + payloadType + ' in msg.' + outputField, function (done) {
-            this.timeout(1000) // timeout with an error if done() isn't called in time
-
+            this.timeout(2000) // timeout with an error if done() isn't called in time
+            opts = opts || {}
+            const cronnode = {
+                id: 't2n1',
+                type: 'cronplus',
+                name: 'test1',
+                outputField,
+                timeZone: '',
+                persistDynamic: false,
+                commandResponseMsgOutput: 'output1',
+                outputs: 1,
+                options: [
+                    { name: 'schedule1', topic, payloadType, payload: payloadValue, expressionType: 'cron', expression: '0 0 * * * * 2000', location: '', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' },
+                    { name: 'schedule2', topic, payloadType, payload: payloadValue, expressionType: 'solar', expression: '41.1,2.1', location: '41.1,2.1', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }
+                ],
+                wires: [['t2n2']],
+                // g: 'grp',
+                z: 'tab1'
+            }
             const flow = [
-                {
-                    id: 't2n1',
-                    type: 'cronplus',
-                    name: 'every1sec',
-                    outputField,
-                    timeZone: '',
-                    persistDynamic: false,
-                    commandResponseMsgOutput: 'output1',
-                    outputs: 1,
-                    options: [
-                        { name: 'schedule1', topic, payloadType, payload: payloadValue, expressionType: 'cron', expression: '0 0 * * * * 2000', location: '', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }
-                    ],
-                    wires: [['t2n2']]
-                },
-                { id: 't2n2', type: 'helper' }
+                { id: 'tab1', type: 'tab', label: 'Flow 1', env: [{ name: 'tabpos', value: opts.tabpos || '51.1, 1.1', type: 'str' }] },
+                // { id: 'grp', type: 'group', z: 'tab1', name: '', style: { label: true }, nodes: ['schedule1', 'schedule2'], env: [{ name: 'grppos', value: opts.grppos || '49.49, 1.2', type: 'str' }] },
+                cronnode,
+                { id: 't2n2', type: 'helper', z: 'tab1' }
             ]
+            if (opts.defaultLocationType && opts.defaultLocation) {
+                cronnode.defaultLocationType = opts.defaultLocationType
+                cronnode.defaultLocation = opts.defaultLocation
+            }
+            if (opts.location) {
+                cronnode.options[1].location = opts.location
+                cronnode.options[1].expression = opts.location
+            }
             helper.load(cronplusNode, flow, function () {
                 const t2n1 = helper.getNode('t2n1')
                 const t2n2 = helper.getNode('t2n2')
+                // const grp = helper.getNode('grp')
                 t2n2.on('input', function (msg) {
                     try {
                         msg.should.have.property('topic', topic)
                         msg.should.have.propertyByPath(...outputField.split('.'))
-                        if (returnVal) {
+                        if (returnType === 'default' && returnVal) {
+                            returnVal.forEach(e => {
+                                const result = getObjectProperty(msg, e.prop)
+                                should.deepEqual(result, e.value)
+                            })
+                        }
+                        if (returnType !== 'default' && returnVal) {
                             const result = getObjectProperty(msg, outputField)
                             should(result).be.of.type(returnType)
                             should.deepEqual(result, returnVal)
                         }
-                        done()
+                        helper.clearFlows().then(function () {
+                            done()
+                        })
                     } catch (err) {
                         done(err)
                     }
                 })
-                t2n1.receive({ topic: 'trigger', payload: 'schedule1' }) // trigger schedule1
+                t2n1.receive({ topic: 'trigger', payload: opts.schedule || 'schedule1' }) // trigger schedule
             })
         })
     }
 
-    // describe('basic tests', function () {
-    basicTest('topic1', 'payload', 'num', 10, 'number', 10)
-    basicTest('topic2', 'result', 'str', '10', 'string', '10')
-    basicTest('topic3', 'payload.value', 'bool', true, 'boolean', true)
-    const valJson = '{"x":"vx","n":1,"o":{}}'
-    basicTest('topic4', 'my.nested.payload', 'json', valJson, 'object', JSON.parse(valJson))
-    const valBuf = '[1,2,3,4,5]'
-    basicTest('topic5', 'payload', 'bin', valBuf, 'object', Buffer.from(JSON.parse(valBuf)))
-    // });
+    describe('basic tests', function () {
+        basicTest('topic1', 'payload', 'num', 10, 'number', 10)
+        basicTest('topic2', 'result', 'str', '10', 'string', '10')
+        basicTest('topic3', 'payload.value', 'bool', true, 'boolean', true)
+        const valJson = '{"x":"vx","n":1,"o":{}}'
+        basicTest('topic4', 'my.nested.payload', 'json', valJson, 'object', JSON.parse(valJson))
+        const valBuf = '[1,2,3,4,5]'
+        basicTest('topic5', 'payload', 'bin', valBuf, 'object', Buffer.from(JSON.parse(valBuf)))
+
+        const opts = { defaultLocationType: 'fixed', defaultLocation: '55.555, 0.5555', schedule: 'schedule2' }
+        const results = [
+            { prop: 'payload.config.location', value: '55.555, 0.5555' }
+        ]
+        basicTest('topic6', 'payload', 'default', '', 'default', results, opts)
+    })
+    // // group env var - groups not working in test env!
+    // const opts2 = { defaultLocationType: 'env', defaultLocation: 'pos', schedule: 'schedule2' }
+    // const results2 = [
+    //     { prop: 'payload.config.location', value: '49.49, 1.2' }
+    // ]
+    // basicTest('topic7', 'payload', 'default', '', 'default', results2, opts2)
+
+    // // tab env var - not supported?
+    // const opts3 = { defaultLocationType: 'env', defaultLocation: 'tabpos', schedule: 'schedule2', tabpos: '48.48, 1.48' }
+    // const results3 = [
+    //     { prop: 'payload.config.location', value: '48.48, 1.48' }
+    // ]
+    // basicTest('topic7', 'payload', 'default', '', 'default', results3, opts3)
 
     // test set 3 - test dynamic capabilities
     const getTestFlow = (nodeName = 'testNode') => {
