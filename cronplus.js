@@ -146,8 +146,12 @@ function validateOpt (opt, permitDefaults = true) {
         if (!opt.offset) {
             opt.offset = 0
         }
-        if (!opt.location) {
-            throw new Error(`Schedule '${opt.name}' - location property missing`)
+        if (opt.locationType === 'fixed' || opt.locationType === 'env') {
+            // location comes from node
+        } else {
+            if (!opt.location) {
+                throw new Error(`Schedule '${opt.name}' - location property missing`)
+            }
         }
         if (opt.solarType !== 'selected' && opt.solarType !== 'all') {
             throw new Error(`Schedule '${opt.name}' - solarType property invalid or mising. Must be either "all" or "selected"`)
@@ -186,15 +190,11 @@ function validateOpt (opt, permitDefaults = true) {
     if (!opt.payloadType === 'default' && opt.payload === null) {
         throw new Error(`Schedule '${opt.name}' - payload property missing`)
     }
-    opt.type = permitDefaults ? opt.type || 'date' : opt.type
-    if (!opt.type) {
-        throw new Error(`Schedule '${opt.name}' - type property missing`)
-    }
     const okTypes = ['default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']
     // eslint-disable-next-line eqeqeq
-    const typeOK = okTypes.find(el => { return el == opt.type })
+    const typeOK = okTypes.find(el => { return el == opt.payloadType })
     if (!typeOK) {
-        throw new Error(`Schedule '${opt.name}' - type property '${opt.type}' is not valid. Must be one of the following... ${okTypes.join(',')}`)
+        throw new Error(`Schedule '${opt.name}' - type property '${opt.payloadType}' is not valid. Must be one of the following... ${okTypes.join(',')}`)
     }
     return true
 }
@@ -238,6 +238,9 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
 
     if (expressionType === 'solar') {
         const opt = {
+            locationType: opts.locationType || opts.defaultLocationType,
+            defaultLocationType: opts.defaultLocationType,
+            defaultLocation: opts.defaultLocation,
             expressionType,
             location: expression,
             offset: offset || 0,
@@ -401,7 +404,7 @@ function isCronLike (expression) {
  * @param {integer} optionIndex An index number to use for defaults
  * @param {object} option The option object to update
 */
-function applyOptionDefaults (option, optionIndex) {
+function applyOptionDefaults (node, option, optionIndex) {
     if (isObject(option) === false) {
         return// no point in continuing
     }
@@ -433,6 +436,8 @@ function applyOptionDefaults (option, optionIndex) {
     if (!option.solarType) option.solarType = option.solarEvents ? 'selected' : 'all'
     if (!option.solarEvents) option.solarEvents = 'sunrise,sunset'
     if (!option.location) option.location = ''
+    // if (option.defaultLocationType === 'fixed' || option.defaultLocationType === 'env')
+    option.locationType = node.defaultLocationType
 }
 function parseDateSequence (expression) {
     const result = { isDateSequence: false, expression }
@@ -898,6 +903,9 @@ module.exports = function (RED) {
 
         function getTaskStatus (node, task, opts) {
             opts = opts || {}
+            opts.locationType = node.defaultLocationType
+            opts.defaultLocation = node.defaultLocation
+            opts.defaultLocationType = node.defaultLocationType
             const sol = task.node_expressionType === 'solar'
             const exp = sol ? task.node_location : task.node_expression
             const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts)
@@ -1138,7 +1146,7 @@ module.exports = function (RED) {
             } catch (error) {
                 node.error(error)
             }
-            applyOptionDefaults(opt, index)
+            applyOptionDefaults(node, opt, index)
             try {
                 validateOpt(opt)
             } catch (error) {
@@ -1574,8 +1582,8 @@ module.exports = function (RED) {
                     case 'describe': // single
                         {
                             const exp = (cmd.expressionType === 'solar') ? cmd.location : cmd.expression
-                            applyOptionDefaults(cmd)
-                            newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset: true })
+                            applyOptionDefaults(node, cmd)
+                            newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset: true, locationType: node.node_locationType })
                             sendCommandResponse(newMsg)
                         }
                         break
@@ -1811,7 +1819,7 @@ module.exports = function (RED) {
                     }
                 }
                 const exp = (opts.expressionType === 'solar') ? opts.location : opts.expression
-                const h = _describeExpression(exp, opts.expressionType, opts.timezone, opts.offset, opts.solarType, opts.solarEvents, null)
+                const h = _describeExpression(exp, opts.expressionType, opts.timezone, opts.offset, opts.solarType, opts.solarEvents, null, { locationType: opts.locationType || opts.defaultLocationType, defaultLocationType: opts.defaultLocationType, defaultLocation: opts.defaultLocation })
                 let r = null
                 if (opts.expressionType === 'solar') {
                     const times = h.eventTimes && h.eventTimes.slice(1)
