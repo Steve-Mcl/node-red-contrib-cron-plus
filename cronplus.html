@@ -112,7 +112,7 @@ copies or substantial portions of the Software.
         }
         return inputOpts;
     }
-    
+
     // Convert an integer range to options to append to select input
     function rangeToOptions(start, end, isClock) {
         var inputOpts = '', label;
@@ -123,14 +123,14 @@ copies or substantial portions of the Software.
         }
         return inputOpts;
     }
-    
+
     // Add input elements to UI as defined in cronInputs
     function addInputElements($baseEl, inputObj, onFinish) {
         $(cronInputs.container).addClass(inputObj.tag).appendTo($baseEl);
         $baseEl.children("." + inputObj.tag).append(inputObj.inputs);
         if(typeof onFinish === "function") onFinish();
     }
-    
+
     var eventHandlers = {
         periodSelect: function() {
             var period = ($(this).val());
@@ -173,7 +173,7 @@ copies or substantial portions of the Software.
                     var $yearlyEl = $selector.siblings('div.cron-yearly');
                     $yearlyEl.show()
                         .find("input[name=yearlyType][value=byDay]").prop('checked', true);
-                    break;                    
+                    break;
             } 
         }
     };
@@ -181,25 +181,23 @@ copies or substantial portions of the Software.
     // Public functions
     $.cronBuilder = function(el, options) {
         var base = this;
-        
+
         // Access to jQuery and DOM versions of element
         base.$el = $(el);
         base.el = el;
-        
+
         // Reverse reference to the DOM object
         base.$el.data('cronBuilder', base);
-        
+
         // Initialization
         base.init = function() {
             base.options = $.extend({}, $.cronBuilder.defaultOptions, options);
-        
-            
             base.$el.append(cronInputs.period);
             base.$el.find("div.cron-select-period label").text(base.options.selectorLabel);
             base.$el.find("select.cron-period-select")
                 .append(periodOpts)
                 .bind("change", eventHandlers.periodSelect);
-            
+
             addInputElements(base.$el, cronInputs.minutes, function() {
                 base.$el.find("select.cron-minutes-select").append(minuteOpts);
             });
@@ -209,13 +207,13 @@ copies or substantial portions of the Software.
                 base.$el.find("select.cron-hourly-hour").append(hourClockOpts);
                 base.$el.find("select.cron-hourly-minute").append(minuteClockOpts);
             });
-            
+
             addInputElements(base.$el, cronInputs.daily, function() {
                 base.$el.find("select.cron-daily-select").append(dayOpts); 
             });
-            
+
             addInputElements(base.$el, cronInputs.weekly);
-            
+
             addInputElements(base.$el, cronInputs.monthly, function() {
                 base.$el.find("select.cron-monthly-day").append(dayInMonthOpts); 
                 base.$el.find("select.cron-monthly-month").append(monthNumOpts); 
@@ -231,12 +229,12 @@ copies or substantial portions of the Software.
                 base.$el.find("select.cron-yearly-day-of-week").append(dayOfWeekOpts); 
                 base.$el.find("select.cron-yearly-month-by-week").append(monthOpts); 
             });
-            
-            
+
+
             base.$el.append(cronInputs.startTime);
             base.$el.find("select.cron-clock-hour").append(hourClockOpts);
             base.$el.find("select.cron-clock-minute").append(minuteClockOpts);
-            
+
             if(typeof base.options.onChange === "function") {
                 base.$el.find("select, input").change(function() {
                     base.options.onChange(base.getExpression());
@@ -245,7 +243,7 @@ copies or substantial portions of the Software.
 
             base.$el.find("select.cron-period-select")
                 .triggerHandler("change");
-            
+
         };
         
         base.getExpression = function() {
@@ -267,7 +265,7 @@ copies or substantial portions of the Software.
                         hour = "*";
                     }
                     break;
-                    
+
                 case 'Hourly':
                     {
                         let $selector = base.$el.find("div.cron-hourly");
@@ -282,7 +280,7 @@ copies or substantial portions of the Software.
                         }
                     }
                     break;
-    
+
                 case 'Daily':
                     {
                         let $selector = base.$el.find("div.cron-daily");
@@ -295,7 +293,7 @@ copies or substantial portions of the Software.
                         }
                     }
                     break;
-    
+
                 case 'Weekly':
                     {
                         let $selector = base.$el.find("div.cron-weekly");
@@ -319,7 +317,7 @@ copies or substantial portions of the Software.
                         if(ndow.length < 7 && ndow.length > 0) dow = ndow.join(",");
                     }
                     break;
-    
+
                 case 'Monthly':
                     {
                         let $selector = base.$el.find("div.cron-monthly");
@@ -340,7 +338,7 @@ copies or substantial portions of the Software.
                         if(nmonth > 1) month = "1/" + nmonth;
                     }
                     break;
-    
+
                 case 'Yearly':
                     {
                         let $selector = base.$el.find("div.cron-yearly");
@@ -362,12 +360,12 @@ copies or substantial portions of the Software.
                 default:
                     break;
             }
-            return [sec, min, hour, dom, month, dow, year].join(" ");            
+            return [sec, min, hour, dom, month, dow, year].join(" ");
         };
-        
+
         base.init();
     };
-    
+
     // Plugin default options
     $.cronBuilder.defaultOptions = {
         selectorLabel: "Select period: "
@@ -385,10 +383,10 @@ copies or substantial portions of the Software.
 
 (function(){
 
-    var debug = false;
-    var map, mapPopup, selectedLocation, selectedLocationInput;
+    let debug = true;
+    let map, mapPopup, selectedLocation, selectedLocationInput;
+    let filesAdded = []; //list of files already added
 
-    var filesAdded = []; //list of files already added 
     function checkLoadJsCssFile(filename, filetype, callback){
         if (filesAdded.indexOf(filename) === -1){
             loadJsCssFile(filename, filetype, function(){
@@ -420,7 +418,7 @@ copies or substantial portions of the Software.
             if (callback) callback();
         };
     }
-  
+
     function safeFloat(value, def) {
         if ((undefined === value) || (null === value)) {
             return def || 0.0;
@@ -472,14 +470,73 @@ copies or substantial portions of the Software.
             RED.sidebar.show("info");// <  V1.1.0
         }
     }
+
     function showCronHelp(){
         showSidebarHelpPanel();
         $("#cron-plus-expression-info").get(0).scrollIntoView();
     }
+
     function showSolarHelp(){
         showSidebarHelpPanel();
         $("#cron-plus-solar-events-info").get(0).scrollIntoView();
     }
+
+    const getIdealDialogHeight = function(){
+        return Math.min(800, ($(document).height() < 600) ? $(document).width() - 30 : $(document).height() - 100);
+    };
+
+    function initMap() {
+        //create map popup dialog
+        $("#cron-plus-map-dialog").dialog({
+            classes: {
+                "ui-dialog-content": "cron-plus-map-dialog-content"
+            },
+            autoOpen: false,
+            height: getIdealDialogHeight(),
+            width: "75%",
+            minWidth: 300,
+            maxWidth: 1000,
+            modal: true,
+            buttons: {
+                Cancel: function () {
+                    $("#cron-plus-map-dialog").dialog("close");
+                },
+                "OK": function () {
+                    $("#cron-plus-map-dialog").dialog("close");
+                    if (selectedLocation && selectedLocationInput) {
+                        if(selectedLocationInput.typedInput("instance")) {
+                            selectedLocationInput.typedInput('value', selectedLocation.lat + " " + selectedLocation.lng);
+                        } else {
+                            selectedLocationInput.val(selectedLocation.lat + " " + selectedLocation.lng)
+                        }
+                        selectedLocationInput.focus();
+                        selectedLocationInput.change();
+                    }
+                }
+            },
+            show: {
+                effect: "blind",
+                duration: 500
+            },
+            // eslint-disable-next-line no-unused-vars
+            open: function (event) {
+                $(this).css('padding', '0px 0px 0px 0px');
+                $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary');
+                $("#cron-plus-map-dialog").dialog("option", "height", getIdealDialogHeight());
+                $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", { my: "center", at: "center", of: window });
+            },
+            hide: {
+                effect: "explode",
+                duration: 500
+            },
+            // eslint-disable-next-line no-unused-vars
+            close: function (event, ui) {
+                if (debug) console.log("destroying map");
+                if (map) map.remove();
+            }
+        });
+    }
+
     function createMap(srcInput) {
         $(".cron-plus-map-loading").hide();
         if(!window.L || navigator.onLine === false){
@@ -490,8 +547,15 @@ copies or substantial portions of the Software.
         $("#cron-plus-map").show();
         $(".cron-plus-map-not-loaded").hide();
         var lat, lon;
-        var latlon = srcInput.val();
-        if(latlon){
+        selectedLocationInput = srcInput
+        function getInputValue() {
+            if(!!selectedLocationInput.typedInput("instance")) {
+                return selectedLocationInput.typedInput('value')
+            }
+            return selectedLocationInput.val()
+        }
+        var latlon = getInputValue();
+        if(latlon && typeof latlon === 'string'){
             var splitChar = " ";
             if(latlon.includes(",")) splitChar = ",";
             var arrLatlon = latlon.split(splitChar);
@@ -522,7 +586,7 @@ copies or substantial portions of the Software.
         mapPopup = window.L.popup();
 
         map.on('click', function (e) {
-            
+
             if(debug) console.log(e);
             var normaliseLat = function(x) {
                 while (x > 90.0 || x < -90.0) {
@@ -541,12 +605,11 @@ copies or substantial portions of the Software.
             selectedLocation = {};
             selectedLocation.lat = normaliseLat(e.latlng.lat);
             selectedLocation.lng = normaliseLng(e.latlng.lng);
-            var content =
+            const content =
             '<div><span>Lat:</span> <span>' + selectedLocation.lat + '</span></div>' +
                 '<div><span>Lon:</span> <span>' + selectedLocation.lng + '</span></div>';
             showMapPopup(content, e.latlng.lat, e.latlng.lng, map);
         });
-
 
         function showMapPopup(content, lat, lon, map) {
             mapPopup
@@ -554,7 +617,6 @@ copies or substantial portions of the Software.
                 .setContent(content)
                 .openOn(map);
         }
-
 
         // add a base layer
         var tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
@@ -578,7 +640,10 @@ copies or substantial portions of the Software.
             .done(function (layer) {
                 layer.setInteraction(true);
                 if (showPopupOnOpen) {
-                    showMapPopup(selectedLocation.lat, selectedLocation.lng, map);
+                    const content =
+                        '<div><span>Lat:</span> <span>' + selectedLocation.lat + '</span></div>' +
+                        '<div><span>Lon:</span> <span>' + selectedLocation.lng + '</span></div>';
+                    showMapPopup(content, selectedLocation.lat, selectedLocation.lng, map);
                 }
 
                 // eslint-disable-next-line no-unused-vars
@@ -587,9 +652,27 @@ copies or substantial portions of the Software.
                 });
                 $( "#cron-plus-map-dialog" ).dialog("option", "position", { my: "center", at: "center", of: window });
             });
-
     }
 
+    function showMap(srcInput) {
+        $("#cron-plus-map-dialog").dialog("open");
+        if (navigator.onLine === true) {
+            $(".cron-plus-map-not-loaded").show();
+            $(".cron-plus-map-loading").hide();
+            $("#cron-plus-map").hide();
+            let proto = location.protocol === 'https:' ? location.protocol : "http:";
+            checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css", "css", function () {
+                checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js", "js", function () {
+                    createMap(srcInput);
+                });
+            });
+        } else {
+            $(".cron-plus-map-not-loaded").show();
+            $(".cron-plus-map-loading").hide();
+            $("#cron-plus-map").hide();
+            return;
+        }
+    }
 
     function updateEditorLayout(){
         if(debug) console.log("cronplus-updateEditorLayout");
@@ -604,7 +687,9 @@ copies or substantial portions of the Software.
                     height -= cr.outerHeight(true);
             }
             expandRow.css("height", height + "px");
-        } 
+        }
+        const show = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
+        $('.node-input-option-location-group').toggleClass('cron-plus-hide-per-location', !show)
     }
 
     function JSONtoTable(data, header, placeholder, options) {
@@ -646,10 +731,10 @@ copies or substantial portions of the Software.
             this.input.addClass("red-ui-typedInput-input");
             this.elementDiv = this.input.wrap("<div>").parent().addClass('red-ui-typedInput-input-wrap');
             this.uiSelect = this.elementDiv.wrap( "<div>" ).parent();
-            var attrStyle = this.element.attr('style');            
-            this.uiWidth = this.input.outerWidth();            
+            var attrStyle = this.element.attr('style');
+            this.uiWidth = this.input.outerWidth();
             this.input.css("paddingLeft", 5);
-            
+
             var m;
             if ((m = /width\s*:\s*(calc\s*\(.*\)|\d+(%|px))/i.exec(attrStyle)) !== null) {
                 this.input.css('width', 'calc(100% - 4px)');
@@ -738,7 +823,7 @@ copies or substantial portions of the Software.
                             that.value(opt.value);
                         }
                     }
-                    
+
                     that._hideMenu(menu);
                 });
             });
@@ -777,7 +862,6 @@ copies or substantial portions of the Software.
             });
             this.input.trigger("focus");
             //this.button.trigger("focus");
-
         },
         _showMenu: function(menu, relativeTo) {
             if (this.disarmClick) {
@@ -869,9 +953,6 @@ copies or substantial portions of the Software.
         }
     });
 
-
-    // checkLoadJsCssFile("https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.js","js")
-
     RED.nodes.registerType('cronplus', {
         category: "input",
         icon: "timer.png",
@@ -885,16 +966,13 @@ copies or substantial portions of the Software.
             timeZone: { value: "" },
             persistDynamic: { value: false },
             commandResponseMsgOutput: { value: "output1" },
+            defaultLocation: { value: "" },
+            defaultLocationType: { value: "" },
             outputs: { value: 1 },
             options: {
                 value: [{ payload: '', topic: '', expression: '' }], 
                 validate: function(value) { 
                     var dupCheck = {};
-                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-name").removeClass("input-error");
-                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-topic").removeClass("input-error");
-                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-payload").removeClass("input-error");
-                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-expressionType").removeClass("input-error");
-                    // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-expression").removeClass("input-error");
                     if (value.length) {
                         for (var i = 0; i < value.length; i++) {
                             if(!value[i].name && value[i].topic) {
@@ -961,78 +1039,41 @@ copies or substantial portions of the Software.
             if (item) return item.name + " (" + item.expressionType + ")"; 
         },
         oneditprepare: function () {
-            var node = this;
+            const node = this;
             var dupCheck = {};
             node.commandResponseMsgOutput = ["output1", "output2", "fanOut"].indexOf(node.commandResponseMsgOutput) >= 0 ? node.commandResponseMsgOutput : "output1";
-            // $( "#node-input-commandResponseMsgOutput" ).on("change", function() {
-            //     var $tip = $("#cron-plus-outputs-tip");
-            //     var choice = $(this).val();
-            //     switch (choice) {
-            //         case "output2":
-            //             $tip.val("Send schedule events to output 1, command responses to output 2");
-            //             break;
-            //         case "fanOut":
-            //             $tip.val("Separate outputs for each static schedule, 2nd last output is for dynamic schedules, last output for command responses");
-            //             break;
-                
-            //         default:
-            //             $tip.val("All events go to output 1");
-            //             break;
-            //     }
-            // })
-            $( "#node-input-commandResponseMsgOutput" ).val(node.commandResponseMsgOutput);
 
-            var getIdealDialogHeight = function(){
-                return Math.min(800, ($(document).height() < 600) ? $(document).width() - 30 : $(document).height() - 100);
-            };
+            initMap()
 
-            //create map popup dialog
-            $( "#cron-plus-map-dialog" ).dialog({
-                classes: {
-                    "ui-dialog-content": "cron-plus-map-dialog-content"
-                },
-                autoOpen: false,
-                height: getIdealDialogHeight(),
-                width: "90%",
-                minWidth: 300,
-                maxWidth: 1000,
-                modal: true,
-                buttons: {
-                    Cancel: function() {
-                        $( "#cron-plus-map-dialog" ).dialog( "close" );
+
+            //create common location typed input
+            $('#node-input-defaultLocation').typedInput({
+                default: 'default',
+                types: [
+                    {
+                        value: "default",
+                        label: "Location per schedule",
+                        hasValue: false,
+                        icon: "fa fa-map-marker"
                     },
-                    "OK": function(){
-                        $( "#cron-plus-map-dialog" ).dialog( "close" );
-                        if(selectedLocation) {
-                            if(selectedLocationInput){
-                                selectedLocationInput.val(selectedLocation.lat + " " + selectedLocation.lng);
-                            }
-                            selectedLocationInput.focus();
-                            selectedLocationInput.change();
-                        }
-                    }
-                },
-                show: {
-                    effect: "blind",
-                    duration: 500
-                },
-                // eslint-disable-next-line no-unused-vars
-                open: function(event) {
-                    $(this).css('padding', '0px 0px 0px 0px');
-                    $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary');
-                    $( "#cron-plus-map-dialog" ).dialog( "option", "height", getIdealDialogHeight() );
-                    $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", { my: "center", at: "center", of: window });
-                },
-                hide: {
-                    effect: "explode",
-                    duration: 500
-                },
-                // eslint-disable-next-line no-unused-vars
-                close: function( event, ui ) {
-                    if(debug) console.log("destroying map");
-                    if(map) map.remove();
-                }
+                    {
+                        value: "fixed",
+                        label: "Fixed Location",
+                        icon: "fa fa-map-pin",
+                        expand: function () {
+                            showMap($('#node-input-defaultLocation'));
+                        },
+                        validate: function(v, opt) { return !!v && v.length >= 3 }
+                    },
+                    'env'
+                ]
             });
+            $("#node-input-defaultLocation").typedInput('type', node.defaultLocationType || 'default')
+            $("#node-input-defaultLocation").typedInput('value', node.defaultLocation || '')
+            $('#node-input-defaultLocation').on('change', function() {
+                const show = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
+                $('.node-input-option-location-group').toggleClass('cron-plus-hide-per-location', !show)
+            })
 
             //create the popup dialog for the cron builder
             $( "#cron-plus-expression-builder-dialog" ).dialog({
@@ -1078,15 +1119,15 @@ copies or substantial portions of the Software.
                     duration: 500
                 }
             });
-            
+
             //build cron builder
             if(!$('#cron-plus-expression-builder').data('cronBuilder')) {
                 $( "#cron-plus-expression-builder" ).cronBuilder();
             }
 
             function drawDynamicSchedulesTable(nodeId, table, spinner, callback){
-                var $table = $( table );                           
-                var $spinner = $( spinner );                 
+                var $table = $( table );
+                var $spinner = $( spinner );
                 $table.hide();
                 $spinner.show();
                 $table.empty();
@@ -1161,8 +1202,8 @@ copies or substantial portions of the Software.
                     console.error(jqXHR, textStatus, errorThrown);
                 });
             }
-            var dnRepositionResize = function(){
-                var w = ($(document).width() < 800) ? "95%" : "80%";
+            const dnRepositionResize = function(){
+                const w = ($(document).width() < 800) ? "95%" : "80%";
                 if(debug) console.log("dialog-open-drawDynamicSchedulesTable done - should now center and resize width", w);
                 $("#cron-plus-dynamic-nodes-dialog").dialog("option", "width", w);
                 $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", { my: "center", at: "center", of: window });
@@ -1243,15 +1284,12 @@ copies or substantial portions of the Software.
                         this.value = ui.item.value.tz;
                     }
                 });
-                        
             })
             .fail(function (jqXHR, textStatus, errorThrown) { 
                 console.error(jqXHR, textStatus, errorThrown);
             });
 
-                
-
-            var formatDateTimeWithTZ = function (date, tz) {
+            const formatDateTimeWithTZ = function (date, tz) {
                 if (!date) {
                     return "";
                 }
@@ -1274,7 +1312,7 @@ copies or substantial portions of the Software.
                 }
                 return dateString;
             };
-            var makeSolarChoice = function(value, label, tooltip){
+            const makeSolarChoice = function(value, label, tooltip){
                 return { 
                     label: label, 
                     value: value || label, 
@@ -1283,7 +1321,7 @@ copies or substantial portions of the Software.
                 };
             };
         
-            var solarChoices = [
+            const solarChoices = [
                 makeSolarChoice("nightEnd", "night end / astronomical dawn", "night ends, astronomical twilight starts (-18°)"), //needed? same as astronomicalDawn
                 // makeSolarChoice("astronomicalDawn", "astronomical dawn", "night ends, astronomical twilight starts (-18°)"), 
                 makeSolarChoice("nauticalDawn", "nautical dawn", "astronomical twilight ends, nautical twilight starts (-12°)"),
@@ -1303,7 +1341,7 @@ copies or substantial portions of the Software.
                 makeSolarChoice("nightStart", "astronomical dusk / night start", "astronomical twilight ends, night starts (-18°)"),  //needed? same as astronomicalDusk              
                 makeSolarChoice("nadir", "solar midnight", "when the sun is closest to nadir and the night is equidistant from dusk and dawn"),
             ];
-                
+
             function isObject(o){
                 return (typeof o === 'object' && o !== null);
             }
@@ -1323,7 +1361,7 @@ copies or substantial portions of the Software.
                 //     version = 0;
                 // } else {
                 //     version = 1;
-                // }                
+                // }
                 optionIndex = optionIndex == null ? 0 : optionIndex;
                 if (["cron", "dates", "solar"].indexOf(option.expressionType) < 0){
                     //if expressionType is not cron or solar - it may be sunrise or sunset
@@ -1365,9 +1403,8 @@ copies or substantial portions of the Software.
             function generateOption(optionIndex, option) {
                 applyOptionDefaults(optionIndex, option);
                 function buildExpressionTip(title, desc, text, type){
-                    var helpFuncHtml = '';
-                    var helpFunc = type == "solar" ? "showSolarHelp" : "showCronHelp";
-                    helpFuncHtml = '<span style="float: right"><button class="cron-plus-info-button" click="' + helpFunc + '();">help <i class="fa fa-external-link"></i></button></span>';
+                    const helpFunc = type == "solar" ? "showSolarHelp" : "showCronHelp";
+                    const helpFuncHtml = '<span style="float: right"><button id="cron-plus-tt-help-button" class="cron-plus-link-button" onclick="' + helpFunc + '();">help <i class="fa fa-external-link"></i></button></span>';
                     return '<div style="min-height:190px"><span style="font-size: 12px; font-weight: bold">' + title + '</span>' + helpFuncHtml +
                             '<hr><div>' + desc + '</div>' +
                             '<pre  class="cron-plus-form-tip form-tips">' + text + '</pre></div>';
@@ -1392,32 +1429,43 @@ copies or substantial portions of the Software.
                         }
                     }).on("blur", function (e) {
                         if(debug) console.log("initTooltip-->on-blur.  relatedTarget:", e.relatedTarget);
-                        if(e.relatedTarget && e.relatedTarget.className == "cron-plus-info-button"){
-                            if(debug) console.log('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-info-button"');
+                        if(e.relatedTarget && e.relatedTarget.id == "cron-plus-tt-help-button"){
+                            if(debug) console.log('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-link-button"');
                             if(type == "cron")
                                 showCronHelp();
                             else if(type == "solar")
                                 showSolarHelp();
                             $(this).focus();
-                            // e.preventDefault();
-                            // e.stopImmediatePropagation();
-                            // //selector.tooltip('open');
                             return false;
                         }
                         $(this).tooltip("close").tooltip("disable");
                     }).on("focusin change keyup", function (e) {
                         if(debug) console.log("initTooltip--focusin change keyup", e );
-                        var $this = $(this);
-                        var expression = $this.val();
+                        const $this = $(this);
+
                         let $timeZone = $("#node-input-timeZone");
-                        var $expressionType = $this.closest("li").find(".node-input-option-expressionType");
-                        var $offset = $this.closest("li").find(".node-input-option-offset");
-                        var $solarEvents = $this.closest("li").find(".node-input-option-solarEvents");
+                        const $expressionType = $this.closest("li").find(".node-input-option-expressionType");
+                        const expressionType = $expressionType.val();
+                        const $location = $this.closest("li").find(".node-input-option-location");
+                        const $expression = $this.closest("li").find(".node-input-option-expression");
+                        let expression
+                        if (expressionType === 'solar') {
+                            const defLocation = $("#node-input-defaultLocation").typedInput('value')
+                            const defLocationType = $("#node-input-defaultLocationType").typedInput('type')
+                            if(defLocationType === 'env' || defLocationType === 'fixed') {
+                                expression = defLocation
+                            } else {
+                                expression = $location.val()
+                            }
+                        } else {
+                            expression = $expression.val()
+                        }
                         if(!expression){
                             $this.tooltip("close").tooltip("disable");
                             return;
                         }
-                        
+                        const $offset = $this.closest("li").find(".node-input-option-offset");
+                        const $solarEvents = $this.closest("li").find(".node-input-option-solarEvents");
                         $this.tooltip("enable").tooltip("open");
                         $this.tooltip("option", "position", pos);
                         $this.tooltip({ 
@@ -1426,35 +1474,59 @@ copies or substantial portions of the Software.
                             show: { effect: "fade" },
                             content: function (callback) {
                                 if(debug) console.log("initTooltip-->content");
-                                expression = $this.val();
-                                var solarType = $solarEvents.typedInput("type");
-                                var solarEvents = $solarEvents.typedInput("value");
-                                var expressionType = $expressionType.val();
-                                var offset = $offset.val();
+
+                                const solarType = $solarEvents.typedInput("type");
+                                const solarEvents = $solarEvents.typedInput("value");
+                                const expressionType = $expressionType.val();
+                                const offset = $offset.val();
                                 let timeZone = $timeZone.val();
-                                var title_html;
+                                let title_html;
                                 let e = { expressionType: expressionType };
                                 if (timeZone) e.timeZone = timeZone;
                                 if (expressionType == "solar"){
-                                    title_html = '<b>solar events</b> at <span class="cron-plus-expression">' + expression.slice(0, 100) + (expression.length > 100 ? "..." : "") + '</span>';
-                                    if(offset != undefined && offset != null && offset != "0" && offset != 0){
-                                        title_html += '<b>';
-                                        if(offset > 0) title_html += ' +';
-                                        title_html += offset + ' minute';
-                                        if(offset != "1" && offset != "-1") title_html += 's';
-                                        title_html += '</b>';
+                                    title_html = (expr) => {
+                                        let title = '<b>solar events</b> at <span class="cron-plus-expression">' + expr.slice(0, 100) + (expr.length > 100 ? "..." : "") + '</span>';
+                                        if(offset != undefined && offset != null && offset != "0" && offset != 0){
+                                            title_html += '<b>';
+                                            if(offset > 0) title_html += ' +';
+                                            title_html += offset + ' minute';
+                                            if(offset != "1" && offset != "-1") title_html += 's';
+                                            title_html += '</b>';
+                                        }
+                                        return title
                                     }
                                     e.offset = offset;
                                     e.location = expression;
                                     e.solarType = solarType;
                                     e.solarEvents = solarEvents;
+                                    e.defaultLocationType = $("#node-input-defaultLocation").typedInput('type')
+                                    e.defaultLocation = $("#node-input-defaultLocation").typedInput('value')
+                                    e.flowId = node.z
+                                    e.nodeId = node.id
+                                    e.nodeGroupId = node.g
+                                    const env = [];
+                                    if(node.g) {
+                                        let gId = node.g
+                                        let group = RED.nodes.group(gId)
+                                        while (group) {
+                                            if (group.env && group.env.length) {
+                                                env.push(...group.env)
+                                            }
+                                            gId = group.g
+                                            group = RED.nodes.group(gId)
+                                        }
+                                    }
+                                    if(node.z && RED.nodes.workspace(node.z) && RED.nodes.workspace(node.z).env) {
+                                        env.push(...RED.nodes.workspace(node.z).env)
+                                    }
+                                    e.env = env
                                 } else {
-                                    title_html = 'Description of <span class="cron-plus-expression">' + expression.slice(0, 50) + (expression.length > 50 ? "..." : "") + '</span>';
+                                    title_html = (expr) => 'Description of <span class="cron-plus-expression">' + expr.slice(0, 50) + (expr.length > 50 ? "..." : "") + '</span>';
                                     e.expression = expression;
                                 }
 
                                 $.ajax({
-                                    url: "cronplus/0/expressionTip",
+                                    url: `cronplus/${node.id}/expressionTip`,
                                     type: 'POST',
                                     data: e,
                                     datatype: 'json'
@@ -1488,7 +1560,8 @@ copies or substantial portions of the Software.
                                             $this.tooltip("enable").tooltip("open");
                                             $this.tooltip("option", "position", pos);
                                         }, 200);
-                                        return buildExpressionTip(title_html, desc, nextInfo, expressionType);
+                                        const expr = data.expressionType === 'solar' ? data.location : data.expression
+                                        return buildExpressionTip(title_html(expr), desc, nextInfo, expressionType);
                                     }; 
                                     callback(okContent);
                                     $this.tooltip("option", "position", pos);
@@ -1502,30 +1575,29 @@ copies or substantial portions of the Software.
                         });
                     });
                 }
-                
-                
-                var container, nameField, topicField, payloadField;
-                var expressionTypeField, expressionField, solarEventsField, locationGroup, offsetField;
+
+                let container, nameField, topicField, payloadField;
+                let expressionTypeField, expressionField, solarEventsField, offsetField;
                 //build options row
                 container = $('<li/>', { style: "margin:0px 0px 5px 0px; padding:0px;" });
-                var row = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
-                var row2 = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
-                
-                var div = row.append( '<div/>' );
+                const row = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
+                const row2 = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
 
-                var span = $('<span/>', { style: "float:right; margin-right:5px;" }).appendTo(div);
-                var deleteButton = $('<a/>', { href: "#", class: "editor-button editor-button-small", style: "margin-top:27px; margin-left:5px;" }).appendTo(span);
+                const div = row.append( '<div/>' );
+
+                const span = $('<span/>', { style: "float:right; margin-right:5px;" }).appendTo(div);
+                const deleteButton = $('<a/>', { href: "#", class: "editor-button editor-button-small", style: "margin-top:27px; margin-left:5px;" }).appendTo(span);
                 $('<i/>', { class: "fa fa-remove" }).appendTo(deleteButton);
 
-                //generate the name field                              
-                var nameClass = "node-input-option-name" + ((!option.name || dupCheck[option.name]) ? " input-error" : "");
+                //generate the name field
+                const nameClass = "node-input-option-name" + ((!option.name || dupCheck[option.name]) ? " input-error" : "");
                 nameField = $('<input/>', { class: nameClass, type: "text", style: "margin-left:0px; width:calc(28% - 16px);", placeholder: 'name', title: "name", value: option.name }).appendTo(div);
                 dupCheck[option.name] = true;
 
                 //generate the topic field
-                var topicClass = "node-input-option-topic" + ((!option.topic) ? " input-error" : "");
+                const topicClass = "node-input-option-topic" + ((!option.topic) ? " input-error" : "");
                 topicField = $('<input/>', { class: topicClass, type: "text", style: "margin-left:5px; width:calc(32% - 16px);", placeholder: 'topic', title: "topic", value: option.topic }).appendTo(div);
-                
+
                 //generate the payload field
                 payloadField = $('<input/>', { class: "node-input-option-payload", type: "text", style: "margin-left:5px; width:calc(40% - 25px);", placeholder: 'payload', value: option.payload || "" }).appendTo(div);
                 payloadField.typedInput({
@@ -1537,28 +1609,27 @@ copies or substantial portions of the Software.
                         hasValue: false 
                     }, 'flow', 'global', 'str', 'num', 'bool', 'json', 'jsonata', 'bin', 'date', 'env']
                 });
+
                 //generate a dropdown for trigger type
-                var expressionType = option.expressionType || "cron";
+                const expressionType = option.expressionType || "cron";
                 expressionTypeField = $('<select/>', { class: "node-input-option-expressionType", type: "text", placeholder: "cron" }).css({ "width": "calc(28% - 16px)", "margin-right": "5px" }).appendTo(row2);
                 $('<option />', { value: "cron", text: "cron" }).appendTo(expressionTypeField);
                 $('<option />', { value: "dates", text: "date sequence" }).appendTo(expressionTypeField);
                 $('<option />', { value: "solar", text: "solar events" }).appendTo(expressionTypeField);
                 expressionTypeField.val(expressionType);
                 expressionTypeField.prop("title", "Expression Type");   
-                
-
 
                 //generate a combo for cron expression
-                var expression = option.expression == null ? "0 * * * * * *" : option.expression;
-                var expressionClass = "node-input-option-expression" + ((!expression) ? " input-error" : "");
-                var expressionMenuData = [
+                const expression = option.expression == null ? "0 * * * * * *" : option.expression;
+                const expressionClass = "node-input-option-expression" + ((!expression) ? " input-error" : "");
+                const expressionMenuData = [
                         { label: "Easy Expression Builder", value: "EEB" },
                         { label: "Every Second (* * * * * *)", value: "* * * * * *" },
                         { label: "Every minute (0 * * * * *)", value: "0 * * * * *" },
                         { label: "Every 10 minutes (0 */10 * * * *)", value: "0 */10 * * * *" },
+                        { label: "Every day at noon - 12pm (0 0 12 * * *)", value: "0 0 12 * * *" },
                         { label: "Every 20 minutes, at 9:00 AM and 5:00 PM (0 */20 9,17 * * *)", value: "0 */20 9,17 * * *" },
                         { label: "At 15, 30, and 45 minutes past the hour (0 15,30,45 * * * *)", value: "0 15,30,45 * * * *" },
-                        { label: "Every day at noon - 12pm (0 0 12 * * *)", value: "0 0 12 * * *" },
                         { label: "At 02:00 AM, on day 29 of Feb (0 0 2 29 FEB * 2020/4)", value: "0 0 2 29 FEB * 2020/4" },
                         { label: "At 07:00 AM, on the 1st Mon of the month (0 0 7 * * MON#1 *)", value: "0 0 7 * * MON#1 *" },
                         { label: "Every day at noon in Jan, Mar & Dec (0 0 12 * JAN,MAR,DEC *)", value: "0 0 12 * JAN,MAR,DEC *" },
@@ -1597,7 +1668,7 @@ copies or substantial portions of the Software.
                 solarEventsField = $('<input/>', { class: "node-input-option-solarEvents", type: "text", style: "margin-left:0px; width:calc(32% - 16px);", placeholder: 'select solar events', value: option.solarEvents || "" }).appendTo(row2);
                 solarEventsField.typedInput({
                     default: "all",
-                    types: [                    
+                    types: [
                         {
                             value: "selected",
                             label: "Selected Solar Events", 
@@ -1620,13 +1691,14 @@ copies or substantial portions of the Software.
                 });
                 solarEventsField.typedInput("type", option.solarType || "all");
                 solarEventsField.typedInput("value", option.solarEvents || "");//added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
+
                 //generate location 
-                locationGroup = $('<div class="red-ui-typedInput-container" style="margin-left:5px; width: calc(25% - 16px); /*display: inline-block;*/">' +
+                const locationGroup = $('<div class="red-ui-typedInput-container node-input-option-location-group" style="margin-left:5px; width: calc(25% - 16px);">' +
                         '<button class="red-ui-typedInput-type-select" style="width:25px" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
                         '<div class="red-ui-typedInput-input red-ui-typedInput-input-wrap" style="left: 25px; right: 0px;">' +
                         '<input class="red-ui-typedInput-input node-input-option-location" type="text" value="" placeholder="lat lng"></div> </div>');                
-                var locationField = locationGroup.find("input");
-                var locationButton = locationGroup.find("button");
+                const locationField = locationGroup.find("input");
+                const locationButton = locationGroup.find("button");
                 locationField.prop("title", "Location coordinates...");
                 locationButton.prop("title", "Show Map...");
                 if(!option.location){
@@ -1650,26 +1722,20 @@ copies or substantial portions of the Software.
                             });
                         });
 
-                        /* google maps - future possibility...
-                            https://jsfiddle.net/user2314737/8ndjuoyj/
-                            checkLoadJsCssFile("https://maps.googleapis.com/maps/api/js?v=3&amp;sensor=false","js", function(){
-                                createMap(selectedLocationInput);
-                            })
-                        */
-
                     } else {
                         $(".cron-plus-map-not-loaded").show();
                         $(".cron-plus-map-loading").hide();
                         $("#cron-plus-map").hide();
                         return;
-                    }                      
+                    }
                 });
 
                 //offset fields
                 offsetField = $('<input/>', { class: "node-input-option-offset", type: "number", min: -1439, max: 1439, style: "margin-left:7px; width:calc(15% - 16px);", value: option.offset || 0, placeholder: "offset" }).appendTo(row2);
                 offsetField.prop("title", "Minutes Offset +/- 1439");  
-                
+
                 //init tooltips
+                initTooltip(offsetField, "solar", { my: "right top", at: "right bottom+5", of: offsetField, collision: "flipfit" });
                 initTooltip(locationField, "solar", { my: "right top", at: "right bottom+5", of: offsetField, collision: "flipfit" });
                 initTooltip(expressionField, "cron", { my: "right top", at: "right bottom+5", of: expressionField /*expDropButton*/, collision: "flipfit" });
 
@@ -1682,30 +1748,30 @@ copies or substantial portions of the Software.
                         fg.addClass('input-error');
                     }
                 });
-            
+
                 nameField.keyup(function() {
                     if ($(this).val() && $(this).hasClass('input-error')) {
                         $(this).removeClass('input-error');
                     } else if (!$(this).val()) {
                         $(this).addClass('input-error');
                     }
-                });                      
-            
+                });
+
                 locationField.change(function() {
                     if ($(this).val() && locationGroup.hasClass("input-error")) {
                         locationGroup.removeClass('input-error');
                     } else if (!$(this).val()) {
                         locationGroup.removeClass('input-error');
                     }
-                });                      
-            
+                });
+
                 topicField.keyup(function() {
                     if ($(this).val() && $(this).hasClass('input-error')) {
                         $(this).removeClass('input-error');
                     } else if (!$(this).val()) {
                         $(this).addClass('input-error');
                     }
-                });                      
+                });
 
                 deleteButton.click(function() {
                     container.css({ "background": "#fee" });
@@ -1713,40 +1779,36 @@ copies or substantial portions of the Software.
                         $(this).remove();
                     });
                 });
-                
+
                 expressionTypeField.change(function(){
                     var value = expressionTypeField.val();
+                    const showLocationGroup = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
+                    locationGroup.toggleClass('cron-plus-hide-per-location', !showLocationGroup)
                     switch (value) {
                         case "solar":
-                            locationGroup.show();
-                            // locationGroup.css("display","inline-block");
-                            offsetField.show();
                             expressionField.combobox("hide");
                             solarEventsField.typedInput("show");
-                            //solarEventsField.typedInput().css("display","inline-block");
                             solarEventsField.css("display", "inline-block");
+                            locationGroup.removeClass('cron-plus-hide-location')
+                            offsetField.show();
                             break;
                         case "dates":
                             expressionField.combobox("show");
-                            // expressionField.css("display","inline-block");
-                            //expressionField.combobox().css("display","inline-block");
                             expressionField.combobox("hideMenu");
-                            locationGroup.hide();
-                            offsetField.hide();                            
                             solarEventsField.typedInput("hide");
+                            locationGroup.addClass('cron-plus-hide-location')
+                            offsetField.hide();
                             break;
                         default: //cron
                             expressionField.combobox("show");
                             expressionField.combobox("showMenu");
-                            // expressionField.combobox().css("display","inline-block");
-                            // expressionField.css("display","inline-block");
-                            locationGroup.hide();
-                            offsetField.hide();                            
                             solarEventsField.typedInput("hide");
+                            locationGroup.addClass('cron-plus-hide-location')
+                            offsetField.hide();
                             break;
                     }
                 });
-                expressionTypeField.change();
+                expressionTypeField.triggerHandler("change")
                 $("#node-input-option-container").append(container);
             }
 
@@ -1761,8 +1823,8 @@ copies or substantial portions of the Software.
                 $( "#cron-plus-dynamic-nodes-dialog" ).dialog( "open" );
             });
 
-            for (var i = 0; i < this.options.length; i++) {
-                var option = this.options[i];
+            for (let i = 0; i < this.options.length; i++) {
+                const option = this.options[i];
                 try {
                     generateOption(i, option);
                 } catch (error) {
@@ -1775,16 +1837,17 @@ copies or substantial portions of the Software.
                 handle: ".node-input-option-handle",
                 cursor: "move"
             });
+
             updateEditorLayout();
         },
         oneditsave: function () {
-            var node = this;
-            var options = $("#node-input-option-container").children();
+            const node = this;
+            const options = $("#node-input-option-container").children();
             node.options = [];
             // eslint-disable-next-line no-unused-vars
             options.each(function(i) {
-                var option = $(this);
-                var o = {
+                const option = $(this);
+                const o = {
                     name: option.find(".node-input-option-name").val(),
                     topic: option.find(".node-input-option-topic").val(),
                     payloadType: option.find(".node-input-option-payload").typedInput('type'),
@@ -1804,10 +1867,12 @@ copies or substantial portions of the Software.
                 }
                 node.options.push(o);
             });
-            var o = $("#node-input-commandResponseMsgOutput").val();
+            const o = $("#node-input-commandResponseMsgOutput").val();
             node.commandResponseMsgOutput = ["output1", "output2", "fanOut"].indexOf(o) >= 0 ? o : "output1";
-            var fanOut = node.commandResponseMsgOutput == "fanOut";
+            const fanOut = node.commandResponseMsgOutput === "fanOut";
             node.outputs = node.commandResponseMsgOutput === "output1" ? 1 : 2;
+            node.defaultLocationType = $("#node-input-defaultLocation").typedInput('type')
+            node.defaultLocation = $("#node-input-defaultLocation").typedInput('value')
             if (fanOut && options && options.length) {
                 node.outputs = options.length + 2; // in fanout mode, we add a separate output for dynamic schedules & command responses
             }
@@ -1825,11 +1890,11 @@ copies or substantial portions of the Software.
                 return !this.changed;
             },
             onclick: function () {
-                var node = this;
+                const node = this;
                 if (node.changed) {
                     return RED.notify(RED._("notification.warning", { message: RED._("notification.warnings.undeployedChanges") }), "warning");
                 }
-                var label = node._def.label.call(node);
+                let label = node._def.label.call(node);
                 if (label.length > 30) {
                     label = label.substring(0, 50) + "...";
                 }
@@ -1861,11 +1926,10 @@ copies or substantial portions of the Software.
             updateEditorLayout();
             //HACK for old versions of node-red - prior to typedInput resizing changed from code to CSS
             if(RED.settings.version && RED.settings.version.split(".")[0] < 1){
-                var tics = $(".red-ui-typedInput-container");
+                const tics = $(".red-ui-typedInput-container");
                 if(tics && tics.length){
-                    var idx = 0;
-                    for (idx = 0; idx < tics.length; idx++) {
-                        var element = $(tics[idx]);
+                    for (let idx = 0; idx < tics.length; idx++) {
+                        const element = $(tics[idx]);
                         if(element && element.length && element.is(":visible") ){
                             element.css("display", "inline-block");
                         }
@@ -1875,7 +1939,73 @@ copies or substantial portions of the Software.
         }
     });
 
-})();    
+})();
+
+function _popoutCronPlusHelp() {
+    const startTag = (name) => `<${name}>`
+    const endTag = (name) => `</${name}>`
+    const winHtml = `
+        ${startTag('html')}
+            ${startTag('head')}
+                ${startTag('title')}cronplus help${endTag('title')}
+                ${startTag('style')}
+                .fade-in {
+                    transition: opacity 1.5s ease-in-out;
+                }
+                .hidden {
+                    opacity: 0;
+                    visibility: hidden;
+                }
+                ${endTag('style')}
+            ${endTag('head')}
+            ${startTag('body')}
+                ${startTag('script')}
+                    const styles = ${JSON.stringify([].map.call(document.querySelectorAll('[rel="stylesheet"]'), e =>  e.href ))}
+                    const head = document.head || document.getElementsByTagName('head')[0]
+                    styles.forEach(href => {
+                        const el = document.createElement('link');
+                        el.rel="stylesheet"
+                        el.href = href
+                        head.appendChild(el);
+                    })
+                ${endTag('script')}
+                <div class="red-ui-editor help-content hidden" style="height: 100%">
+                    <div class="red-ui-sidebar-info">
+                        <div class="red-ui-sidebar-help-stack red-ui-panels" style="height: 100%;">
+                            <div class="red-ui-panel" style="overflow-y: auto;height: 100%;">
+                                <div class="red-ui-help" style="padding: 6px;height: 100%;">
+                                    <h1 class="red-ui-help-title">cronplus</h1>
+                                    <div class="red-ui-help">
+                                        <span class="red-ui-text-bidi-aware">
+                                            ${RED.nodes.getNodeHelp('cronplus')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ${startTag('script')}
+                    document.querySelector('.cron-plus-link-button').classList.add('hidden')
+                    const content = document.querySelector('.help-content');
+                    content.classList.add('hidden')
+                    content.classList.remove('hidden')
+                    content.classList.add('fade-in')
+                ${endTag('script')}
+            ${endTag('body')}
+        ${endTag('html')}`
+
+    const winUrl = URL.createObjectURL(
+        new Blob([winHtml], { type: "text/html" })
+    );
+
+    const win = window.open(
+        winUrl,
+        'win',
+        //'width=600,height=600,screenX=200,screenY=200'
+        'width=600,height=600'
+    )
+}
 </script>
 
 <script type="text/html" data-template-name="cronplus">
@@ -1904,7 +2034,7 @@ copies or substantial portions of the Software.
         table.cron-plus-table th {
             background-color: var(--red-ui-primary-background);
             border: solid 1px var(--red-ui-secondary-background);
-            color: #fff;
+            color: var(--red-ui-primary-text-color);
             text-align: left;
         }
         table.cron-plus-table > tr > td {
@@ -1912,7 +2042,7 @@ copies or substantial portions of the Software.
             font-size: 10pt;
             border: solid 1px var(--red-ui-secondary-background);
             color: var(--red-ui-primary-text-color);
-            background: var(--red-ui-primary-background);
+            background: var(--red-ui-tertiary-background);
         }
         .cron-plus-form-row > label {
             width: 120px !important;
@@ -1966,6 +2096,14 @@ copies or substantial portions of the Software.
             padding: 0;
             margin: 0;
         }
+        .cron-plus-hide-per-location{
+            display: none !important;
+            visibility: hidden;
+        }
+        .cron-plus-hide-location{
+            display: none !important;
+            visibility: hidden;
+        }
         .cron-plus-map-dialog-content{
             padding: 0px 0px 0px 0px;
         }
@@ -1987,7 +2125,7 @@ copies or substantial portions of the Software.
             white-space: pre;
             font-size: 9px
         }
-        .cron-plus-info-button {
+        .cron-plus-link-button {
             background: none!important;
             border: none!important;
             padding: 0!important;
@@ -2081,7 +2219,11 @@ copies or substantial portions of the Software.
     <div class="form-row cron-plus-form-row">
         <label for="node-input-timeZone"><i class="fa fa-globe"></i> Timezone</label>
         <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
-    </div>  
+    </div>
+    <div class="form-row cron-plus-form-row">
+        <label for="node-input-defaultLocation"><i class="fa fa-map-marker"></i> Location</label>
+        <input type="text" id="node-input-defaultLocation" style="width: 70%" placeholder="lat lng (optional)">
+    </div>
     <div class="form-row cron-plus-form-row">
         <label for="node-input-commandResponseMsgOutput"><i class="fa fa-dot-circle-o"></i> Outputs</label>
         <select style="width: 70%" id="node-input-commandResponseMsgOutput">
@@ -2111,8 +2253,17 @@ copies or substantial portions of the Software.
 </script>
 
 <script type="text/html" data-help-name="cronplus">
-    <p>Schedule the injection of a payload to start a flow</p>
-    <h3>Properties...</h3>
+    <style>
+        .cron-plus-link-button {
+            background: none!important;
+            border: none!important;
+            padding: 0!important;
+            cursor: pointer!important;
+            color: var(--red-ui-primary-text-color);
+        }
+    </style>
+    <p>Schedule the injection of a payload to start a flow <span style="float: right"><button class="cron-plus-link-button" onclick="_popoutCronPlusHelp()">pop out <i class="fa fa-external-link"></i></button></span></p>
+    <h3>Properties</h3>
     <dl class="message-properties">
         <h4>Output property</h4>
         <div style="padding-left: 15px">
@@ -2123,6 +2274,10 @@ copies or substantial portions of the Software.
             A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area (<a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">list</a>)
             <br>
             TIP: Timezone should be perceived from your own perspective. See the <a href="#understanding-timezone">Understanding Timezone</a> example below.
+        </div>    
+        <h4>Location (optional)</h4>
+        <div style="padding-left: 15px">
+            Here you can chose to set a common location for all solar events (optional)
         </div>    
         <h4>Outputs</h4>
         <div style="padding-left: 15px">
@@ -2276,7 +2431,7 @@ copies or substantial portions of the Software.
                         <li>stop</li>
                         <li>start</li>
             </ul>
-            This includes the <code>-all</code>, <code>-all-dynamic</code>, <code>-all-static</code>, <code>-active</code>,  <code>-active-dynamic</code>,  <code>-active-static</code>, <code>-inactive</code>, <code>-inactive-all-dynamic</code> and <code>-inactive-static</code> command topics (e.g. export-all, stop-all-dynamic, start-all-static, remove-inactive-dynamic)<br>
+            This includes the <code>-all</code>, <code>-all-dynamic</code>, <code>-all-static</code>, <code>-active</code>,  <code>-active-dynamic</code>,  <code>-active-static</code>, <code>-inactive</code>, <code>-inactive-dynamic</code> and <code>-inactive-static</code> command topics (e.g. export-all, stop-all-dynamic, start-all-static, remove-inactive-dynamic)<br>
             See <a href="#cron-plus-commands-info">commands</a> below for details.
         </dd>
     <dl class="message-properties">
