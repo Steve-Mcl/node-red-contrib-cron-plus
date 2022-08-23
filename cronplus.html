@@ -383,7 +383,7 @@ copies or substantial portions of the Software.
 
 (function(){
 
-    let debug = false;
+    let debug = true;
     let map, mapPopup, selectedLocation, selectedLocationInput;
     let filesAdded = []; //list of files already added
 
@@ -1133,7 +1133,6 @@ copies or substantial portions of the Software.
                 $table.empty();
                 $.ajax({
                     url: "cronplus/" + nodeId + "/getDynamic",
-                    // url: 'cronplus/tz',
                     type: 'POST',
                     datatype: 'json'
                 })
@@ -1403,11 +1402,15 @@ copies or substantial portions of the Software.
             function generateOption(optionIndex, option) {
                 applyOptionDefaults(optionIndex, option);
                 function buildExpressionTip(title, desc, text, type){
-                    const helpFunc = type == "solar" ? "showSolarHelp" : "showCronHelp";
-                    const helpFuncHtml = '<span style="float: right"><button id="cron-plus-tt-help-button" class="cron-plus-link-button" onclick="' + helpFunc + '();">help <i class="fa fa-external-link"></i></button></span>';
-                    return '<div style="min-height:190px"><span style="font-size: 12px; font-weight: bold">' + title + '</span>' + helpFuncHtml +
-                            '<hr><div>' + desc + '</div>' +
-                            '<pre  class="cron-plus-form-tip form-tips">' + text + '</pre></div>';
+                    const helpFunc = type == "solar" ? "showSolarHelp();" : "showCronHelp();";
+                    const helpFuncPopOut = type == "solar" ? "_popoutCronPlusHelp('cron-plus-solar-events-info');" : "_popoutCronPlusHelp('cron-plus-expression-info');";
+                    const helpFuncHtml = '<span style="float: right">' + 
+                        '<button id="cron-plus-tt-help-button" class="cron-plus-link-button" onclick="' + helpFunc + '">help </button>&nbsp;' +
+                        '<button class="cron-plus-link-button" onclick="' + helpFuncPopOut + '"> <i class="fa fa-external-link"></i></button></span>';
+                    return '<div style="min-height:190px"><span style="font-size: 12px; font-weight: bold">' + title + '</span>' + 
+                        helpFuncHtml +
+                        '<hr><div>' + desc + '</div>' +
+                        '<pre class="cron-plus-form-tip form-tips">' + text + '</pre></div>';
                 }
                 function initTooltip(selector, type, pos){                    
                     selector.off("mouseenter").tooltip({
@@ -1591,12 +1594,12 @@ copies or substantial portions of the Software.
 
                 //generate the name field
                 const nameClass = "node-input-option-name" + ((!option.name || dupCheck[option.name]) ? " input-error" : "");
-                nameField = $('<input/>', { class: nameClass, type: "text", style: "margin-left:0px; width:calc(28% - 16px);", placeholder: 'name', title: "name", value: option.name }).appendTo(div);
+                nameField = $('<input/>', { class: nameClass, type: "text", style: "margin-left:0px; width:calc(22% - 16px);", placeholder: 'name', title: "name", value: option.name }).appendTo(div);
                 dupCheck[option.name] = true;
 
                 //generate the topic field
                 const topicClass = "node-input-option-topic" + ((!option.topic) ? " input-error" : "");
-                topicField = $('<input/>', { class: topicClass, type: "text", style: "margin-left:5px; width:calc(32% - 16px);", placeholder: 'topic', title: "topic", value: option.topic }).appendTo(div);
+                topicField = $('<input/>', { class: topicClass, type: "text", style: "margin-left:5px; width:calc(32% - 36px);", placeholder: 'topic', title: "topic", value: option.topic }).appendTo(div);
 
                 //generate the payload field
                 payloadField = $('<input/>', { class: "node-input-option-payload", type: "text", style: "margin-left:5px; width:calc(40% - 25px);", placeholder: 'payload', value: option.payload || "" }).appendTo(div);
@@ -1612,7 +1615,7 @@ copies or substantial portions of the Software.
 
                 //generate a dropdown for trigger type
                 const expressionType = option.expressionType || "cron";
-                expressionTypeField = $('<select/>', { class: "node-input-option-expressionType", type: "text", placeholder: "cron" }).css({ "width": "calc(28% - 16px)", "margin-right": "5px" }).appendTo(row2);
+                expressionTypeField = $('<select/>', { class: "node-input-option-expressionType", type: "text", placeholder: "cron" }).css({ "width": "calc(22% - 16px)", "margin-right": "5px" }).appendTo(row2);
                 $('<option />', { value: "cron", text: "cron" }).appendTo(expressionTypeField);
                 $('<option />', { value: "dates", text: "date sequence" }).appendTo(expressionTypeField);
                 $('<option />', { value: "solar", text: "solar events" }).appendTo(expressionTypeField);
@@ -1638,7 +1641,7 @@ copies or substantial portions of the Software.
                         { label: "At 12:00 PM, on the last Monday of the month (0 12 * * MONL)", value: "0 12 * * MONL" },
                     ];
 
-                expressionField = $('<input/>', { class: expressionClass, type: "text", style: "margin-left:0px; width:calc(72% - 36px);", placeholder: '* * * * * * *', list: "cron-expression-example-list", title: "cron expression", value: option.expression }).appendTo(row2);
+                expressionField = $('<input/>', { class: expressionClass, type: "text", style: "margin-left:0px; width:calc(72% - 56px);", placeholder: '* * * * * * *', list: "cron-expression-example-list", title: "cron expression", value: option.expression }).appendTo(row2);
                 expressionField.appendTo(row2);
    
                 //setup the expression combo
@@ -1665,7 +1668,7 @@ copies or substantial portions of the Software.
                 expressionField.combobox("value", option.expression || "");
 
                 //generate the solar events field
-                solarEventsField = $('<input/>', { class: "node-input-option-solarEvents", type: "text", style: "margin-left:0px; width:calc(32% - 16px);", placeholder: 'select solar events', value: option.solarEvents || "" }).appendTo(row2);
+                solarEventsField = $('<input/>', { class: "node-input-option-solarEvents", type: "text", style: "margin-left:0px; width:calc(32% - 36px);", placeholder: 'select solar events', value: option.solarEvents || "" }).appendTo(row2);
                 solarEventsField.typedInput({
                     default: "all",
                     types: [
@@ -1941,13 +1944,13 @@ copies or substantial portions of the Software.
 
 })();
 
-function _popoutCronPlusHelp() {
+function _popoutCronPlusHelp(tag) {
     const startTag = (name) => `<${name}>`
     const endTag = (name) => `</${name}>`
     const winHtml = `
         ${startTag('html')}
             ${startTag('head')}
-                ${startTag('title')}cronplus help${endTag('title')}
+                ${startTag('title')}cron-plus help${endTag('title')}
                 ${startTag('style')}
                 .fade-in {
                     transition: opacity 1.5s ease-in-out;
@@ -1974,7 +1977,7 @@ function _popoutCronPlusHelp() {
                         <div class="red-ui-sidebar-help-stack red-ui-panels" style="height: 100%;">
                             <div class="red-ui-panel" style="overflow-y: auto;height: 100%;">
                                 <div class="red-ui-help" style="padding: 6px;height: 100%;">
-                                    <h1 class="red-ui-help-title">cronplus</h1>
+                                    <h1 class="red-ui-help-title">cron-plus</h1>
                                     <div class="red-ui-help">
                                         <span class="red-ui-text-bidi-aware">
                                             ${RED.nodes.getNodeHelp('cronplus')}
@@ -1986,24 +1989,41 @@ function _popoutCronPlusHelp() {
                     </div>
                 </div>
                 ${startTag('script')}
-                    document.querySelector('.cron-plus-link-button').classList.add('hidden')
-                    const content = document.querySelector('.help-content');
-                    content.classList.add('hidden')
-                    content.classList.remove('hidden')
-                    content.classList.add('fade-in')
+                    if (navigator.clipboard) {
+                        document.querySelector('.cron-plus-link-button').classList.add('hidden')
+                        const content = document.querySelector('.help-content');
+                        content.classList.add('hidden')
+                        content.classList.remove('hidden')
+                        content.classList.add('fade-in')
+                        const copyButtonLabel = "Copy"
+                        const blocks = document.querySelectorAll("pre.cron-plus-code")
+                        blocks.forEach((block) => {
+                            const button = document.createElement("button")
+                            button.innerText = copyButtonLabel
+                            button.classList.add('cron-plus-copy-button')
+                            button.addEventListener("click", copyCode)
+                            block.appendChild(button)
+                        })
+                    }
+                    async function copyCode(event) {
+                        const button = event.srcElement
+                        const pre = button.parentElement
+                        const code = pre.querySelector("code")
+                        const text = code.innerText
+                        await navigator.clipboard.writeText(text)
+                    }
                 ${endTag('script')}
             ${endTag('body')}
         ${endTag('html')}`
 
+    const BOM = new Uint8Array([0xEF,0xBB,0xBF])
     const winUrl = URL.createObjectURL(
-        new Blob([winHtml], { type: "text/html" })
-    );
-
+        new Blob([BOM, winHtml], { encoding:"UTF-8",type:"text/html;charset=UTF-8" })
+    )
     const win = window.open(
-        winUrl,
+        winUrl + (tag ? '#' + tag : ''),
         'win',
-        //'width=600,height=600,screenX=200,screenY=200'
-        'width=600,height=600'
+        'width=800,height=600'
     )
 }
 </script>
@@ -2090,21 +2110,19 @@ function _popoutCronPlusHelp() {
             border-bottom: 1px solid var(--red-ui-primary-text-color)
         }
         #cron-plus-map {
-            /* height: 300px; */
-            /* width: 100%; */
             height: 100%;
             padding: 0;
             margin: 0;
         }
-        .cron-plus-hide-per-location{
+        .cron-plus-hide-per-location {
             display: none !important;
             visibility: hidden;
         }
-        .cron-plus-hide-location{
+        .cron-plus-hide-location {
             display: none !important;
             visibility: hidden;
         }
-        .cron-plus-map-dialog-content{
+        .cron-plus-map-dialog-content {
             padding: 0px 0px 0px 0px;
         }
         .cron-plus-map-not-loaded {
@@ -2113,17 +2131,13 @@ function _popoutCronPlusHelp() {
         .cron-plus-map-loading {
             padding: 2px 10px 2px 10px;
         }
-        .cron-plus-coordinates{
+        .cron-plus-coordinates {
             font-family: monospace;
             background: var(--red-ui-primary-text-color);
             color: var(--red-ui-primary-background);
             padding-left: 5px;
             padding-right: 5px;
             border: 1px solid var(--red-ui-secondary-background);
-        }
-        pre .cron-plus-code {
-            white-space: pre;
-            font-size: 9px
         }
         .cron-plus-link-button {
             background: none!important;
@@ -2147,6 +2161,15 @@ function _popoutCronPlusHelp() {
             text-align: left;
             border: 1px dotted;
         }
+        pre.cron-plus-code {
+            white-space: pre;
+            font-size: 9px;
+            position: relative;
+            overflow: auto;
+            margin: 5px 0;
+            padding: 1rem;
+            border-radius: 4px;
+        }
     </style>  
 
     <div id="cron-plus-map-dialog" style="display: none;" title="Choose location...">
@@ -2155,7 +2178,7 @@ function _popoutCronPlusHelp() {
             <p>The interactive Map is loaded via CDN at client side (to minimise installation size) and therefore requires an internet connection. Please wait 1 moment.</p>
             <h4>Alternative ways to get coordinates...</h4>
             <ul> 
-                <li>Visit <a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer">www.latlong.net</a> (on another device if required) then copy the "Lat Long" value provided into the cronplus coordinates box</li>
+                <li>Visit <a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer">www.latlong.net</a> (on another device if required) then copy the "Lat Long" value provided into the cron-plus coordinates box</li>
                 <li>Visit google maps, MSN maps, almost any other maps website on another device to get GPS or longitude latitude value</li>
                 <li>Try one of the many longitude latitude apps available in the app store on your mobile phone</li>
                 <li>Check your satnav device - it may show coordinates</li>
@@ -2175,7 +2198,7 @@ function _popoutCronPlusHelp() {
             <p>The interactive Map is loaded via CDN at client side (to minimise installation size) and therefore requires an internet connection. As you are seeing this message, it is likely this device does not have access to the internet.</p>
             <h4>Alternative ways to get coordinates...</h4>
             <ul> 
-                <li>Visit <a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer">www.latlong.net</a> (on another device if required) then copy the "Lat Long" value provided into the cronplus coordinates box</li>
+                <li>Visit <a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer">www.latlong.net</a> (on another device if required) then copy the "Lat Long" value provided into the cron-plus coordinates box</li>
                 <li>Visit google maps, MSN maps, almost any other maps website on another device to get GPS or longitude latitude value</li>
                 <li>Try one of the many longitude latitude apps available in the app store on your mobile phone</li>
                 <li>Check your satnav device - it may show coordinates</li>
@@ -2200,33 +2223,30 @@ function _popoutCronPlusHelp() {
             <i class="fa fa-spinner fa-spin" style="font-size:48px"></i>
         </div>
     </div>
+
     <div id="cron-plus-expression-builder-dialog" style="display: none;" title="Easy Expression Builder...">
         <div id="cron-plus-expression-builder" >
         </div>
     </div>    
     <div class="form-row cron-plus-form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
-        <input type="text" id="node-input-name" placeholder="Name">
+        <input type="text" id="node-input-name" style="width: calc(100% - 130px)" placeholder="Name">
     </div>
-    <!-- <div class="form-row cron-plus-form-row">
-        <label for="node-input-config"><i class="icon-globe"></i><span data-i18n="common.label.config"> Config</span></label>
-        <input type="text" id="node-input-config">
-    </div> -->
     <div class="form-row cron-plus-form-row">
         <label for="node-input-outputField"><i class="fa fa-sign-out"></i> Output property</label>
-        <input type="text" id="node-input-outputField" style="width: 70%" placeholder="payload">
+        <input type="text" id="node-input-outputField" style="width: calc(100% - 130px)" placeholder="payload">
     </div>         
     <div class="form-row cron-plus-form-row">
         <label for="node-input-timeZone"><i class="fa fa-globe"></i> Timezone</label>
-        <input type="text" id="node-input-timeZone" placeholder="Leave empty for none/system">
+        <input type="text" id="node-input-timeZone" style="width: calc(100% - 130px)" placeholder="Leave empty for none/system">
     </div>
     <div class="form-row cron-plus-form-row">
         <label for="node-input-defaultLocation"><i class="fa fa-map-marker"></i> Location</label>
-        <input type="text" id="node-input-defaultLocation" style="width: 70%" placeholder="lat lng (optional)">
+        <input type="text" id="node-input-defaultLocation" style="width: calc(100% - 130px)" placeholder="lat lng (optional)">
     </div>
     <div class="form-row cron-plus-form-row">
         <label for="node-input-commandResponseMsgOutput"><i class="fa fa-dot-circle-o"></i> Outputs</label>
-        <select style="width: 70%" id="node-input-commandResponseMsgOutput">
+        <select style="width: calc(100% - 130px)" id="node-input-commandResponseMsgOutput">
           <option value="output1">1 output: All messages to output 1</option>
           <option value="output2">2 outputs: Schedule messages to output 1, command responses to output 2</option>
           <option value="fanOut" >Fan out: Separate outputs for static, dynamic and command messages</option>
@@ -2260,6 +2280,26 @@ function _popoutCronPlusHelp() {
             padding: 0!important;
             cursor: pointer!important;
             color: var(--red-ui-primary-text-color);
+        }
+        pre.cron-plus-code button.cron-plus-copy-button {
+            position: absolute;
+            padding: 2px;
+            background-color: var(--red-ui-primary-text-color);
+            color: var(--red-ui-primary-background);
+            border: ridge 1px var(--red-ui-secondary-text-color);
+            border-radius: 15px;
+            opacity: 0.35;
+            top: 0px;
+            right: 4px;
+            scale: 70%;
+            transform-origin: right;
+        }
+        pre.cron-plus-code button.cron-plus-copy-button:hover{
+            cursor: pointer;
+            opacity: 0.9;
+        }
+        .red-ui-help pre.cron-plus-code {
+            position: relative;
         }
     </style>
     <p>Schedule the injection of a payload to start a flow <span style="float: right"><button class="cron-plus-link-button" onclick="_popoutCronPlusHelp()">pop out <i class="fa fa-external-link"></i></button></span></p>
@@ -2440,7 +2480,7 @@ function _popoutCronPlusHelp() {
         <dd>
             <p><b>Adding one (or more) schedules</b><br>
                 Example...<br>
-                <pre class="cron-plus-code">payload: [
+                <pre class="cron-plus-code"><code>payload: [
   {
     "command": "add",
     "name": "every 6",
@@ -2468,7 +2508,7 @@ function _popoutCronPlusHelp() {
     "payload": "In 60 mins, it will be a great time to take photographs",
     "limit": null
   }
-]</pre>
+]</code></pre>
                 
                 <p><i>Details...</i><br>
                     Adding a CRON expression
@@ -2520,13 +2560,13 @@ function _popoutCronPlusHelp() {
 
             <p id="cron-plus-commands-info"><b>Getting status of a schedule or removing / stopping / pausing / starting a schedule</b><br><br>
                 Topic Method...<br>
-                <pre class="cron-plus-code">msg.topic = "command"; // command name - *see details below*,
-msg.payload = "name"; //  name of the schedule</pre>
+                <pre class="cron-plus-code"><code>msg.topic = "command"; // command name - *see details below*,
+msg.payload = "name"; //  name of the schedule</code></pre>
                 Payload Method...<br>
-                <pre class="cron-plus-code">payload: {
+                <pre class="cron-plus-code"><code>payload: {
   "command": "*see details below*",
   "name": "* name of schedule",
-}</pre>
+}</code></pre>
                 <p><i>Details...</i><br>
                     <ul>
                         <li>command: (string|required) The operation to perform - this can be one of the following...
@@ -2565,27 +2605,27 @@ msg.payload = "name"; //  name of the schedule</pre>
                 </p>
                 <p><i>Examples...</i><br>
                     Example : Using a simple topic command to manually trigger a schedule named "schedule1"<br>
-                    <pre class="cron-plus-code">msg: {
+                    <pre class="cron-plus-code"><code>msg: {
   "topic": "trigger",
   "payload": "schedule1"
-}</pre>                    
+}</code></pre>                    
                     Example : Using a simple topic command to export all dynamically added schedules...<br>
-                    <pre class="cron-plus-code">msg: {
+                    <pre class="cron-plus-code"><code>msg: {
   "topic": "export-all-dynamic"
-}</pre>                    
+}</code></pre>                    
                     Example : Using a simple topic command to delete a schedule named "schedule1"<br>
-                    <pre class="cron-plus-code">msg: {
+                    <pre class="cron-plus-code"><code>msg: {
   "topic": "remove",
   "payload": "schedule1"
-}</pre>                    
+}</code></pre>                    
                     Example : Using a cmd payload to pause all schedules...<br>
-                    <pre class="cron-plus-code">payload: {
+                    <pre class="cron-plus-code"><code>payload: {
   "command": "pause-all"
-}</pre> 
+}</code></pre> 
                     Example : Using a simple topic command to delete all dynamic schedules that have finished <br>
-                    <pre class="cron-plus-code">msg: {
+                    <pre class="cron-plus-code"><code>msg: {
   "topic": "remove-inactive-dynamic"
-}</pre>                    
+}</code></pre>                    
                 </p>
             </p>
             </p>
@@ -2594,22 +2634,22 @@ msg.payload = "name"; //  name of the schedule</pre>
 
             <p><b>Describe</b><br>
                 Example : cmd payload to describe a cron expression...<br>
-                <pre class="cron-plus-code">{
+                <pre class="cron-plus-code"><code>{
   "command": "describe",
   "expressionType": "cron",
   "expression": "0 */5 * * * MON *",
   "timeZone": "Europe/London"
-}</pre>
+}</code></pre>
                 Example : cmd payload to get all solar event times + solar state at this time...<br>
-<pre class="cron-plus-code">{
+<pre class="cron-plus-code"><code>{
   "command": "describe",
   "expressionType": "solar",
   "location": "54.9992500,-1.4170300",
   "solarType": "all",
   "timeZone": "Europe/London"
-}</pre>
+}</code></pre>
                 Example : cmd payload to get 4 solar event times + solar for a specific point in time...<br>
-    <pre class="cron-plus-code">{
+    <pre class="cron-plus-code"><code>{
   "command": "describe",
   "expressionType": "solar",
   "time": "2020-03-22 18:40",
@@ -2617,7 +2657,7 @@ msg.payload = "name"; //  name of the schedule</pre>
   "solarType": "selected",
   "solarEvents": "civilDawn,sunrise,sunset,civilDusk",
   "timeZone": "Europe/London"
-}</pre>
+}</code></pre>
                 <p><i>Details...</i><br>
                     Returns an object in payload containing human readable info for the given expression.
                     <ul>
