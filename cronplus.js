@@ -69,7 +69,8 @@ const controlTopics = [
     { command: 'clear', payloadIsName: false },
     { command: 'remove', payloadIsName: true },
     { command: 'delete', payloadIsName: true },
-    { command: 'debug', payloadIsName: true }
+    { command: 'debug', payloadIsName: true },
+    { command: 'next', payloadIsName: false }
 ]
 const addExtendedControlTopics = function (baseCommand) {
     controlTopics.push({ command: `${baseCommand}-all`, payloadIsName: false })
@@ -430,14 +431,19 @@ function applyOptionDefaults (node, option, optionIndex) {
     }
     option.name = option.name || 'schedule' + (optionIndex + 1)
     option.topic = option.topic || option.name
-    option.payloadType = option.payloadType || option.type || 'default'
+    option.payloadType = option.payloadType || option.type
+    if (option.payloadType == null && typeof option.payload === 'string' && option.payload.length) {
+        option.payloadType = 'str'
+    }
+    option.payloadType = option.payloadType || 'default'
     delete option.type
     if (option.expressionType === 'cron' && !option.expression) option.expression = '0 * * * * * *'
-    if (!option.solarType) option.solarType = option.solarEvents ? 'selected' : 'all'
-    if (!option.solarEvents) option.solarEvents = 'sunrise,sunset'
-    if (!option.location) option.location = ''
-    // if (option.defaultLocationType === 'fixed' || option.defaultLocationType === 'env')
-    option.locationType = node.defaultLocationType
+    if (option.expressionType === 'solar') {
+        if (!option.solarType) option.solarType = option.solarEvents ? 'selected' : 'all'
+        if (!option.solarEvents) option.solarEvents = 'sunrise,sunset'
+        if (!option.location) option.location = ''
+        option.locationType = node.defaultLocationType
+    }
 }
 function parseDateSequence (expression) {
     const result = { isDateSequence: false, expression }
@@ -728,6 +734,58 @@ function exportTask (task, includeStatus) {
     return o
 }
 
+function isTaskFinished (_task) {
+    if (!_task) return true
+    return _task.node_limit ? _task.node_count >= _task.node_limit : false
+}
+
+function getTaskStatus (node, task, opts) {
+    opts = opts || {}
+    opts.locationType = node.defaultLocationType
+    opts.defaultLocation = node.defaultLocation
+    opts.defaultLocationType = node.defaultLocationType
+    const sol = task.node_expressionType === 'solar'
+    const exp = sol ? task.node_location : task.node_expression
+    const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts)
+    let nextDescription = null
+    let nextDate = null
+    const running = !isTaskFinished(task)
+    if (running) {
+        // nextDescription = h.nextDescription;
+        nextDescription = h.prettyNext
+        nextDate = sol ? h.nextEventTimeOffset : h.nextDate
+    }
+    let tz = node.timeZone
+    let localTZ = ''
+    try {
+        localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone
+        if (!tz) tz = localTZ
+    // eslint-disable-next-line no-empty
+    } catch (error) { }
+
+    const r = {
+        type: task.isDynamic ? 'dynamic' : 'static',
+        modified: !!task.modified,
+        isRunning: running && task.isRunning,
+        count: task.node_count,
+        limit: task.node_limit,
+        nextDescription,
+        nextDate: running ? nextDate : null,
+        nextDateTZ: running ? formatShortDateTimeWithTZ(nextDate, tz) : null,
+        timeZone: tz,
+        serverTime: new Date(),
+        serverTimeZone: localTZ,
+        description: h.description
+    }
+    if (sol) {
+        r.solarState = h.solarState
+        if (h.offset) r.solarStateOffset = h.solarStateOffset
+        r.solarTimes = running ? h.eventTimes : null
+        r.nextDescription = running ? nextDescription : null// r.solarTimes && (r.solarTimes[0].event + " " + r.nextDescription);
+    }
+    return r
+}
+
 let userDir = ''; let persistPath = ''; let persistAvailable = false
 const cronplusDir = 'cronplusdata'
 
@@ -779,14 +837,14 @@ module.exports = function (RED) {
         }
         node.statusUpdatePending = false
 
-        const MAX_CLOCK_DIFF = 5000
+        const MAX_CLOCK_DIFF = Number(RED.settings.CRONPLUS_MAX_CLOCK_DIFF || process.env.CRONPLUS_MAX_CLOCK_DIFF || 5000)
         const clockMonitor = setInterval(function timeChecker () {
             const oldTime = timeChecker.oldTime || new Date()
             const newTime = new Date()
             const timeDiff = newTime - oldTime
             timeChecker.oldTime = newTime
             if (Math.abs(timeDiff) >= MAX_CLOCK_DIFF) {
-                node.log('System Time Change Detected - refreshing schedules! Typically this is due to blocking code elsewhere in your application')
+                node.log('System Time Change Detected - refreshing schedules! If the system time was not changed then typically occurs due to blocking code elsewhere in your application')
                 refreshTasks(node)
             }
         }, 1000)
@@ -901,52 +959,6 @@ module.exports = function (RED) {
             return task
         }
 
-        function getTaskStatus (node, task, opts) {
-            opts = opts || {}
-            opts.locationType = node.defaultLocationType
-            opts.defaultLocation = node.defaultLocation
-            opts.defaultLocationType = node.defaultLocationType
-            const sol = task.node_expressionType === 'solar'
-            const exp = sol ? task.node_location : task.node_expression
-            const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts)
-            let nextDescription = null
-            let nextDate = null
-            const running = !isTaskFinished(task)
-            if (running) {
-                // nextDescription = h.nextDescription;
-                nextDescription = h.prettyNext
-                nextDate = sol ? h.nextEventTimeOffset : h.nextDate
-            }
-            let tz = node.timeZone
-            let localTZ = ''
-            try {
-                localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone
-                if (!tz) tz = localTZ
-            // eslint-disable-next-line no-empty
-            } catch (error) { }
-
-            const r = {
-                type: task.isDynamic ? 'dynamic' : 'static',
-                modified: !!task.modified,
-                isRunning: running && task.isRunning,
-                count: task.node_count,
-                limit: task.node_limit,
-                nextDescription,
-                nextDate: running ? nextDate : null,
-                nextDateTZ: running ? formatShortDateTimeWithTZ(nextDate, tz) : null,
-                timeZone: tz,
-                serverTime: new Date(),
-                serverTimeZone: localTZ,
-                description: h.description
-            }
-            if (sol) {
-                r.solarState = h.solarState
-                if (h.offset) r.solarStateOffset = h.solarStateOffset
-                r.solarTimes = running ? h.eventTimes : null
-                r.nextDescription = running ? nextDescription : null// r.solarTimes && (r.solarTimes[0].event + " " + r.nextDescription);
-            }
-            return r
-        }
         function refreshTasks (node) {
             const tasks = node.tasks
             node.debug('Refreshing running schedules')
@@ -1109,6 +1121,12 @@ module.exports = function (RED) {
 
             for (let index = 0; index < options.length; index++) {
                 const opt = options[index]
+                opt.payloadType = opt.payloadType || opt.type
+                if (opt.payloadType == null && typeof opt.payload === 'string' && opt.payload.length) {
+                    opt.payloadType = 'str'
+                }
+                opt.payloadType = opt.payloadType || 'default'
+                delete opt.type
                 try {
                     validateOpt(opt)
                 } catch (error) {
@@ -1393,10 +1411,6 @@ module.exports = function (RED) {
             }
         }
 
-        function isTaskFinished (_task) {
-            if (!_task) return true
-            return _task.node_limit ? _task.node_count >= _task.node_limit : false
-        }
         function getNextTask (tasks) {
             try {
                 const now = new Date()
@@ -1688,6 +1702,37 @@ module.exports = function (RED) {
                         serialise()// update persistence
                     }
                         break
+                    case 'next':
+                        if (node.tasks && node.tasks.length) {
+                            // gather statuses
+                            const statuses = []
+                            for (let index = 0; index < node.tasks.length; index++) {
+                                const task = node.tasks[index]
+                                const result = {}
+                                result.config = exportTask(task, true)
+                                result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                                statuses.push(result)
+                            }
+                            const next = statuses.length && statuses.reduce((a, b) => a.status.nextDate < b.status.nextDate ? a : b)
+                            if (next) {
+                                newMsg.payload = {
+                                    name: next.config.name,
+                                    topic: next.config.topic,
+                                    next: next.status.nextDate,
+                                    nextLocal: next.status.nextDateTZ,
+                                    timeZone: next.status.serverTimeZone,
+                                    when: next.status.description,
+                                    msUntil: next.status.nextDate.valueOf() - next.status.serverTime.valueOf(),
+                                    description: next.status.nextDescription
+                                }
+                            } else {
+                                newMsg.payload = {}
+                            }
+                        } else {
+                            newMsg.payload = {}
+                        }
+                        sendCommandResponse(newMsg)
+                        break
                     case 'debug': {
                         const task = getTask(node, cmd.name)
                         const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true })
@@ -1755,7 +1800,6 @@ module.exports = function (RED) {
         // console.log("/cronplus", req.body);
         try {
             const operation = req.params.operation
-            // eslint-disable-next-line eqeqeq
             const node = RED.nodes.getNode(req.params.id)
             if (operation === 'expressionTip') {
                 const timeZone = req.body.timeZone ? req.body.timeZone : undefined
@@ -1859,7 +1903,12 @@ module.exports = function (RED) {
                     return
                 }
                 const dynNodes = node.tasks.filter((e) => e && e.isDynamic)
-                const exp = (t) => exportTask(t, false)
+                const exp = (t) => {
+                    return {
+                        config: exportTask(t, false),
+                        status: getTaskStatus(node, t, { includeSolarStateOffset: true })
+                    }
+                }
                 const dynNodesExp = dynNodes.map(exp)
                 res.json(dynNodesExp)
             } else if (operation === 'tz') {

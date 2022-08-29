@@ -18,610 +18,573 @@ copies or substantial portions of the Software.
 <script type="text/javascript">
 /* global RED, $, jQuery */
 /* global cartodb, L */
+(function ($) {
+    'use strict'
 
-(function($) {
-    "use strict";
-    
     /*
         cronBuilder - adapted for cron-plus from https://github.com/juliacscai/jquery-cron-quartz - License...
-
         The MIT License (MIT)
-
         Copyright (c) 2016 Julia Cai
-
-        Permission is hereby granted, free of charge, to any person obtaining a copy
-        of this software and associated documentation files (the "Software"), to deal
-        in the Software without restriction, including without limitation the rights
-        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-        copies of the Software, and to permit persons to whom the Software is
-        furnished to do so, subject to the following conditions:
-
-        The above copyright notice and this permission notice shall be included in all
-        copies or substantial portions of the Software.
-
-        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-        SOFTWARE.
     */
 
-    var cronInputs = {
+    const cronInputs = {
         period: '<div class="cron-select-period"><label></label><select class="cron-period-select"></select></div>',
         startTime: '<div class="cron-input cron-start-time">Start time <select class="cron-clock-hour"></select>:<select class="cron-clock-minute"></select></div>',
         container: '<div class="cron-input"></div>',
         minutes: {
             tag: 'cron-minutes',
-            inputs: [ '<p>Every <select class="cron-minutes-select"></select> minutes(s)</p>' ]
+            inputs: ['<p>Every <select class="cron-minutes-select"></select> minutes(s)</p>']
         },
         hourly: {
             tag: 'cron-hourly',
-            inputs: [ '<p><input type="radio" name="hourlyType" value="every"> Every <select class="cron-hourly-select"></select> hour(s)</p>',
-                '<p><input type="radio" name="hourlyType" value="clock"> Every day at <select class="cron-hourly-hour"></select>:<select class="cron-hourly-minute"></select></p>' ]
+            inputs: ['<p><input type="radio" name="hourlyType" value="every"> Every <select class="cron-hourly-select"></select> hour(s)</p>',
+                '<p><input type="radio" name="hourlyType" value="clock"> Every day at <select class="cron-hourly-hour"></select>:<select class="cron-hourly-minute"></select></p>']
         },
         daily: {
             tag: 'cron-daily',
-            inputs: [ '<p><input type="radio" name="dailyType" value="every"> Every <select class="cron-daily-select"></select> day(s)</p>',
-                '<p><input type="radio" name="dailyType" value="clock"> Every week day</p>' ]
+            inputs: ['<p><input type="radio" name="dailyType" value="every"> Every <select class="cron-daily-select"></select> day(s)</p>',
+                '<p><input type="radio" name="dailyType" value="clock"> Every week day</p>']
         },
         weekly: {
             tag: 'cron-weekly',
-            inputs: [ '<p><input type="checkbox" name="dayOfWeekMon"> Monday  <input type="checkbox" name="dayOfWeekTue"> Tuesday  ' + 
-                '<input type="checkbox" name="dayOfWeekWed"> Wednesday  <input type="checkbox" name="dayOfWeekThu"> Thursday</p>', 
-                '<p><input type="checkbox" name="dayOfWeekFri"> Friday  <input type="checkbox" name="dayOfWeekSat"> Saturday  ' + 
-                '<input type="checkbox" name="dayOfWeekSun"> Sunday</p>' ]
+            inputs: ['<p><input type="checkbox" name="dayOfWeekMon"> Monday  <input type="checkbox" name="dayOfWeekTue"> Tuesday  ' +
+                '<input type="checkbox" name="dayOfWeekWed"> Wednesday  <input type="checkbox" name="dayOfWeekThu"> Thursday</p>',
+            '<p><input type="checkbox" name="dayOfWeekFri"> Friday  <input type="checkbox" name="dayOfWeekSat"> Saturday  ' +
+                '<input type="checkbox" name="dayOfWeekSun"> Sunday</p>']
         },
         monthly: {
             tag: 'cron-monthly',
-            inputs: [ '<p><input type="radio" name="monthlyType" value="byDay"> Day <select class="cron-monthly-day"></select> of every <select class="cron-monthly-month"></select> month(s)</p>',
-                '<p><input type="radio" name="monthlyType" value="byWeek"> The <select class="cron-monthly-nth-day"></select> ' + 
+            inputs: ['<p><input type="radio" name="monthlyType" value="byDay"> Day <select class="cron-monthly-day"></select> of every <select class="cron-monthly-month"></select> month(s)</p>',
+                '<p><input type="radio" name="monthlyType" value="byWeek"> The <select class="cron-monthly-nth-day"></select> ' +
                 '<select class="cron-monthly-day-of-week"></select> of every <select class="cron-monthly-month-by-week"></select> month(s)</p>']
         },
         yearly: {
             tag: 'cron-yearly',
-            inputs: [ '<p><input type="radio" name="yearlyType" value="byDay"> Every <select class="cron-yearly-month"></select> <select class="cron-yearly-day"></select></p>',
-                '<p><input type="radio" name="yearlyType" value="byWeek"> The <select class="cron-yearly-nth-day"></select> ' + 
+            inputs: ['<p><input type="radio" name="yearlyType" value="byDay"> Every <select class="cron-yearly-month"></select> <select class="cron-yearly-day"></select></p>',
+                '<p><input type="radio" name="yearlyType" value="byWeek"> The <select class="cron-yearly-nth-day"></select> ' +
                 '<select class="cron-yearly-day-of-week"></select> of <select class="cron-yearly-month-by-week"></select></p>']
         }
-    };
+    }
 
-    var periodOpts = arrayToOptions(["Minutes", "Hourly", "Daily", "Weekly", "Monthly", "Yearly"]);
-    var minuteOpts = rangeToOptions(1, 59);
-    var hourOpts = rangeToOptions(1, 24);
-    var dayOpts = rangeToOptions(1, 31);
-    var minuteClockOpts = rangeToOptions(0, 59, true);
-    var hourClockOpts = rangeToOptions(0, 23, true);
-    var dayInMonthOpts = rangeToOptions(1, 31);
-    var monthOpts = arrayToOptions(["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-                                    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-    var monthNumOpts = rangeToOptions(1, 12);
-    var nthWeekOpts = arrayToOptions(["First", "Second", "Third", "Forth", "Last"], [1, 2, 3, 4, "L"]);
-    var dayOfWeekOpts = arrayToOptions(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]);
-    
-    
+    const periodOpts = arrayToOptions(['Minutes', 'Hourly', 'Daily', 'Weekly', 'Monthly', 'Yearly'])
+    const minuteOpts = rangeToOptions(1, 59)
+    const hourOpts = rangeToOptions(1, 24)
+    const dayOpts = rangeToOptions(1, 31)
+    const minuteClockOpts = rangeToOptions(0, 59, true)
+    const hourClockOpts = rangeToOptions(0, 23, true)
+    const dayInMonthOpts = rangeToOptions(1, 31)
+    const monthOpts = arrayToOptions(['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    const monthNumOpts = rangeToOptions(1, 12)
+    const nthWeekOpts = arrayToOptions(['First', 'Second', 'Third', 'Forth', 'Last'], [1, 2, 3, 4, 'L'])
+    const dayOfWeekOpts = arrayToOptions(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'])
+
     // Convert an array of values to options to append to select input
-    function arrayToOptions(opts, values) {
-        var inputOpts = '';
-        for (var i = 0; i < opts.length; i++) {
-            var value = opts[i];
-            if(values != null) value = values[i];
-            inputOpts += "<option value='" + value + "'>" + opts[i] + "</option>\n";
-            
+    function arrayToOptions (opts, values) {
+        let inputOpts = ''
+        for (let i = 0; i < opts.length; i++) {
+            let value = opts[i]
+            if (values != null) value = values[i]
+            inputOpts += "<option value='" + value + "'>" + opts[i] + '</option>\n'
         }
-        return inputOpts;
+        return inputOpts
     }
 
     // Convert an integer range to options to append to select input
-    function rangeToOptions(start, end, isClock) {
-        var inputOpts = '', label;
-        for (var i = start; i <= end; i++) {
-            if(isClock && i < 10) label = "0" + i;
-            else label = i;
-            inputOpts += "<option value='" + i + "'>" + label + "</option>\n";
+    function rangeToOptions (start, end, isClock) {
+        let inputOpts = ''; let label
+        for (let i = start; i <= end; i++) {
+            if (isClock && i < 10) label = '0' + i
+            else label = i
+            inputOpts += "<option value='" + i + "'>" + label + '</option>\n'
         }
-        return inputOpts;
+        return inputOpts
     }
 
     // Add input elements to UI as defined in cronInputs
-    function addInputElements($baseEl, inputObj, onFinish) {
-        $(cronInputs.container).addClass(inputObj.tag).appendTo($baseEl);
-        $baseEl.children("." + inputObj.tag).append(inputObj.inputs);
-        if(typeof onFinish === "function") onFinish();
+    function addInputElements ($baseEl, inputObj, onFinish) {
+        $(cronInputs.container).addClass(inputObj.tag).appendTo($baseEl)
+        $baseEl.children('.' + inputObj.tag).append(inputObj.inputs)
+        if (typeof onFinish === 'function') onFinish()
     }
 
-    var eventHandlers = {
-        periodSelect: function() {
-            var period = ($(this).val());
-            var $selector = $(this).parent();
-            $selector.siblings('div.cron-input').hide();
-            $selector.siblings().find("select option").removeAttr("selected");
-            $selector.siblings().find("select option:first").attr("selected", "selected");
-            $selector.siblings('div.cron-start-time').show();
-            $selector.siblings('div.cron-start-time').children("select.cron-clock-hour").val('12');
-            switch(period) {
-                case 'Minutes':
-                    $selector.siblings('div.cron-minutes')
-                        .show()
-                        .find("select.cron-minutes-select").val('1');
-                    $selector.siblings('div.cron-start-time').hide();
-                    break;
-                case 'Hourly':
-                    var $hourlyEl = $selector.siblings('div.cron-hourly');
-                    $hourlyEl.show()
-                        .find("input[name=hourlyType][value=every]").prop('checked', true);
-                    $hourlyEl.find("select.cron-hourly-hour").val('12');
-                    $selector.siblings('div.cron-start-time').hide();
-                    break;
-                case 'Daily':
-                    var $dailyEl = $selector.siblings('div.cron-daily');
-                    $dailyEl.show()
-                        .find("input[name=dailyType][value=every]").prop('checked', true);
-                    break;
-                case 'Weekly':
-                    $selector.siblings('div.cron-weekly')
-                        .show()
-                        .find("input[type=checkbox]").prop('checked', false);
-                    break;
-                case 'Monthly':
-                    var $monthlyEl = $selector.siblings('div.cron-monthly');
-                    $monthlyEl.show()
-                        .find("input[name=monthlyType][value=byDay]").prop('checked', true);
-                    break;
-                case 'Yearly':
-                    var $yearlyEl = $selector.siblings('div.cron-yearly');
-                    $yearlyEl.show()
-                        .find("input[name=yearlyType][value=byDay]").prop('checked', true);
-                    break;
-            } 
+    const eventHandlers = {
+        periodSelect: function () {
+            const period = ($(this).val())
+            const $selector = $(this).parent()
+            $selector.siblings('div.cron-input').hide()
+            $selector.siblings().find('select option').removeAttr('selected')
+            $selector.siblings().find('select option:first').attr('selected', 'selected')
+            $selector.siblings('div.cron-start-time').show()
+            $selector.siblings('div.cron-start-time').children('select.cron-clock-hour').val('12')
+            switch (period) {
+            case 'Minutes':
+                $selector.siblings('div.cron-minutes')
+                    .show()
+                    .find('select.cron-minutes-select').val('1')
+                $selector.siblings('div.cron-start-time').hide()
+                break
+            case 'Hourly':{
+                const $hourlyEl = $selector.siblings('div.cron-hourly')
+                $hourlyEl.show()
+                    .find('input[name=hourlyType][value=every]').prop('checked', true)
+                $hourlyEl.find('select.cron-hourly-hour').val('12')
+                $selector.siblings('div.cron-start-time').hide() }
+                break
+            case 'Daily':{
+                const $dailyEl = $selector.siblings('div.cron-daily')
+                $dailyEl.show()
+                    .find('input[name=dailyType][value=every]').prop('checked', true) }
+                break
+            case 'Weekly':
+                $selector.siblings('div.cron-weekly')
+                    .show()
+                    .find('input[type=checkbox]').prop('checked', false)
+                break
+            case 'Monthly':{
+                const $monthlyEl = $selector.siblings('div.cron-monthly')
+                $monthlyEl.show()
+                    .find('input[name=monthlyType][value=byDay]').prop('checked', true) }
+                break
+            case 'Yearly':{
+                const $yearlyEl = $selector.siblings('div.cron-yearly')
+                $yearlyEl.show()
+                    .find('input[name=yearlyType][value=byDay]').prop('checked', true) }
+                break
+            }
         }
-    };
-    
+    }
+
     // Public functions
-    $.cronBuilder = function(el, options) {
-        var base = this;
+    $.cronBuilder = function (el, options) {
+        const base = this
 
         // Access to jQuery and DOM versions of element
-        base.$el = $(el);
-        base.el = el;
+        base.$el = $(el)
+        base.el = el
 
         // Reverse reference to the DOM object
-        base.$el.data('cronBuilder', base);
+        base.$el.data('cronBuilder', base)
 
         // Initialization
-        base.init = function() {
-            base.options = $.extend({}, $.cronBuilder.defaultOptions, options);
-            base.$el.append(cronInputs.period);
-            base.$el.find("div.cron-select-period label").text(base.options.selectorLabel);
-            base.$el.find("select.cron-period-select")
+        base.init = function () {
+            base.options = $.extend({}, $.cronBuilder.defaultOptions, options)
+            base.$el.append(cronInputs.period)
+            base.$el.find('div.cron-select-period label').text(base.options.selectorLabel)
+            base.$el.find('select.cron-period-select')
                 .append(periodOpts)
-                .bind("change", eventHandlers.periodSelect);
+                .bind('change', eventHandlers.periodSelect)
 
-            addInputElements(base.$el, cronInputs.minutes, function() {
-                base.$el.find("select.cron-minutes-select").append(minuteOpts);
-            });
+            addInputElements(base.$el, cronInputs.minutes, function () {
+                base.$el.find('select.cron-minutes-select').append(minuteOpts)
+            })
 
-            addInputElements(base.$el, cronInputs.hourly, function() {
-                base.$el.find("select.cron-hourly-select").append(hourOpts); 
-                base.$el.find("select.cron-hourly-hour").append(hourClockOpts);
-                base.$el.find("select.cron-hourly-minute").append(minuteClockOpts);
-            });
+            addInputElements(base.$el, cronInputs.hourly, function () {
+                base.$el.find('select.cron-hourly-select').append(hourOpts)
+                base.$el.find('select.cron-hourly-hour').append(hourClockOpts)
+                base.$el.find('select.cron-hourly-minute').append(minuteClockOpts)
+            })
 
-            addInputElements(base.$el, cronInputs.daily, function() {
-                base.$el.find("select.cron-daily-select").append(dayOpts); 
-            });
+            addInputElements(base.$el, cronInputs.daily, function () {
+                base.$el.find('select.cron-daily-select').append(dayOpts)
+            })
 
-            addInputElements(base.$el, cronInputs.weekly);
+            addInputElements(base.$el, cronInputs.weekly)
 
-            addInputElements(base.$el, cronInputs.monthly, function() {
-                base.$el.find("select.cron-monthly-day").append(dayInMonthOpts); 
-                base.$el.find("select.cron-monthly-month").append(monthNumOpts); 
-                base.$el.find("select.cron-monthly-nth-day").append(nthWeekOpts); 
-                base.$el.find("select.cron-monthly-day-of-week").append(dayOfWeekOpts); 
-                base.$el.find("select.cron-monthly-month-by-week").append(monthNumOpts);
-            });
+            addInputElements(base.$el, cronInputs.monthly, function () {
+                base.$el.find('select.cron-monthly-day').append(dayInMonthOpts)
+                base.$el.find('select.cron-monthly-month').append(monthNumOpts)
+                base.$el.find('select.cron-monthly-nth-day').append(nthWeekOpts)
+                base.$el.find('select.cron-monthly-day-of-week').append(dayOfWeekOpts)
+                base.$el.find('select.cron-monthly-month-by-week').append(monthNumOpts)
+            })
 
-            addInputElements(base.$el, cronInputs.yearly, function() {
-                base.$el.find("select.cron-yearly-month").append(monthOpts); 
-                base.$el.find("select.cron-yearly-day").append(dayInMonthOpts); 
-                base.$el.find("select.cron-yearly-nth-day").append(nthWeekOpts); 
-                base.$el.find("select.cron-yearly-day-of-week").append(dayOfWeekOpts); 
-                base.$el.find("select.cron-yearly-month-by-week").append(monthOpts); 
-            });
+            addInputElements(base.$el, cronInputs.yearly, function () {
+                base.$el.find('select.cron-yearly-month').append(monthOpts)
+                base.$el.find('select.cron-yearly-day').append(dayInMonthOpts)
+                base.$el.find('select.cron-yearly-nth-day').append(nthWeekOpts)
+                base.$el.find('select.cron-yearly-day-of-week').append(dayOfWeekOpts)
+                base.$el.find('select.cron-yearly-month-by-week').append(monthOpts)
+            })
 
+            base.$el.append(cronInputs.startTime)
+            base.$el.find('select.cron-clock-hour').append(hourClockOpts)
+            base.$el.find('select.cron-clock-minute').append(minuteClockOpts)
 
-            base.$el.append(cronInputs.startTime);
-            base.$el.find("select.cron-clock-hour").append(hourClockOpts);
-            base.$el.find("select.cron-clock-minute").append(minuteClockOpts);
-
-            if(typeof base.options.onChange === "function") {
-                base.$el.find("select, input").change(function() {
-                    base.options.onChange(base.getExpression());
-                });
+            if (typeof base.options.onChange === 'function') {
+                base.$el.find('select, input').change(function () {
+                    base.options.onChange(base.getExpression())
+                })
             }
 
-            base.$el.find("select.cron-period-select")
-                .triggerHandler("change");
+            base.$el.find('select.cron-period-select')
+                .triggerHandler('change')
+        }
 
-        };
-        
-        base.getExpression = function() {
-            //var b = c.data("block");
-            var sec = 0; // ignoring seconds by default
-            var year = "*"; // every year by default
-            var dow = "?";
-            var month = "*", dom = "*";
-            var min = base.$el.find("select.cron-clock-minute").val();
-            var hour = base.$el.find("select.cron-clock-hour").val();
-            var period = base.$el.find("select.cron-period-select").val();
+        base.getExpression = function () {
+            // var b = c.data("block");
+            const sec = 0 // ignoring seconds by default
+            const year = '*' // every year by default
+            let dow = '?'
+            let month = '*'; let dom = '*'
+            let min = base.$el.find('select.cron-clock-minute').val()
+            let hour = base.$el.find('select.cron-clock-hour').val()
+            const period = base.$el.find('select.cron-period-select').val()
             switch (period) {
-                case 'Minutes':
-                    {
-                        let $selector = base.$el.find("div.cron-minutes");
-                        let nmin = $selector.find("select.cron-minutes-select").val();
-                        if(nmin > 1) min = "0/" + nmin;
-                        else min = "*";
-                        hour = "*";
-                    }
-                    break;
+            case 'Minutes':
+                {
+                    const $selector = base.$el.find('div.cron-minutes')
+                    const nmin = $selector.find('select.cron-minutes-select').val()
+                    if (nmin > 1) min = '0/' + nmin
+                    else min = '*'
+                    hour = '*'
+                }
+                break
 
-                case 'Hourly':
-                    {
-                        let $selector = base.$el.find("div.cron-hourly");
-                        if($selector.find("input[name=hourlyType][value=every]").is(":checked")){
-                            min = 0;
-                            hour = "*";
-                            var nhour = $selector.find("select.cron-hourly-select").val();
-                            if(nhour > 1) hour = "0/" + nhour;
-                        } else {
-                            min = $selector.find("select.cron-hourly-minute").val();
-                            hour = $selector.find("select.cron-hourly-hour").val();
-                        }
+            case 'Hourly':
+                {
+                    const $selector = base.$el.find('div.cron-hourly')
+                    if ($selector.find('input[name=hourlyType][value=every]').is(':checked')) {
+                        min = 0
+                        hour = '*'
+                        const nhour = $selector.find('select.cron-hourly-select').val()
+                        if (nhour > 1) hour = '0/' + nhour
+                    } else {
+                        min = $selector.find('select.cron-hourly-minute').val()
+                        hour = $selector.find('select.cron-hourly-hour').val()
                     }
-                    break;
+                }
+                break
 
-                case 'Daily':
-                    {
-                        let $selector = base.$el.find("div.cron-daily");
-                        if($selector.find("input[name=dailyType][value=every]").is(":checked")){
-                            var ndom = $selector.find("select.cron-daily-select").val();
-                            if(ndom > 1) dom = "1/" + ndom;
-                        } else {
-                            dom = "?";
-                            dow = "MON-FRI";
-                        }
+            case 'Daily':
+                {
+                    const $selector = base.$el.find('div.cron-daily')
+                    if ($selector.find('input[name=dailyType][value=every]').is(':checked')) {
+                        const ndom = $selector.find('select.cron-daily-select').val()
+                        if (ndom > 1) dom = '1/' + ndom
+                    } else {
+                        dom = '?'
+                        dow = 'MON-FRI'
                     }
-                    break;
+                }
+                break
 
-                case 'Weekly':
-                    {
-                        let $selector = base.$el.find("div.cron-weekly");
-                        let ndow = [];
-                        if($selector.find("input[name=dayOfWeekMon]").is(":checked"))
-                            ndow.push("MON");
-                        if($selector.find("input[name=dayOfWeekTue]").is(":checked"))
-                            ndow.push("TUE");
-                        if($selector.find("input[name=dayOfWeekWed]").is(":checked"))
-                            ndow.push("WED");
-                        if($selector.find("input[name=dayOfWeekThu]").is(":checked"))
-                            ndow.push("THU");
-                        if($selector.find("input[name=dayOfWeekFri]").is(":checked"))
-                            ndow.push("FRI");
-                        if($selector.find("input[name=dayOfWeekSat]").is(":checked"))
-                            ndow.push("SAT");
-                        if($selector.find("input[name=dayOfWeekSun]").is(":checked"))
-                            ndow.push("SUN");
-                        dow = "*";
-                        dom = "?";
-                        if(ndow.length < 7 && ndow.length > 0) dow = ndow.join(",");
-                    }
-                    break;
+            case 'Weekly':
+                {
+                    const $selector = base.$el.find('div.cron-weekly')
+                    const ndow = []
+                    if ($selector.find('input[name=dayOfWeekMon]').is(':checked')) { ndow.push('MON') }
+                    if ($selector.find('input[name=dayOfWeekTue]').is(':checked')) { ndow.push('TUE') }
+                    if ($selector.find('input[name=dayOfWeekWed]').is(':checked')) { ndow.push('WED') }
+                    if ($selector.find('input[name=dayOfWeekThu]').is(':checked')) { ndow.push('THU') }
+                    if ($selector.find('input[name=dayOfWeekFri]').is(':checked')) { ndow.push('FRI') }
+                    if ($selector.find('input[name=dayOfWeekSat]').is(':checked')) { ndow.push('SAT') }
+                    if ($selector.find('input[name=dayOfWeekSun]').is(':checked')) { ndow.push('SUN') }
+                    dow = '*'
+                    dom = '?'
+                    if (ndow.length < 7 && ndow.length > 0) dow = ndow.join(',')
+                }
+                break
 
-                case 'Monthly':
-                    {
-                        let $selector = base.$el.find("div.cron-monthly");
-                        let nmonth;
-                        let mnd;
-                        if($selector.find("input[name=monthlyType][value=byDay]").is(":checked")){
-                            month = "*";
-                            nmonth = $selector.find("select.cron-monthly-month").val();
-                            dom = $selector.find("select.cron-monthly-day").val();
-                            dow = "?";
-                        } else {
-                            mnd = $selector.find("select.cron-monthly-nth-day").val();
-                            dow = $selector.find("select.cron-monthly-day-of-week").val()
-                                + (mnd == "L" ? "L" : "#" + mnd);
-                            nmonth = $selector.find("select.cron-monthly-month-by-week").val();
-                            dom = "?";
-                        }
-                        if(nmonth > 1) month = "1/" + nmonth;
+            case 'Monthly':
+                {
+                    const $selector = base.$el.find('div.cron-monthly')
+                    let nmonth
+                    let mnd
+                    if ($selector.find('input[name=monthlyType][value=byDay]').is(':checked')) {
+                        month = '*'
+                        nmonth = $selector.find('select.cron-monthly-month').val()
+                        dom = $selector.find('select.cron-monthly-day').val()
+                        dow = '?'
+                    } else {
+                        mnd = $selector.find('select.cron-monthly-nth-day').val()
+                        dow = $selector.find('select.cron-monthly-day-of-week').val() +
+                                (mnd === 'L' ? 'L' : '#' + mnd)
+                        nmonth = $selector.find('select.cron-monthly-month-by-week').val()
+                        dom = '?'
                     }
-                    break;
+                    if (nmonth > 1) month = '1/' + nmonth
+                }
+                break
 
-                case 'Yearly':
-                    {
-                        let $selector = base.$el.find("div.cron-yearly");
-                        let ynd;
-                        if($selector.find("input[name=yearlyType][value=byDay]").is(":checked")){
-                            dom = $selector.find("select.cron-yearly-day").val();
-                            month = $selector.find("select.cron-yearly-month").val();
-                            dow = "?";
-                        } else {
-                            ynd = $selector.find("select.cron-yearly-nth-day").val();
-                            dow = $selector.find("select.cron-yearly-day-of-week").val()
-                                + (ynd == "L" ? "L" : "#" + ynd);
-                            month = $selector.find("select.cron-yearly-month-by-week").val();
-                            dom = "?";
-                        }
+            case 'Yearly':
+                {
+                    const $selector = base.$el.find('div.cron-yearly')
+                    let ynd
+                    if ($selector.find('input[name=yearlyType][value=byDay]').is(':checked')) {
+                        dom = $selector.find('select.cron-yearly-day').val()
+                        month = $selector.find('select.cron-yearly-month').val()
+                        dow = '?'
+                    } else {
+                        ynd = $selector.find('select.cron-yearly-nth-day').val()
+                        dow = $selector.find('select.cron-yearly-day-of-week').val() +
+                                (ynd === 'L' ? 'L' : '#' + ynd)
+                        month = $selector.find('select.cron-yearly-month-by-week').val()
+                        dom = '?'
                     }
-                    break;
-    
-                default:
-                    break;
+                }
+                break
+
+            default:
+                break
             }
-            return [sec, min, hour, dom, month, dow, year].join(" ");
-        };
+            return [sec, min, hour, dom, month, dow, year].join(' ')
+        }
 
-        base.init();
-    };
+        base.init()
+    }
 
     // Plugin default options
     $.cronBuilder.defaultOptions = {
-        selectorLabel: "Select period: "
-    };    
+        selectorLabel: 'Select period: '
+    }
 
-    // Plugin definition 
-    $.fn.cronBuilder = function(options) {
-        return this.each(function(){
-            (new $.cronBuilder(this, options));
-        });
-    };
+    // Plugin definition
+    $.fn.cronBuilder = function (options) {
+        return this.each(function () {
+            // eslint-disable-next-line no-new
+            (new $.cronBuilder(this, options))
+        })
+    }
+}(jQuery));
 
-}( jQuery ));
+(function () {
+    const debug = false
+    let map, mapPopup, selectedLocation, selectedLocationInput
+    const filesAdded = [] // list of files already added
 
-
-(function(){
-
-    let debug = true;
-    let map, mapPopup, selectedLocation, selectedLocationInput;
-    let filesAdded = []; //list of files already added
-
-    function checkLoadJsCssFile(filename, filetype, callback){
-        if (filesAdded.indexOf(filename) === -1){
-            loadJsCssFile(filename, filetype, function(){
-                filesAdded.push(filename);
-                if(callback) callback();
-            });
+    function checkLoadJsCssFile (filename, filetype, callback) {
+        if (filesAdded.indexOf(filename) === -1) {
+            loadJsCssFile(filename, filetype, function () {
+                filesAdded.push(filename)
+                if (callback) callback()
+            })
         } else {
-            if (callback) callback();
+            if (callback) callback()
         }
     }
 
-    function loadJsCssFile(filename, filetype, callback){
-        var fileRef;
-        if (filetype == "js"){ //if filename is a external JavaScript file
-            fileRef = document.createElement('script');
-            fileRef.setAttribute("type", "text/javascript");
-            fileRef.setAttribute("src", filename);
+    function loadJsCssFile (filename, filetype, callback) {
+        let fileRef
+        if (filetype === 'js') { // if filename is a external JavaScript file
+            fileRef = document.createElement('script')
+            fileRef.setAttribute('type', 'text/javascript')
+            fileRef.setAttribute('src', filename)
+        } else if (filetype === 'css') { // if filename is an external CSS file
+            fileRef = document.createElement('link')
+            fileRef.setAttribute('rel', 'stylesheet')
+            fileRef.setAttribute('type', 'text/css')
+            fileRef.setAttribute('href', filename)
         }
-        else if (filetype == "css"){ //if filename is an external CSS file
-            fileRef = document.createElement("link");
-            fileRef.setAttribute("rel", "stylesheet");
-            fileRef.setAttribute("type", "text/css");
-            fileRef.setAttribute("href", filename);
-        }
-        if (typeof fileRef != "undefined")
-            document.getElementsByTagName("head")[0].appendChild(fileRef);
+        if (typeof fileRef !== 'undefined') { document.getElementsByTagName('head')[0].appendChild(fileRef) }
 
-        fileRef.onload = function() {
-            if (callback) callback();
-        };
+        fileRef.onload = function () {
+            if (callback) callback()
+        }
     }
 
-    function safeFloat(value, def) {
-        if ((undefined === value) || (null === value)) {
-            return def || 0.0;
+    function safeFloat (value, def) {
+        if ((undefined === value) || (value === null)) {
+            return def || 0.0
         }
         try {
-            value = parseFloat(value);
+            value = parseFloat(value)
         } catch (e) {
-            value = def || 0.0;
+            value = def || 0.0
         }
         if (isNaN(value)) {
-            return def || 0.0;
+            return def || 0.0
         }
-        return value;
+        return value
     }
 
-    function isCronLike(expression){
-        if(typeof expression !== "string") return false;
-        if(expression.indexOf("*") >= 0) return true;
-        let cleaned = expression.replace(/\s\s+/g, ' ');
-        let spaces = cleaned.split(" ");
-        return spaces.length >= 4 && spaces.length <= 6 ; 
+    function isCronLike (expression) {
+        if (typeof expression !== 'string') return false
+        if (expression.indexOf('*') >= 0) return true
+        const cleaned = expression.replace(/\s\s+/g, ' ')
+        const spaces = cleaned.split(' ')
+        return spaces.length >= 4 && spaces.length <= 6
     }
 
-    function isDateSequenceLike(expression){
+    function isDateSequenceLike (expression) {
         try {
-            if(typeof expression !== "string") return false;
-            if(expression.indexOf("*") >= 0) return false;
-            if(expression.indexOf("#") >= 0) return false;
-            if(expression.indexOf("?") >= 0) return false;
-            var cleaned = expression.replace(/\s\s+/g, ' ');
-            var parts = cleaned.split(",");
-            for (var index = 0; index < parts.length; index++) {
-                var part = parts[index];
-                if(parseInt(part) == part) part = parseInt(part);
-                var d = new Date(part);
-                var isDate = (d instanceof Date && !isNaN(d.valueOf()));
-                if(!isDate) return false;
+            if (typeof expression !== 'string') return false
+            if (expression.indexOf('*') >= 0) return false
+            if (expression.indexOf('#') >= 0) return false
+            if (expression.indexOf('?') >= 0) return false
+            const cleaned = expression.replace(/\s\s+/g, ' ')
+            const parts = cleaned.split(',')
+            for (let index = 0; index < parts.length; index++) {
+                let part = parts[index]
+                if (parseInt(part) === part) part = parseInt(part)
+                const d = new Date(part)
+                const isDate = (d instanceof Date && !isNaN(d.valueOf()))
+                if (!isDate) return false
             }
-            return true;
+            return true
         } catch (error) {
-            return false;
+            return false
         }
     }
 
-    function showSidebarHelpPanel(){ 
-        if(RED.sidebar.help) {
-            RED.sidebar.help.show();//  >= V1.1.0
+    function showSidebarHelpPanel () {
+        if (RED.sidebar.help) {
+            RED.sidebar.help.show()//  >= V1.1.0
         } else {
-            RED.sidebar.show("info");// <  V1.1.0
+            RED.sidebar.show('info')// <  V1.1.0
         }
     }
 
-    function showCronHelp(){
-        showSidebarHelpPanel();
-        $("#cron-plus-expression-info").get(0).scrollIntoView();
+    function showCronHelp () {
+        showSidebarHelpPanel()
+        $('#cron-plus-expression-info').get(0).scrollIntoView()
     }
 
-    function showSolarHelp(){
-        showSidebarHelpPanel();
-        $("#cron-plus-solar-events-info").get(0).scrollIntoView();
+    function showSolarHelp () {
+        showSidebarHelpPanel()
+        $('#cron-plus-solar-events-info').get(0).scrollIntoView()
     }
 
-    const getIdealDialogHeight = function(){
-        return Math.min(800, ($(document).height() < 600) ? $(document).width() - 30 : $(document).height() - 100);
-    };
+    const getIdealDialogHeight = function () {
+        return Math.min(800, ($(document).height() < 600) ? $(document).height() - 30 : $(document).height() - 100)
+    }
 
-    function initMap() {
-        //create map popup dialog
-        $("#cron-plus-map-dialog").dialog({
+    function initMap () {
+        // create map popup dialog
+        $('#cron-plus-map-dialog').dialog({
             classes: {
-                "ui-dialog-content": "cron-plus-map-dialog-content"
+                'ui-dialog-content': 'cron-plus-map-dialog-content'
             },
             autoOpen: false,
             height: getIdealDialogHeight(),
-            width: "75%",
+            width: '75%',
             minWidth: 300,
             maxWidth: 1000,
             modal: true,
             buttons: {
                 Cancel: function () {
-                    $("#cron-plus-map-dialog").dialog("close");
+                    $('#cron-plus-map-dialog').dialog('close')
                 },
-                "OK": function () {
-                    $("#cron-plus-map-dialog").dialog("close");
+                OK: function () {
+                    $('#cron-plus-map-dialog').dialog('close')
                     if (selectedLocation && selectedLocationInput) {
-                        if(selectedLocationInput.typedInput("instance")) {
-                            selectedLocationInput.typedInput('value', selectedLocation.lat + " " + selectedLocation.lng);
+                        if (selectedLocationInput.typedInput('instance')) {
+                            selectedLocationInput.typedInput('value', selectedLocation.lat + ' ' + selectedLocation.lng)
                         } else {
-                            selectedLocationInput.val(selectedLocation.lat + " " + selectedLocation.lng)
+                            selectedLocationInput.val(selectedLocation.lat + ' ' + selectedLocation.lng)
                         }
-                        selectedLocationInput.focus();
-                        selectedLocationInput.change();
+                        selectedLocationInput.focus()
+                        selectedLocationInput.change()
                     }
                 }
             },
             show: {
-                effect: "blind",
+                effect: 'blind',
                 duration: 500
             },
             // eslint-disable-next-line no-unused-vars
             open: function (event) {
-                $(this).css('padding', '0px 0px 0px 0px');
-                $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary');
-                $("#cron-plus-map-dialog").dialog("option", "height", getIdealDialogHeight());
-                $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", { my: "center", at: "center", of: window });
+                $(this).css('padding', '0px 0px 0px 0px')
+                $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary')
+                $('#cron-plus-map-dialog').dialog('option', 'height', getIdealDialogHeight())
+                $('#cron-plus-dynamic-nodes-dialog').dialog('option', 'position', { my: 'center', at: 'center', of: window })
             },
             hide: {
-                effect: "explode",
+                effect: 'explode',
                 duration: 500
             },
             // eslint-disable-next-line no-unused-vars
             close: function (event, ui) {
-                if (debug) console.log("destroying map");
-                if (map) map.remove();
+                if (debug) console.log('destroying map')
+                if (map) map.remove()
             }
-        });
+        })
     }
 
-    function createMap(srcInput) {
-        $(".cron-plus-map-loading").hide();
-        if(!window.L || navigator.onLine === false){
-            $(".cron-plus-map-not-loaded").show();
-            $("#cron-plus-map").hide();
-            return;
+    function createMap (srcInput) {
+        $('.cron-plus-map-loading').hide()
+        if (!window.L || navigator.onLine === false) {
+            $('.cron-plus-map-not-loaded').show()
+            $('#cron-plus-map').hide()
+            return
         }
-        $("#cron-plus-map").show();
-        $(".cron-plus-map-not-loaded").hide();
-        var lat, lon;
+        $('#cron-plus-map').show()
+        $('.cron-plus-map-not-loaded').hide()
+        let lat, lon
         selectedLocationInput = srcInput
-        function getInputValue() {
-            if(!!selectedLocationInput.typedInput("instance")) {
+        function getInputValue () {
+            if (selectedLocationInput.typedInput('instance')) {
                 return selectedLocationInput.typedInput('value')
             }
             return selectedLocationInput.val()
         }
-        var latlon = getInputValue();
-        if(latlon && typeof latlon === 'string'){
-            var splitChar = " ";
-            if(latlon.includes(",")) splitChar = ",";
-            var arrLatlon = latlon.split(splitChar);
-            if(arrLatlon.length >= 2){
-                lat = arrLatlon[0];
-                lon = arrLatlon[1];
+        const latlon = getInputValue()
+        if (latlon && typeof latlon === 'string') {
+            let splitChar = ' '
+            if (latlon.includes(',')) splitChar = ','
+            const arrLatlon = latlon.split(splitChar)
+            if (arrLatlon.length >= 2) {
+                lat = arrLatlon[0]
+                lon = arrLatlon[1]
             }
         }
-        if(debug) console.log("createMap", lat, lon);
-        var zoom = 3;//by default, zoomed out
-        var showPopupOnOpen = false;
-        if (lat != undefined && lon != undefined) {
-            showPopupOnOpen = true;
-            zoom = 5;//if location is set, zoom in a bit
+        if (debug) console.log('createMap', lat, lon)
+        let zoom = 3// by default, zoomed out
+        let showPopupOnOpen = false
+        if (!lat && !lon) {
+            showPopupOnOpen = true
+            zoom = 5// if location is set, zoom in a bit
         }
-        lat = safeFloat(lat, 50.0);
-        lon = safeFloat(lon, 0.0);
-        if(debug) console.log("lat/lon", lat, lon);
-        selectedLocation = window.L.latLng(lat, lon);
-        if(debug) console.log("selectedLocation", selectedLocation.lat, selectedLocation.lng);
+        lat = safeFloat(lat, 50.0)
+        lon = safeFloat(lon, 0.0)
+        if (debug) console.log('lat/lon', lat, lon)
+        selectedLocation = window.L.latLng(lat, lon)
+        if (debug) console.log('selectedLocation', selectedLocation.lat, selectedLocation.lng)
 
         // create leaflet map
         map = window.L.map('cron-plus-map', {
             zoomControl: true,
-            center: selectedLocation, //[selectedLocation.lat,selectedLocation.lng],
-            zoom: zoom
-        });
-        mapPopup = window.L.popup();
+            center: selectedLocation, // [selectedLocation.lat,selectedLocation.lng],
+            zoom
+        })
+        mapPopup = window.L.popup()
 
         map.on('click', function (e) {
-
-            if(debug) console.log(e);
-            var normaliseLat = function(x) {
+            if (debug) console.log(e)
+            const normaliseLat = function (x) {
                 while (x > 90.0 || x < -90.0) {
-                    if (x > 90.0) {   x = -(90.0 - (x - 90)); }
-                    if (x < -90.0) {   x = (90.0 - ((-x) - 90)); }
+                    if (x > 90.0) { x = -(90.0 - (x - 90)) }
+                    if (x < -90.0) { x = (90.0 - ((-x) - 90)) }
                 }
-                return x;
-            };
-            var normaliseLng = function(x) {
+                return x
+            }
+            const normaliseLng = function (x) {
                 while (x > 180.0 || x < -180.0) {
-                    if (x > 180.0) {   x = -(180.0 - (x - 180)); }
-                    if (x < -180.0) {   x = (180.0 - ((-x) - 180)); }
+                    if (x > 180.0) { x = -(180.0 - (x - 180)) }
+                    if (x < -180.0) { x = (180.0 - ((-x) - 180)) }
                 }
-                return x;
-            };
-            selectedLocation = {};
-            selectedLocation.lat = normaliseLat(e.latlng.lat);
-            selectedLocation.lng = normaliseLng(e.latlng.lng);
+                return x
+            }
+            selectedLocation = {}
+            selectedLocation.lat = normaliseLat(e.latlng.lat)
+            selectedLocation.lng = normaliseLng(e.latlng.lng)
             const content =
             '<div><span>Lat:</span> <span>' + selectedLocation.lat + '</span></div>' +
-                '<div><span>Lon:</span> <span>' + selectedLocation.lng + '</span></div>';
-            showMapPopup(content, e.latlng.lat, e.latlng.lng, map);
-        });
+                '<div><span>Lon:</span> <span>' + selectedLocation.lng + '</span></div>'
+            showMapPopup(content, e.latlng.lat, e.latlng.lng, map)
+        })
 
-        function showMapPopup(content, lat, lon, map) {
+        function showMapPopup (content, lat, lon, map) {
             mapPopup
                 .setLatLng([lat, lon])
                 .setContent(content)
-                .openOn(map);
+                .openOn(map)
         }
 
         // add a base layer
-        var tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-        var layer = L.tileLayer(tileUrl, {});
-        layer.addTo(map);
+        const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+        const layer = L.tileLayer(tileUrl, {})
+        layer.addTo(map)
         // add cartodb layer with one sublayer
         cartodb.createLayer(map, {
             user_name: 'node-red',
@@ -630,7 +593,7 @@ copies or substantial portions of the Software.
                 named_map: {
                     name: 'node-red@cronplus',
                     params: {
-                        "color": "#5CA2D1"
+                        color: '#5CA2D1'
                     },
                     layers: [{}]
                 }
@@ -638,445 +601,414 @@ copies or substantial portions of the Software.
         })
             .addTo(map)
             .done(function (layer) {
-                layer.setInteraction(true);
+                layer.setInteraction(true)
                 if (showPopupOnOpen) {
                     const content =
                         '<div><span>Lat:</span> <span>' + selectedLocation.lat + '</span></div>' +
-                        '<div><span>Lon:</span> <span>' + selectedLocation.lng + '</span></div>';
-                    showMapPopup(content, selectedLocation.lat, selectedLocation.lng, map);
+                        '<div><span>Lon:</span> <span>' + selectedLocation.lng + '</span></div>'
+                    showMapPopup(content, selectedLocation.lat, selectedLocation.lng, map)
                 }
 
                 // eslint-disable-next-line no-unused-vars
                 layer.on('featureClick', function (e, latlng, pos, data, layer) {
-                    if(debug) console.log("click", latlng, data);
-                });
-                $( "#cron-plus-map-dialog" ).dialog("option", "position", { my: "center", at: "center", of: window });
-            });
+                    if (debug) console.log('click', latlng, data)
+                })
+                $('#cron-plus-map-dialog').dialog('option', 'position', { my: 'center', at: 'center', of: window })
+            })
     }
 
-    function showMap(srcInput) {
-        $("#cron-plus-map-dialog").dialog("open");
+    function showMap (srcInput) {
+        $('#cron-plus-map-dialog').dialog('open')
         if (navigator.onLine === true) {
-            $(".cron-plus-map-not-loaded").show();
-            $(".cron-plus-map-loading").hide();
-            $("#cron-plus-map").hide();
-            let proto = location.protocol === 'https:' ? location.protocol : "http:";
-            checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css", "css", function () {
-                checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js", "js", function () {
-                    createMap(srcInput);
-                });
-            });
+            $('.cron-plus-map-not-loaded').show()
+            $('.cron-plus-map-loading').hide()
+            $('#cron-plus-map').hide()
+            const proto = location.protocol === 'https:' ? location.protocol : 'http:'
+            checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css', 'css', function () {
+                checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js', 'js', function () {
+                    createMap(srcInput)
+                })
+            })
         } else {
-            $(".cron-plus-map-not-loaded").show();
-            $(".cron-plus-map-loading").hide();
-            $("#cron-plus-map").hide();
-            return;
+            $('.cron-plus-map-not-loaded').show()
+            $('.cron-plus-map-loading').hide()
+            $('#cron-plus-map').hide()
         }
     }
 
-    function updateEditorLayout(){
-        if(debug) console.log("cronplus-updateEditorLayout");
-        var dlg = $("#dialog-form");
-        var height = dlg.height() - 5;
-        var expandRow = dlg.find('.form-row-auto-height');
-        if(expandRow && expandRow.length){
-            let childRows = dlg.find('.form-row:not(.form-row-auto-height)');
-            for (var i = 0; i < childRows.size(); i++) {
-                var cr = $(childRows[i]);
-                if(cr.is(":visible"))
-                    height -= cr.outerHeight(true);
+    function updateEditorLayout () {
+        if (debug) console.log('cronplus-updateEditorLayout')
+        const dlg = $('#dialog-form')
+        let height = dlg.height() - 5
+        const expandRow = dlg.find('.form-row-auto-height')
+        if (expandRow && expandRow.length) {
+            const childRows = dlg.find('.form-row:not(.form-row-auto-height)')
+            for (let i = 0; i < childRows.size(); i++) {
+                const cr = $(childRows[i])
+                if (cr.is(':visible')) { height -= cr.outerHeight(true) }
             }
-            expandRow.css("height", height + "px");
+            expandRow.css('height', height + 'px')
         }
         const show = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
         $('.node-input-option-location-group').toggleClass('cron-plus-hide-per-location', !show)
     }
 
-    function JSONtoTable(data, header, placeholder, options) {
-        if(debug) console.log("JSONtoTable");
-        options = options || {};
-        if(!data || !data.length){
-            $('<div class="ui-dialog-title"/>' + (options.emptyMessage || 'no data') + '<div>').appendTo(placeholder);
-            return;
-        }
-        var table = $('<table/>');
-        if(options.width) table.width(options.width);
-        if(options.height) table.width(options.height);
-        if(options.class) table.addClass(options.class);
-        
-        //TH Loop
-        var rows = '<tr>';
-        $.each(header, function (header_key, header_value) {
-            rows += '<th>' + header_value.header + '</th>';
-        });
-        rows += '</tr>';
-        //TR loop
-        $.each(data, function (key, value) {
-            rows += '<tr>';
-            //TD loop
-            $.each(header, function (item_key, header_value) {
-                rows += '<td>' + value[header_value.key] + '</td>';
-            });
-            rows += '</tr>';
-        });
- 
-        table.append(rows);
-        $(placeholder).append(table);
-    }
-
-    $.widget("custom.combobox", {
+    $.widget('custom.combobox', {
         _create: function () {
-            var that = this;
-            this.input = this.element;
-            this.input.addClass("red-ui-typedInput-input");
-            this.elementDiv = this.input.wrap("<div>").parent().addClass('red-ui-typedInput-input-wrap');
-            this.uiSelect = this.elementDiv.wrap( "<div>" ).parent();
-            var attrStyle = this.element.attr('style');
-            this.uiWidth = this.input.outerWidth();
-            this.input.css("paddingLeft", 5);
+            const that = this
+            this.input = this.element
+            this.input.addClass('red-ui-typedInput-input')
+            this.elementDiv = this.input.wrap('<div>').parent().addClass('red-ui-typedInput-input-wrap')
+            this.uiSelect = this.elementDiv.wrap('<div>').parent()
+            const attrStyle = this.element.attr('style')
+            this.uiWidth = this.input.outerWidth()
+            this.input.css('paddingLeft', 5)
 
-            var m;
+            let m
             if ((m = /width\s*:\s*(calc\s*\(.*\)|\d+(%|px))/i.exec(attrStyle)) !== null) {
-                this.input.css('width', 'calc(100% - 4px)');
-                this.uiSelect.width(m[1]);
-                this.uiWidth = null;
+                this.input.css('width', 'calc(100% - 4px)')
+                this.uiSelect.width(m[1])
+                this.uiWidth = null
             } else {
-                this.uiSelect.width(this.uiWidth);
+                this.uiSelect.width(this.uiWidth)
             }
 
-            ["Right", "Left"].forEach(function(d) {
-                var m = that.element.css("margin" + d);
-                that.uiSelect.css("margin" + d, m);
-                that.input.css("margin" + d, 1);
-            });
+            ['Right', 'Left'].forEach(function (d) {
+                const m = that.element.css('margin' + d)
+                that.uiSelect.css('margin' + d, m)
+                that.input.css('margin' + d, 1)
+            })
 
-            this.uiSelect.addClass("red-ui-typedInput-container");
+            this.uiSelect.addClass('red-ui-typedInput-container')
 
-            this.input.on('change', function() {
-                that.validate();
-            });
+            this.input.on('change', function () {
+                that.validate()
+            })
 
-            this.button = $('<button tabindex="0" class="red-ui-typedInput-option-expand" style="display:inline-block;width: 20px"><span class="red-ui-typedInput-option-caret"><i class="red-ui-typedInput-icon fa fa-caret-down"></i></span></button>').appendTo(this.uiSelect);
+            this.button = $('<button tabindex="0" class="red-ui-typedInput-option-expand" style="display:inline-block;width: 20px"><span class="red-ui-typedInput-option-caret"><i class="red-ui-typedInput-icon fa fa-caret-down"></i></span></button>').appendTo(this.uiSelect)
             // this.buttonLabel = $('<span class="red-ui-typedInput-option-label"></span>').prependTo(this.button);
-            this.button.on("click", function(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                that._showDropdownMenu();
-            }).on('keydown', function(evt) {
-                if (evt.keyCode === 40 /*down*/) {
-                    that._showDropdownMenu();
+            this.button.on('click', function (event) {
+                event.preventDefault()
+                event.stopPropagation()
+                that._showDropdownMenu()
+            }).on('keydown', function (evt) {
+                if (evt.keyCode === 40 /* down */) {
+                    that._showDropdownMenu()
                 }
-                evt.stopPropagation();
-            }).on('blur', function() {
-                that.uiSelect.removeClass('red-ui-typedInput-focus');
-            }).on('focus', function() {
-                that.uiSelect.addClass('red-ui-typedInput-focus');
-            });
-            this.menu = this._createMenu(this.options.menu);
+                evt.stopPropagation()
+            }).on('blur', function () {
+                that.uiSelect.removeClass('red-ui-typedInput-focus')
+            }).on('focus', function () {
+                that.uiSelect.addClass('red-ui-typedInput-focus')
+            })
+            this.menu = this._createMenu(this.options.menu)
         },
-        _createMenu: function(options) {
-            if(debug) console.log("combobox -> _createMenu  options:", options);
-            var that = this;
-            this.disarmClick = false;
-            options = options || {};
-            var menu = $("<div>").addClass("red-ui-typedInput-options red-ui-editor-dialog");
-            var callback = options.options ? options.options.callback : null;
-            var beforeSelect = options.options ? options.options.beforeSelect : null;
-            var menuItems = options.menu || [];
-            menuItems.forEach(function(opt) {
+        _createMenu: function (options) {
+            if (debug) console.log('combobox -> _createMenu  options:', options)
+            const that = this
+            this.disarmClick = false
+            options = options || {}
+            const menu = $('<div>').addClass('red-ui-typedInput-options red-ui-editor-dialog')
+            const callback = options.options ? options.options.callback : null
+            const beforeSelect = options.options ? options.options.beforeSelect : null
+            const menuItems = options.menu || []
+            menuItems.forEach(function (opt) {
                 if (typeof opt === 'string') {
-                    opt = { value: opt, label: opt };
+                    opt = { value: opt, label: opt }
                 }
-                var op = $('<a href="#"></a>').attr("value", opt.value).appendTo(menu);
+                const op = $('<a href="#"></a>').attr('value', opt.value).appendTo(menu)
                 if (opt.label) {
-                    op.text(opt.label);
+                    op.text(opt.label)
                 }
                 if (opt.title) {
-                    op.prop('title', opt.title);
+                    op.prop('title', opt.title)
                 }
                 if (opt.icon) {
-                    if (opt.icon.indexOf("<") === 0) {
-                        $(opt.icon).prependTo(op);
-                    } else if (opt.icon.indexOf("/") !== -1) {
-                        $('<img>', { src: opt.icon, style: "margin-right: 4px; height: 18px;" }).prependTo(op);
+                    if (opt.icon.indexOf('<') === 0) {
+                        $(opt.icon).prependTo(op)
+                    } else if (opt.icon.indexOf('/') !== -1) {
+                        $('<img>', { src: opt.icon, style: 'margin-right: 4px; height: 18px;' }).prependTo(op)
                     } else {
-                        $('<i>', { class: "red-ui-typedInput-icon " + opt.icon }).prependTo(op);
+                        $('<i>', { class: 'red-ui-typedInput-icon ' + opt.icon }).prependTo(op)
                     }
                 } else {
-                    op.css({ paddingLeft: "18px" });
+                    op.css({ paddingLeft: '18px' })
                 }
                 if (!opt.icon && !opt.label) {
-                    op.text(opt.value);
+                    op.text(opt.value)
                 }
 
-                op.on("click", function(event) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    var cancel = false;
-                    if(beforeSelect) {
-                        cancel = beforeSelect(opt);
+                op.on('click', function (event) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    let cancel = false
+                    if (beforeSelect) {
+                        cancel = beforeSelect(opt)
                     }
-                    if(!cancel) {
-                        if(callback){
-                            that.value(callback(opt.value));
+                    if (!cancel) {
+                        if (callback) {
+                            that.value(callback(opt.value))
                         } else {
-                            that.value(opt.value);
+                            that.value(opt.value)
                         }
                     }
 
-                    that._hideMenu(menu);
-                });
-            });
-            menu.css({ display: "none" });
-            menu.appendTo(document.body);
+                    that._hideMenu(menu)
+                })
+            })
+            menu.css({ display: 'none' })
+            menu.appendTo(document.body)
 
-            menu.on('keydown', function(evt) {
-                if (evt.keyCode === 40/*down*/) {
-                    evt.preventDefault();
-                    $(this).children(":focus").next().trigger("focus");
-                } else if (evt.keyCode === 38/*up*/) {
-                    evt.preventDefault();
-                    $(this).children(":focus").prev().trigger("focus");
-                } else if (evt.keyCode === 27/*escape*/) {
-                    evt.preventDefault();
-                    that._hideMenu(menu);
+            menu.on('keydown', function (evt) {
+                if (evt.keyCode === 40/* down */) {
+                    evt.preventDefault()
+                    $(this).children(':focus').next().trigger('focus')
+                } else if (evt.keyCode === 38/* up */) {
+                    evt.preventDefault()
+                    $(this).children(':focus').prev().trigger('focus')
+                } else if (evt.keyCode === 27/* escape */) {
+                    evt.preventDefault()
+                    that._hideMenu(menu)
                 }
-                evt.stopPropagation();
-            });
-            return menu;
-
+                evt.stopPropagation()
+            })
+            return menu
         },
-        _showDropdownMenu: function() {
+        _showDropdownMenu: function () {
             if (this.menu) {
                 this.menu.css({
                     minWidth: this.uiSelect.width()
-                });
-                this._showMenu(this.menu, this.button);
+                })
+                this._showMenu(this.menu, this.button)
             }
         },
-        _hideMenu: function(menu) {
-            $(document).off("mousedown.red-ui-typedInput-close-property-select");
-            menu.hide();
+        _hideMenu: function (menu) {
+            $(document).off('mousedown.red-ui-typedInput-close-property-select')
+            menu.hide()
             menu.css({
-                height: "auto"
-            });
-            this.input.trigger("focus");
-            //this.button.trigger("focus");
+                height: 'auto'
+            })
+            this.input.trigger('focus')
+            // this.button.trigger("focus");
         },
-        _showMenu: function(menu, relativeTo) {
+        _showMenu: function (menu, relativeTo) {
             if (this.disarmClick) {
-                this.disarmClick = false;
-                return;
+                this.disarmClick = false
+                return
             }
-            var that = this;
-            //var pos = relativeTo.offset();
-            //var height = relativeTo.height();
-            var pos = this.uiSelect.offset();
-            var height = this.uiSelect.height();
-            var menuHeight = menu.height();
-            var menuWidth = menu.width();
-            var top = (height + pos.top);
-            var left = pos.left;
+            const that = this
+            // var pos = relativeTo.offset();
+            // var height = relativeTo.height();
+            const pos = this.uiSelect.offset()
+            const height = this.uiSelect.height()
+            const menuHeight = menu.height()
+            const menuWidth = menu.width()
+            let top = (height + pos.top)
+            let left = pos.left
             if (left + menuWidth > $(window).width()) {
-                left -= (left + menuWidth) - $(window).width() + 5;
+                left -= (left + menuWidth) - $(window).width() + 5
             }
             if (top + menuHeight > $(window).height()) {
-                top -= (top + menuHeight) - $(window).height() + 5;
+                top -= (top + menuHeight) - $(window).height() + 5
             }
             if (top < 0) {
-                menu.height(menuHeight + top);
-                top = 0;
+                menu.height(menuHeight + top)
+                top = 0
             }
             menu.css({
-                top: top + "px",
-                left: (left) + "px",
-            });
-            menu.slideDown(100);
-            this._delay(function() {
-                that.uiSelect.addClass('red-ui-typedInput-focus');
-                $(document).on("mousedown.red-ui-typedInput-close-property-select", function(event) {
-                    if(!$(event.target).closest(menu).length) {
-                        that._hideMenu(menu);
+                top: top + 'px',
+                left: (left) + 'px'
+            })
+            menu.slideDown(100)
+            this._delay(function () {
+                that.uiSelect.addClass('red-ui-typedInput-focus')
+                $(document).on('mousedown.red-ui-typedInput-close-property-select', function (event) {
+                    if (!$(event.target).closest(menu).length) {
+                        that._hideMenu(menu)
                     }
                     if ($(event.target).closest(relativeTo).length) {
-                        that.disarmClick = true;
-                        event.preventDefault();
+                        that.disarmClick = true
+                        event.preventDefault()
                     }
-                });
-            });
+                })
+            })
         },
         _destroy: function () {
             if (this.menu) {
-                this.menu.remove();
+                this.menu.remove()
             }
-            this.button.remove();
-            this.element.unwrap();
-            this.element.unwrap();
-            this.input.removeClass("red-ui-typedInput-input");
+            this.button.remove()
+            this.element.unwrap()
+            this.element.unwrap()
+            this.input.removeClass('red-ui-typedInput-input')
         },
-        value: function(value) {
-            var that = this;
+        value: function (value) {
+            const that = this
             if (!arguments.length) {
-                return that.input.val();
+                return that.input.val()
             } else {
-                that.input.val(value);
-                that.validate();
+                that.input.val(value)
+                that.validate()
             }
         },
-        validate: function() {
-            var result;
-            var value = this.value();
-            var val = this.options.validate;// || this.validate;
+        validate: function () {
+            let result
+            const value = this.value()
+            const val = this.options.validate// || this.validate;
             if (!val || typeof val !== 'function') {
-                result = true;
-            }  else {
-                result = val(value);
+                result = true
+            } else {
+                result = val(value)
             }
             if (result) {
-                this.uiSelect.removeClass('input-error');
+                this.uiSelect.removeClass('input-error')
             } else {
-                this.uiSelect.addClass('input-error');
+                this.uiSelect.addClass('input-error')
             }
-            return result;
+            return result
         },
-        showMenu: function(){
-            this.button.show();
+        showMenu: function () {
+            this.button.show()
         },
-        hideMenu: function(){
-            this.button.hide();
+        hideMenu: function () {
+            this.button.hide()
         },
-        show: function() {
-            this.uiSelect.show();
+        show: function () {
+            this.uiSelect.show()
         },
-        hide: function() {
-            this.uiSelect.hide();
+        hide: function () {
+            this.uiSelect.hide()
         }
-    });
+    })
 
     RED.nodes.registerType('cronplus', {
-        category: "input",
-        icon: "timer.png",
-        color: "#a6bbcf",
+        category: 'input',
+        icon: 'timer.png',
+        color: '#a6bbcf',
         inputs: 1,
         outputs: 1,
         defaults: {
-            name: { value: "" },
-            //FUTURE config: { type: "CRON-PLUS Config" },
-            outputField: { value: "payload" },
-            timeZone: { value: "" },
+            name: { value: '' },
+            // FUTURE config: { type: "CRON-PLUS Config" },
+            outputField: { value: 'payload' },
+            timeZone: { value: '' },
             persistDynamic: { value: false },
-            commandResponseMsgOutput: { value: "output1" },
-            defaultLocation: { value: "" },
-            defaultLocationType: { value: "" },
+            commandResponseMsgOutput: { value: 'output1' },
+            defaultLocation: { value: '' },
+            defaultLocationType: { value: '' },
             outputs: { value: 1 },
             options: {
-                value: [{ payload: '', topic: '', expression: '' }], 
-                validate: function(value) { 
-                    var dupCheck = {};
+                value: [{ payload: '', topic: '', expression: '' }],
+                validate: function (value) {
+                    const dupCheck = {}
                     if (value.length) {
-                        for (var i = 0; i < value.length; i++) {
-                            if(!value[i].name && value[i].topic) {
-                                value[i].name = value[i].topic;
+                        for (let i = 0; i < value.length; i++) {
+                            if (!value[i].name && value[i].topic) {
+                                value[i].name = value[i].topic
                             }
-                            if(!value[i].name) {
-                                console.warn("cron-plus: validation error - schedule name missing");
-                                $("#node-input-option-container > li:nth-child(" + (i + 1) + ")  .node-input-option-name").addClass("input-error");
-                                return false;
+                            if (!value[i].name) {
+                                console.warn('cron-plus: validation error - schedule name missing')
+                                $('#node-input-option-container > li:nth-child(' + (i + 1) + ')  .node-input-option-name').addClass('input-error')
+                                return false
                             } else {
-                                $("#node-input-option-container > li:nth-child(" + (i + 1) + ")  .node-input-option-name").removeClass("input-error");
-                            }                 
-                            if(dupCheck[value[i].name]) {
-                                console.warn("cron-plus: validation error - duplicate schedule named '" + value[i].name + "'");
-                                $("#node-input-option-container > li:nth-child(" + (i + 1) + ")  .node-input-option-name").addClass("input-error");
-                                return false;
-                            } else {
-                                $("#node-input-option-container > li:nth-child(" + (i + 1) + ")  .node-input-option-name").removeClass("input-error");
+                                $('#node-input-option-container > li:nth-child(' + (i + 1) + ')  .node-input-option-name').removeClass('input-error')
                             }
-                            dupCheck[value[i].name] = true;
-                            if (!value[i].expressionType || value[i].expressionType === "cron") {
+                            if (dupCheck[value[i].name]) {
+                                console.warn("cron-plus: validation error - duplicate schedule named '" + value[i].name + "'")
+                                $('#node-input-option-container > li:nth-child(' + (i + 1) + ')  .node-input-option-name').addClass('input-error')
+                                return false
+                            } else {
+                                $('#node-input-option-container > li:nth-child(' + (i + 1) + ')  .node-input-option-name').removeClass('input-error')
+                            }
+                            dupCheck[value[i].name] = true
+                            if (!value[i].expressionType || value[i].expressionType === 'cron') {
                                 if (!value[i].expression) {
-                                    console.warn("cron-plus: validation error - expression missing");
+                                    console.warn('cron-plus: validation error - expression missing')
                                     // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-expressionType").addClass("input-error");
-                                    return false;
+                                    return false
                                 }
-                            } else if(value[i].expressionType === "solar" ) {
-                                if (value[i].solarType != "all" && value[i].solarType != "selected") {
-                                    console.warn("cron-plus: validation error - solarType is not 'all' or 'selected'");
+                            } else if (value[i].expressionType === 'solar') {
+                                if (value[i].solarType !== 'all' && value[i].solarType !== 'selected') {
+                                    console.warn("cron-plus: validation error - solarType is not 'all' or 'selected'")
                                     // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-solarType").addClass("input-error");
-                                    return false;
+                                    return false
                                 }
-                                if (value[i].solarType == "selected" && !value[i].solarEvents) {
-                                    console.warn("cron-plus: validation error - solarEvents missing");
-                                    return false;
+                                if (value[i].solarType === 'selected' && !value[i].solarEvents) {
+                                    console.warn('cron-plus: validation error - solarEvents missing')
+                                    return false
                                 }
                             }
                         }
                     }
-                    return true;
+                    return true
                 },
                 required: true
-            },
+            }
         },
         label: function () {
-            return this.name || "cron-plus";
+            return this.name || 'cron-plus'
         },
-        outputLabels: function(index) {
-            var node = this;
-            var fanOut = node.commandResponseMsgOutput === "fanOut" ? true : false;
-            var hasCommandOutputPin = (node.commandResponseMsgOutput === "output2" || fanOut) ? true : false;
-            var optionCount = node.options ? node.options.length : 0;
-            var dynOutputPinIndex = 0;
-            var cmdOutputPinIndex = hasCommandOutputPin ? 1 : 0;
+        outputLabels: function (index) {
+            const node = this
+            const fanOut = node.commandResponseMsgOutput === 'fanOut'
+            const hasCommandOutputPin = !!((node.commandResponseMsgOutput === 'output2' || fanOut))
+            const optionCount = node.options ? node.options.length : 0
+            let dynOutputPinIndex = 0
+            let cmdOutputPinIndex = hasCommandOutputPin ? 1 : 0
             if (fanOut) {
-                dynOutputPinIndex = optionCount;
-                cmdOutputPinIndex = optionCount + 1;
+                dynOutputPinIndex = optionCount
+                cmdOutputPinIndex = optionCount + 1
             }
-            if (!fanOut && !hasCommandOutputPin) return "All messages and events";
-            if (!fanOut && hasCommandOutputPin && index == 0) return "Static and Dynamic schedule messages";
-            if (index == cmdOutputPinIndex) return "Command responses only";
-            if (index == dynOutputPinIndex) return "Dynamic schedules only";
-            var item = node.options && node.options[index];
-            if (item) return item.name + " (" + item.expressionType + ")"; 
+            if (!fanOut && !hasCommandOutputPin) return 'All messages and events'
+            if (!fanOut && hasCommandOutputPin && index === 0) return 'Static and Dynamic schedule messages'
+            if (index === cmdOutputPinIndex) return 'Command responses only'
+            if (index === dynOutputPinIndex) return 'Dynamic schedules only'
+            const item = node.options && node.options[index]
+            if (item) return item.name + ' (' + item.expressionType + ')'
         },
-        oneditprepare: function () {
-            const node = this;
-            var dupCheck = {};
-            node.commandResponseMsgOutput = ["output1", "output2", "fanOut"].indexOf(node.commandResponseMsgOutput) >= 0 ? node.commandResponseMsgOutput : "output1";
 
+        oneditprepare: function () {
+            const node = this
+            const dupCheck = {}
+            let selectedLocationInput = null
+
+            node.commandResponseMsgOutput = ['output1', 'output2', 'fanOut'].indexOf(node.commandResponseMsgOutput) >= 0 ? node.commandResponseMsgOutput : 'output1'
+
+            // eslint-disable-next-line no-undef
             initMap()
 
-
-            //create common location typed input
+            // create common location typed input
             $('#node-input-defaultLocation').typedInput({
                 default: 'default',
                 types: [
                     {
-                        value: "default",
-                        label: "Location per schedule",
+                        value: 'default',
+                        label: 'Location per schedule',
                         hasValue: false,
-                        icon: "fa fa-map-marker"
+                        icon: 'fa fa-map-marker'
                     },
                     {
-                        value: "fixed",
-                        label: "Fixed Location",
-                        icon: "fa fa-map-pin",
+                        value: 'fixed',
+                        label: 'Fixed Location',
+                        icon: 'fa fa-map-pin',
                         expand: function () {
-                            showMap($('#node-input-defaultLocation'));
+                            // eslint-disable-next-line no-undef
+                            showMap($('#node-input-defaultLocation'))
                         },
-                        validate: function(v, opt) { return !!v && v.length >= 3 }
+                        validate: function (v, opt) { return !!v && v.length >= 3 }
                     },
                     'env'
                 ]
-            });
-            $("#node-input-defaultLocation").typedInput('type', node.defaultLocationType || 'default')
-            $("#node-input-defaultLocation").typedInput('value', node.defaultLocation || '')
-            $('#node-input-defaultLocation').on('change', function() {
+            })
+            $('#node-input-defaultLocation').typedInput('type', node.defaultLocationType || 'default')
+            $('#node-input-defaultLocation').typedInput('value', node.defaultLocation || '')
+            $('#node-input-defaultLocation').on('change', function () {
                 const show = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
                 $('.node-input-option-location-group').toggleClass('cron-plus-hide-per-location', !show)
             })
 
-            //create the popup dialog for the cron builder
-            $( "#cron-plus-expression-builder-dialog" ).dialog({
+            // create the popup dialog for the cron builder
+            $('#cron-plus-expression-builder-dialog').dialog({
                 autoOpen: false,
                 height: 300,
                 width: 480,
@@ -1084,378 +1016,518 @@ copies or substantial portions of the Software.
                 maxWidth: 600,
                 modal: true,
                 buttons: {
-                    Cancel: function() {
-                        $( "#cron-plus-expression-builder-dialog" ).dialog( "close" );
+                    Cancel: function () {
+                        $('#cron-plus-expression-builder-dialog').dialog('close')
                     },
-                    "OK": function(){
-                        var val = $('#cron-plus-expression-builder').data('cronBuilder').getExpression();
-                        var expressionField = $( "#cron-plus-expression-builder-dialog" ).data("opener");
-                        if(expressionField && expressionField.length) {
-                            expressionField.combobox("value", val || "");
+                    OK: function () {
+                        const val = $('#cron-plus-expression-builder').data('cronBuilder').getExpression()
+                        const expressionField = $('#cron-plus-expression-builder-dialog').data('opener')
+                        if (expressionField && expressionField.length) {
+                            expressionField.combobox('value', val || '')
                             // expressionField.focus();
                         }
-                        $( "#cron-plus-expression-builder-dialog" ).dialog( "close" );
+                        $('#cron-plus-expression-builder-dialog').dialog('close')
                     }
                 },
                 show: {
-                    effect: "blind",
+                    effect: 'blind',
                     duration: 500
                 },
                 // eslint-disable-next-line no-unused-vars
-                open: function(event) {
+                open: function (event) {
                     // $(this).css('padding', '0px 0px 0px 0px');
-                    $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary');
-                    $("#cron-plus-expression-builder .cron-period-select").change();//cause cronBuilder UI to update
+                    $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary')
+                    $('#cron-plus-expression-builder .cron-period-select').change()// cause cronBuilder UI to update
                 },
-                close: function() {
-                    var expressionField = $( "#cron-plus-expression-builder-dialog" ).data("opener");
-                    if(expressionField && expressionField.data("customCombobox") && expressionField.data("customCombobox").input) {
+                close: function () {
+                    const expressionField = $('#cron-plus-expression-builder-dialog').data('opener')
+                    if (expressionField && expressionField.data('customCombobox') && expressionField.data('customCombobox').input) {
                         // expressionField.combobox("value", val || "");
-                        expressionField.data("customCombobox").input.focus();
+                        expressionField.data('customCombobox').input.focus()
                     }
                 },
                 hide: {
-                    effect: "explode",
+                    effect: 'explode',
                     duration: 500
                 }
-            });
+            })
 
-            //build cron builder
-            if(!$('#cron-plus-expression-builder').data('cronBuilder')) {
-                $( "#cron-plus-expression-builder" ).cronBuilder();
+            // build cron builder
+            if (!$('#cron-plus-expression-builder').data('cronBuilder')) {
+                $('#cron-plus-expression-builder').cronBuilder()
             }
 
-            function drawDynamicSchedulesTable(nodeId, table, spinner, callback){
-                var $table = $( table );
-                var $spinner = $( spinner );
-                $table.hide();
-                $spinner.show();
-                $table.empty();
+            function StringBuilder () {
+                const strings = []
+                return {
+                    push: function (value) {
+                        if (value) {
+                            if (value instanceof StringBuilder) {
+                                strings.push(...value.strings)
+                            } else if (Array.isArray(value)) {
+                                strings.push(...value)
+                            } else {
+                                strings.push(value)
+                            }
+                        }
+                        return this
+                    },
+                    clear: function () {
+                        strings.length = 0
+                        return this
+                    },
+                    toString: function (joiner = '\n') {
+                        return strings.join(joiner)
+                    }
+                }
+            }
+
+            function drawDynamicSchedulesTable (nodeId, table, spinner, options, callback) {
+                if (debug) console.log('drawDynamicSchedulesTable...')
+                const $table = $(table)
+                const $spinner = $(spinner)
+                $table.hide()
+                $spinner.show()
+                $table.empty()
                 $.ajax({
-                    url: "cronplus/" + nodeId + "/getDynamic",
+                    url: 'cronplus/' + nodeId + '/getDynamic',
                     type: 'POST',
                     datatype: 'json'
                 })
-                .done(function (response) {
-                    if(debug) console.log("cronplus/" + nodeId + "/getDynamic => response:", response);
-                    var titles = [
-                        { "key": "item", "header": "Item" },
-                        { "key": "expressionType", "header": "Type" },
-                        // {"key":"name", "header":"Name"},
-                        // {"key":"topic", "header":"Topic"},
-                        // {"key":"payloadType", "header":"Payload Type"},
-                        // {"key":"payload", "header":"Payload"},
-                        { "key": "info", "header": "Info" },
-                        { "key": "details", "header": "Details" },
-                    ];
-                    //tidy up date for display
-                    var tableData = response.map(function(e, i){
-                        e.item = i + 1;
-                        if(e.type){
-                            e.payloadType == e.type;
+                    .done(function (response) {
+                        if (debug) console.log('cronplus/' + nodeId + '/getDynamic => response:', response)
+
+                        options = options || {}
+                        if (options.width) $table.width(options.width)
+                        if (options.height) $table.width(options.height)
+                        if (options.class) $table.addClass(options.class)
+
+                        if (!response || !response.length) {
+                            $('<div class="ui-dialog-title"/>' + (options.emptyMessage || 'no data') + '<div>').appendTo($table)
+                            return
                         }
-                        if(e.payloadType == "default") e.payload = null;
-                        var payload, payloadTT = "";
-                        if(e.payload && isObject(e.payload)){
-                            try {
-                                payload = JSON.stringify(e.payload, undefined, 2);
-                                if(payload.length > 200) {
-                                    payloadTT = payload;
-                                    payload = payload.substring(0, 200) + "...";
-                                }
-                            } catch (error) {
-                                payload = typeof e.payload;
+
+                        const itemsToHTML = (items) => {
+                            const styleBuilder = new StringBuilder()
+                            styleBuilder.push('<' + 'style' + '>')
+                            styleBuilder.push('    .accordion-container{')
+                            styleBuilder.push('        position: relative;')
+                            styleBuilder.push('        width: 100%;')
+                            styleBuilder.push('        height: auto;')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container .accordion-item{')
+                            styleBuilder.push('        position: relative;')
+                            styleBuilder.push('        width: 100%;')
+                            styleBuilder.push('        height: auto;')
+                            styleBuilder.push('        background-color: var(--red-ui-form-button-background);')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container .accordion-item > a{')
+                            styleBuilder.push('        display: block;')
+                            styleBuilder.push('        padding: 10px 15px;')
+                            styleBuilder.push('        text-decoration: none;')
+                            styleBuilder.push('        color: var(--red-ui-primary-text-color);')
+                            styleBuilder.push('        font-weight: 600;')
+                            styleBuilder.push('        border-bottom: 1px solid var(--red-ui-primary-border-color);')
+                            styleBuilder.push('        -webkit-transition:all 0.2s linear;')
+                            styleBuilder.push('        -moz-transition:all 0.2s linear;')
+                            styleBuilder.push('        transition:all 0.2s linear;')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container .accordion-item > a.active{')
+                            styleBuilder.push('        background-color: var(--red-ui-form-input-focus-color)')
+                            styleBuilder.push('        color: var(--red-ui-primary-text-color);')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container .accordion-item > div{')
+                            styleBuilder.push('        background-color: var(--red-ui-primary-background);')
+                            styleBuilder.push('        border-bottom: 1px solid var(--red-ui-primary-border-color);')
+                            styleBuilder.push('        display:none;')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container .accordion-item > div {')
+                            styleBuilder.push('        padding: 10px 15px;')
+                            styleBuilder.push('        margin: 0;')
+                            styleBuilder.push('        color: var(--red-ui-primary-text-color);')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    div.accordion-container a > div {')
+                            styleBuilder.push('        display: flex;')
+                            styleBuilder.push('        flex-flow: row wrap;')
+                            styleBuilder.push('        justify-content: space-around;')
+                            styleBuilder.push('        padding: 0;')
+                            styleBuilder.push('        margin: 0;')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container a > div > name,')
+                            styleBuilder.push('    .accordion-container a > div > topic,')
+                            styleBuilder.push('    .accordion-container a > div > desc{')
+                            styleBuilder.push('        flex-grow: 2;')
+                            styleBuilder.push('        flex: 2 0 5px;')
+                            styleBuilder.push('        white-space: break-word;')
+                            styleBuilder.push('        word-break: break-all;')
+                            styleBuilder.push('        overflow: hidden;')
+                            styleBuilder.push('        text-overflow: ellipsis;')
+                            styleBuilder.push('        min-width: 0;')
+                            styleBuilder.push('        padding: 0px 6px')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container a > div > name{')
+                            styleBuilder.push('        flex-grow: 3;')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container a > div > topic{')
+                            styleBuilder.push('        flex-grow: 3;')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container a > div > desc{')
+                            styleBuilder.push('        flex-grow: 4;')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container  a .accordion-title > i {')
+                            styleBuilder.push('        flex: 0 1 20px;')
+                            styleBuilder.push('        -webkit-order: 0;')
+                            styleBuilder.push('        -ms-flex-order: 0;')
+                            styleBuilder.push('        order: 0;')
+                            styleBuilder.push('        -webkit-flex: 0 1 auto;')
+                            styleBuilder.push('        -ms-flex: 0 1 auto;')
+                            styleBuilder.push('        -webkit-align-self: auto;')
+                            styleBuilder.push('        -ms-flex-item-align: auto;')
+                            styleBuilder.push('        align-self: auto;')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container a.active .accordion-title > :not(:first-child,:last-child){')
+                            styleBuilder.push('        display: none;')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container a.active .accordion-title > name {')
+                            styleBuilder.push('        flex: 2;')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('    .accordion-container .accordion-content code {')
+                            styleBuilder.push('        color: var(--red-ui-text-color-code);')
+                            styleBuilder.push('    }')
+                            styleBuilder.push('<' + '/style' + '>')
+
+                            const scriptBuilder = new StringBuilder()
+                            scriptBuilder.push('<' + 'script' + '>')
+                            scriptBuilder.push('$(".accordion-container a").on("click", function() {')
+                            scriptBuilder.push('    if ($(this).hasClass("active")) {')
+                            scriptBuilder.push('    $(this).removeClass("active");')
+                            scriptBuilder.push('    $(this).siblings("div").slideUp(200);')
+                            scriptBuilder.push('    } else {')
+                            scriptBuilder.push('    $(this).addClass("active");')
+                            scriptBuilder.push('    $(this).siblings("div").slideDown(200);')
+                            scriptBuilder.push('    }')
+                            scriptBuilder.push('    $(".accordion-container a:not(.active) i")')
+                            scriptBuilder.push('        .removeClass("fa-minus")')
+                            scriptBuilder.push('        .addClass("fa-plus");')
+                            scriptBuilder.push('    $(".accordion-container a.active i")')
+                            scriptBuilder.push('        .removeClass("fa-plus")')
+                            scriptBuilder.push('        .addClass("fa-minus");')
+                            scriptBuilder.push('});')
+                            scriptBuilder.push('<' + '/script' + '>')
+
+                            const htmlBuilder = new StringBuilder()
+                            htmlBuilder.push('<div class="accordion-container">')
+                            items.forEach(item => {
+                                htmlBuilder.push('  <div class="accordion-item">')
+                                htmlBuilder.push('    <a href="#">')
+                                htmlBuilder.push('      <div class="accordion-title">')
+                                htmlBuilder.push(`        <name>${item.config.name}</name>`)
+                                htmlBuilder.push(`        <topic>${item.config.topic}</topic>`)
+                                htmlBuilder.push(`        <desc>${item.status.nextDescription}</desc>`)
+                                htmlBuilder.push('        <i class="fa fa-plus"></i>')
+                                htmlBuilder.push('      </div> ')
+                                htmlBuilder.push('    </a>')
+                                htmlBuilder.push('    <div class="accordion-content">')
+                                htmlBuilder.push('      <p>')
+                                htmlBuilder.push('        <code>config:</code>')
+                                htmlBuilder.push('        <code>')
+                                htmlBuilder.push(`          ${JSON.stringify(item.config, null, 1).replace(/\n/g, '')}`)
+                                htmlBuilder.push('        </code>')
+                                htmlBuilder.push('      </p>')
+                                htmlBuilder.push('      <p>')
+                                htmlBuilder.push('        <code>status:</code>')
+                                htmlBuilder.push('        <code>')
+                                htmlBuilder.push(`          ${JSON.stringify(item.status, null, 1).replace(/\n/g, '')}`)
+                                htmlBuilder.push('        </code>')
+                                htmlBuilder.push('      </p>')
+                                htmlBuilder.push('    </div>')
+                                htmlBuilder.push('  </div>')
+                            })
+                            htmlBuilder.push('</div>')
+                            const stringBuilder = new StringBuilder()
+                            stringBuilder.push(styleBuilder)
+                            stringBuilder.push(htmlBuilder)
+                            stringBuilder.push(scriptBuilder)
+                            return stringBuilder.toString()
+                        }
+
+                        // tidy up date for display
+                        const data = response.map(function (e, i) {
+                            e.item = i + 1
+                            if (e.type) {
+                                e.payloadType = e.type
+                                delete e.type
                             }
-                        }
+                            if (e.payloadType === 'default') e.payload = null
 
-                        var info = ["<table>"];
-                        info.push('<tr><td>Name</td><td>' + e.name + '</td></tr>');
-                        info.push('<tr><td>Topic</td><td>' + e.topic + '</td></tr>');
-                        info.push('<tr><td>PayloadType</td><td>' + e.payloadType + '</td></tr>');
-                        if(payload) {
-                            info.push('<tr><td title="' + payloadTT + '">Payload</td><td>' + payload + '</td></tr>');
-                        }                       
-                        info.push("</table>");
-                        e.info = info.join("");
+                            if (e.payload && isObject(e.payload)) {
+                                try {
+                                    e.payload = JSON.stringify(e.payload, undefined, 2)
+                                } catch (error) {
+                                    e.payload = typeof e.payload
+                                }
+                            }
+                            return e
+                        })
 
-                        var details = ["<table>"];
-                        if(e.expressionType == "solar"){
-                            if(e.solarType == "all") details.push('<tr><td>solarType</td><td>' + e.solarType + '</td></tr>');
-                            if(e.solarType == "selected") details.push('<tr><td>solarEvents</td><td>' + e.solarEvents + '</td></tr>');
-                            details.push('<tr><td>location</td><td>' + e.location + '</td></tr>');
-                            details.push('<tr><td>offset</td><td>' + e.offset + '</td></tr>');
-                        } else {
-                            details.push('<tr><td>expression</td><td>' + e.expression + '</td></tr>');
-                        }
-                        details.push("</table>");
-                        e.details = details.join("");
-                        return e;
-                    });       
-                    JSONtoTable(tableData, titles, $table, { class: "cron-plus-table", width: "100%", emptyMessage: "No dynamic schedules!" });    
-                    $table.show();
-                    $spinner.hide();
-                    if(callback) callback();
-                })
-                .fail(function (jqXHR, textStatus, errorThrown) { 
-                    if(callback) callback(errorThrown); 
-                    console.error(jqXHR, textStatus, errorThrown);
-                });
+                        $table.html(itemsToHTML(data))
+                        $table.show()
+                        $spinner.hide()
+                        if (callback) callback()
+                    })
+                    .fail(function (jqXHR, textStatus, errorThrown) {
+                        if (callback) callback(errorThrown)
+                        console.error(jqXHR, textStatus, errorThrown)
+                    })
             }
-            const dnRepositionResize = function(){
-                const w = ($(document).width() < 800) ? "95%" : "80%";
-                if(debug) console.log("dialog-open-drawDynamicSchedulesTable done - should now center and resize width", w);
-                $("#cron-plus-dynamic-nodes-dialog").dialog("option", "width", w);
-                $("#cron-plus-dynamic-nodes-dialog").dialog("option", "position", { my: "center", at: "center", of: window });
-            };
-            $( "#cron-plus-dynamic-nodes-dialog" ).dialog({
+
+            const dnRepositionResize = function () {
+                const w = ($(document).width() < 1025) ? '95%' : '60%'
+                if (debug) console.log('dialog-open-drawDynamicSchedulesTable done - should now center and resize width', w)
+                $('#cron-plus-dynamic-nodes-dialog').dialog('option', 'width', w)
+                $('#cron-plus-dynamic-nodes-dialog').dialog('option', 'position', { my: 'center', at: 'center', of: window })
+            }
+
+            $('#cron-plus-dynamic-nodes-dialog').dialog({
                 autoOpen: false,
-                height: getIdealDialogHeight(),
-                // height: "auto",
+                height: 630,
                 minHeight: 400,
                 minWidth: 300,
-                // maxWidth: 1000,
                 modal: true,
                 buttons: {
-                    "Refresh": function() {
-                        var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id");
-                        drawDynamicSchedulesTable(node_id, "#cron-plus-dynamic-nodes-table-placeholder", "#cron-plus-dynamic-nodes-loader", dnRepositionResize);
+                    Refresh: function () {
+                        const nodeId = $('#cron-plus-dynamic-nodes-dialog').data('_cron_node_id')
+                        drawDynamicSchedulesTable(nodeId, '#cron-plus-dynamic-nodes-table-placeholder', '#cron-plus-dynamic-nodes-loader', {}, dnRepositionResize)
                     },
-                    "Close": function(){
-                        $( "#cron-plus-dynamic-nodes-dialog" ).dialog( "close" );
+                    Close: function () {
+                        $('#cron-plus-dynamic-nodes-dialog').dialog('close')
                     }
                 },
-                show: {
-                    effect: "fade",
-                    duration: 250
-                },
                 // eslint-disable-next-line no-unused-vars
-                open: function(event) {
-                    $(this).css('padding', '0px 0px 0px 0px');
-                    $('.ui-dialog-buttonpane').find('button:contains("Close")').addClass('primary');
-                    var node_id = $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id");
-                    dnRepositionResize();
-                    drawDynamicSchedulesTable(node_id, "#cron-plus-dynamic-nodes-table-placeholder", "#cron-plus-dynamic-nodes-loader", dnRepositionResize);
+                open: function (event) {
+                    $(this).css('padding', '0px 0px 0px 0px')
+                    $('.ui-dialog-buttonpane').find('button:contains("Close")').addClass('primary')
+                    const nodeId = $('#cron-plus-dynamic-nodes-dialog').data('_cron_node_id')
+                    dnRepositionResize()
+                    drawDynamicSchedulesTable(nodeId, '#cron-plus-dynamic-nodes-table-placeholder', '#cron-plus-dynamic-nodes-loader', dnRepositionResize)
+                },
+                show: {
+                    effect: 'fade',
+                    duration: 250
                 },
                 hide: {
-                    effect: "fade",
+                    effect: 'fade',
                     duration: 250
                 }
-            });
-            $( "#cron-plus-dynamic-nodes-dialog" ).data("_cron_node_id", node.id);
-            dnRepositionResize();
+            })
 
-            var tzData;
+            $('#cron-plus-dynamic-nodes-dialog').data('_cron_node_id', node.id)
+            dnRepositionResize()
+
+            let tzData
             $.ajax({
-                url: "cronplus/0/tz",
+                url: 'cronplus/0/tz',
                 type: 'POST',
                 datatype: 'json'
             })
-            .done(function (data) { 
-                tzData = data;
-                $( "#node-input-timeZone" ).autocomplete({
-                    source: function( request, response ) {
-                        var matcher = new RegExp( $.ui.autocomplete.escapeRegex(request.term), "i" );
-                        response($.map(tzData, function(item){
-                            if(item && item.tz){
-                                var label = (item.code ? item.code + ", " : "") + item.tz + " (UTC: " + item.UTCOffset + ", DST: " + item.UTCDSTOffset + ")";
-                                if ( label && ( !request.term || matcher.test(label) ) ) {
-                                    return {
-                                        label: label,
-                                        value: item
-                                    };
+                .done(function (data) {
+                    tzData = data
+                    $('#node-input-timeZone').autocomplete({
+                        source: function (request, response) {
+                            const matcher = new RegExp($.ui.autocomplete.escapeRegex(request.term), 'i')
+                            response($.map(tzData, function (item) {
+                                if (item && item.tz) {
+                                    const label = (item.code ? item.code + ', ' : '') + item.tz + ' (UTC: ' + item.UTCOffset + ', DST: ' + item.UTCDSTOffset + ')'
+                                    if (label && (!request.term || matcher.test(label))) {
+                                        return {
+                                            label,
+                                            value: item
+                                        }
+                                    }
                                 }
-                            }
-                        }));
-                    },
-                    minLength: 1,
-                    open: function() {
-                        $( this ).removeClass( "ui-corner-all" ).addClass( "ui-corner-top" );
-                    },
-                    close: function() {
-                        $( this ).removeClass( "ui-corner-top" ).addClass( "ui-corner-all" );
-                    },
-                    focus: function (event, ui) {
-                        event.preventDefault();
-                        $("#node-input-timeZone").val(ui.item.label);
-                    },
-                    select: function (event, ui) {
-                        event.preventDefault();
-                        this.value = ui.item.value.tz;
-                    }
-                });
-            })
-            .fail(function (jqXHR, textStatus, errorThrown) { 
-                console.error(jqXHR, textStatus, errorThrown);
-            });
+                            }))
+                        },
+                        minLength: 1,
+                        open: function () {
+                            $(this).removeClass('ui-corner-all').addClass('ui-corner-top')
+                        },
+                        close: function () {
+                            $(this).removeClass('ui-corner-top').addClass('ui-corner-all')
+                        },
+                        focus: function (event, ui) {
+                            event.preventDefault()
+                            $('#node-input-timeZone').val(ui.item.label)
+                        },
+                        select: function (event, ui) {
+                            event.preventDefault()
+                            this.value = ui.item.value.tz
+                        }
+                    })
+                })
+                .fail(function (jqXHR, textStatus, errorThrown) {
+                    console.error(jqXHR, textStatus, errorThrown)
+                })
 
             const formatDateTimeWithTZ = function (date, tz) {
                 if (!date) {
-                    return "";
+                    return ''
                 }
-                let dateString;
-                let o = {
-                    timeZone: tz ? tz : undefined,
-                    timeZoneName: "short",
+                let dateString
+                const o = {
+                    timeZone: tz || undefined,
+                    timeZoneName: 'short',
                     hour12: false,
-                    year: "numeric",
-                    month: "short",
-                    day: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit"
-                };
-                try {
-                    dateString = new Intl.DateTimeFormat('default', o).format(new Date(date));
-                } catch (error) {
-                    dateString = "Error. Check timezone setting";
+                    year: 'numeric',
+                    month: 'short',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
                 }
-                return dateString;
-            };
-            const makeSolarChoice = function(value, label, tooltip){
-                return { 
-                    label: label, 
-                    value: value || label, 
-                    title: tooltip,
-                    multiple: true
-                };
-            };
-        
-            const solarChoices = [
-                makeSolarChoice("nightEnd", "night end / astronomical dawn", "night ends, astronomical twilight starts (-18°)"), //needed? same as astronomicalDawn
-                // makeSolarChoice("astronomicalDawn", "astronomical dawn", "night ends, astronomical twilight starts (-18°)"), 
-                makeSolarChoice("nauticalDawn", "nautical dawn", "astronomical twilight ends, nautical twilight starts (-12°)"),
-                makeSolarChoice("civilDawn", "civil dawn / golden hour", "nautical twilight ends, civil twilight and golden hour starts (-6°)"),
-                // makeSolarChoice("morningGoldenHourStart", "golden hour starts", "when the sun is 6 degrees below the horizon (-6°)"), //needed? same as civilDawn
-                makeSolarChoice("sunrise", "sunrise", "top edge of the sun appears on the horizon (-0.833°)"),
-                makeSolarChoice("sunriseEnd", "sunrise end", "bottom edge of the sun touches the horizon (-0.3°)"),
-                makeSolarChoice("morningGoldenHourEnd", "morning golden hour ends", "when the sun is 6 degrees above the horizon (6°)"),
-                makeSolarChoice("solarNoon", "solar noon", "sun is at its highest position"),
-                makeSolarChoice("eveningGoldenHourStart", "evening golden hour start", "when the sun is 6 degrees above the horizon (6°)"),
-                makeSolarChoice("sunsetStart", "sunset start", "bottom edge of the sun touches the horizon (-0.3°)"),
-                makeSolarChoice("sunset", "sunset", "civil twilight starts, sun disappears below the horizon (-0.833°)"),
-                // makeSolarChoice("eveningGoldenHourEnd", "evening golden hour end","golden hour ends (-6°)"), //needed? same as civilDusk
-                makeSolarChoice("civilDusk", "civil dusk / golden hour end", "civil twilight and golden hour ends, nautical twilight starts (-6°)"),
-                makeSolarChoice("nauticalDusk", "nautical dusk", "nautical twilight ends, astronomical twilight starts (-12°)"),
-                // makeSolarChoice("astronomicalDusk", "astronomical dusk", "astronomical twilight ends, night starts (-18°)"),
-                makeSolarChoice("nightStart", "astronomical dusk / night start", "astronomical twilight ends, night starts (-18°)"),  //needed? same as astronomicalDusk              
-                makeSolarChoice("nadir", "solar midnight", "when the sun is closest to nadir and the night is equidistant from dusk and dawn"),
-            ];
-
-            function isObject(o){
-                return (typeof o === 'object' && o !== null);
+                try {
+                    dateString = new Intl.DateTimeFormat('default', o).format(new Date(date))
+                } catch (error) {
+                    dateString = 'Error. Check timezone setting'
+                }
+                return dateString
             }
 
-            /** 
+            const makeSolarChoice = function (value, label, tooltip) {
+                return {
+                    label,
+                    value: value || label,
+                    title: tooltip,
+                    multiple: true
+                }
+            }
+
+            const solarChoices = [
+                makeSolarChoice('nightEnd', 'night end / astronomical dawn', 'night ends, astronomical twilight starts (-18°)'), // needed? same as astronomicalDawn
+                // makeSolarChoice("astronomicalDawn", "astronomical dawn", "night ends, astronomical twilight starts (-18°)"),
+                makeSolarChoice('nauticalDawn', 'nautical dawn', 'astronomical twilight ends, nautical twilight starts (-12°)'),
+                makeSolarChoice('civilDawn', 'civil dawn / golden hour', 'nautical twilight ends, civil twilight and golden hour starts (-6°)'),
+                // makeSolarChoice("morningGoldenHourStart", "golden hour starts", "when the sun is 6 degrees below the horizon (-6°)"), //needed? same as civilDawn
+                makeSolarChoice('sunrise', 'sunrise', 'top edge of the sun appears on the horizon (-0.833°)'),
+                makeSolarChoice('sunriseEnd', 'sunrise end', 'bottom edge of the sun touches the horizon (-0.3°)'),
+                makeSolarChoice('morningGoldenHourEnd', 'morning golden hour ends', 'when the sun is 6 degrees above the horizon (6°)'),
+                makeSolarChoice('solarNoon', 'solar noon', 'sun is at its highest position'),
+                makeSolarChoice('eveningGoldenHourStart', 'evening golden hour start', 'when the sun is 6 degrees above the horizon (6°)'),
+                makeSolarChoice('sunsetStart', 'sunset start', 'bottom edge of the sun touches the horizon (-0.3°)'),
+                makeSolarChoice('sunset', 'sunset', 'civil twilight starts, sun disappears below the horizon (-0.833°)'),
+                // makeSolarChoice("eveningGoldenHourEnd", "evening golden hour end","golden hour ends (-6°)"), //needed? same as civilDusk
+                makeSolarChoice('civilDusk', 'civil dusk / golden hour end', 'civil twilight and golden hour ends, nautical twilight starts (-6°)'),
+                makeSolarChoice('nauticalDusk', 'nautical dusk', 'nautical twilight ends, astronomical twilight starts (-12°)'),
+                // makeSolarChoice("astronomicalDusk", "astronomical dusk", "astronomical twilight ends, night starts (-18°)"),
+                makeSolarChoice('nightStart', 'astronomical dusk / night start', 'astronomical twilight ends, night starts (-18°)'), // needed? same as astronomicalDusk
+                makeSolarChoice('nadir', 'solar midnight', 'when the sun is closest to nadir and the night is equidistant from dusk and dawn')
+            ]
+
+            function isObject (o) {
+                return (typeof o === 'object' && o !== null)
+            }
+
+            /**
              * Apply defaults to the cron schedule object
              * @param {integer} optionIndex An index number to use for defaults
              * @param {object} option The option object to update
-            */         
-            function applyOptionDefaults(optionIndex, option) {
-                if(isObject(option) == false){
-                    return;//no point in continuing
+            */
+            function applyOptionDefaults (optionIndex, option) {
+                if (isObject(option) === false) {
+                    return// no point in continuing
                 }
-                // var version;
-                // if( !option.version && option.expressionType !== "solar" && option.expressionType !== "dates" &&  
-                //     (!option.name || !option.topic) && (!option.payloadType || option.type) ){
-                //     version = 0;
-                // } else {
-                //     version = 1;
-                // }
-                optionIndex = optionIndex == null ? 0 : optionIndex;
-                if (["cron", "dates", "solar"].indexOf(option.expressionType) < 0){
-                    //if expressionType is not cron or solar - it may be sunrise or sunset
-                    if(option.expressionType == "sunrise"){
-                        option.solarEvents = option.solarEvents || "sunrise";
-                        option.expressionType = "solar";
-                    } else if(option.expressionType == "sunset"){
-                        option.solarEvents = option.solarEvents || "sunset";
-                        option.expressionType = "solar";
+                optionIndex = optionIndex == null ? 0 : optionIndex
+                if (['cron', 'dates', 'solar'].indexOf(option.expressionType) < 0) {
+                    // if expressionType is not cron or solar - it may be sunrise or sunset
+                    if (option.expressionType === 'sunrise') {
+                        option.solarEvents = option.solarEvents || 'sunrise'
+                        option.expressionType = 'solar'
+                    } else if (option.expressionType === 'sunset') {
+                        option.solarEvents = option.solarEvents || 'sunset'
+                        option.expressionType = 'solar'
                     } else {
-                        if(!option.expression) {
-                            option.expressionType = "cron";
+                        if (!option.expression) {
+                            option.expressionType = 'cron'
                         } else {
-                            if (!isCronLike(option.expression)) 
-                                option.expressionType = "dates";
-                            else if(isDateSequenceLike(option.expression))
-                                option.expressionType = "dates";
-                            else 
-                                option.expressionType = "cron";
+                            if (!isCronLike(option.expression)) {
+                                option.expressionType = 'dates'
+                            } else if (isDateSequenceLike(option.expression)) {
+                                option.expressionType = 'dates'
+                            } else {
+                                option.expressionType = 'cron'
+                            }
                         }
-                    }   
+                    }
                 }
-                option.name = option.name || "schedule" + (optionIndex + 1);
-                option.topic = option.topic || "topic" + (optionIndex + 1);
-                option.payloadType = option.payloadType || option.type || "default";
-                delete option.type;                
-                if (option.expressionType == "cron" && !option.expression) option.expression = "0 * * * * * *";
-                if (!option.solarType) option.solarType =  option.solarEvents ? "selected" : "all";
-                if (!option.solarEvents) option.solarEvents = "sunrise,sunset";
-                if (!option.location) option.location = "";
-                // option.version = 1; 
+                option.name = option.name || 'schedule' + (optionIndex + 1)
+                option.topic = option.topic || 'topic' + (optionIndex + 1)
+                option.payloadType = option.payloadType || option.type || 'default'
+                delete option.type
+                if (option.expressionType === 'cron' && !option.expression) option.expression = '0 * * * * * *'
+                if (!option.solarType) option.solarType = option.solarEvents ? 'selected' : 'all'
+                if (!option.solarEvents) option.solarEvents = 'sunrise,sunset'
+                if (!option.location) option.location = ''
+                // option.version = 1;
             }
 
-            /** 
+            /**
              * Generate an option row on the UI
              * @param {integer} optionIndex the index number of this schedule
              * @param {object} option The option object to present
-            */             
-            function generateOption(optionIndex, option) {
-                applyOptionDefaults(optionIndex, option);
-                function buildExpressionTip(title, desc, text, type){
-                    const helpFunc = type == "solar" ? "showSolarHelp();" : "showCronHelp();";
-                    const helpFuncPopOut = type == "solar" ? "_popoutCronPlusHelp('cron-plus-solar-events-info');" : "_popoutCronPlusHelp('cron-plus-expression-info');";
-                    const helpFuncHtml = '<span style="float: right">' + 
+            */
+            function generateOption (optionIndex, option) {
+                applyOptionDefaults(optionIndex, option)
+                function buildExpressionTip (title, desc, text, type) {
+                    const helpFunc = type === 'solar' ? 'showSolarHelp();' : 'showCronHelp();'
+                    const helpFuncPopOut = type === 'solar' ? "_popoutCronPlusHelp('cron-plus-solar-events-info');" : "_popoutCronPlusHelp('cron-plus-expression-info');"
+                    const helpFuncHtml = '<span style="float: right">' +
                         '<button id="cron-plus-tt-help-button" class="cron-plus-link-button" onclick="' + helpFunc + '">help </button>&nbsp;' +
-                        '<button class="cron-plus-link-button" onclick="' + helpFuncPopOut + '"> <i class="fa fa-external-link"></i></button></span>';
-                    return '<div style="min-height:190px"><span style="font-size: 12px; font-weight: bold">' + title + '</span>' + 
+                        '<button class="cron-plus-link-button" onclick="' + helpFuncPopOut + '"> <i class="fa fa-external-link"></i></button></span>'
+                    return '<div style="min-height:190px"><span style="font-size: 12px; font-weight: bold">' + title + '</span>' +
                         helpFuncHtml +
                         '<hr><div>' + desc + '</div>' +
-                        '<pre class="cron-plus-form-tip form-tips">' + text + '</pre></div>';
+                        '<pre class="cron-plus-form-tip form-tips">' + text + '</pre></div>'
                 }
-                function initTooltip(selector, type, pos){                    
-                    selector.off("mouseenter").tooltip({
-                        show: { effect: "fade" },
-                        tooltipClass: "cron-plus-expression-tip form-tips",
+                function initTooltip (selector, type, pos) {
+                    selector.off('mouseenter').tooltip({
+                        show: { effect: 'fade' },
+                        tooltipClass: 'cron-plus-expression-tip form-tips',
                         position: pos,
-                        content: function () { 
-                            return buildExpressionTip("Expression...", "Getting description...", "", type); 
+                        content: function () {
+                            return buildExpressionTip('Expression...', 'Getting description...', '', type)
                         },
                         disabled: true
-                    }).off('focusout').off('mouseleave').mouseleave(function(e){
-                        if(debug) console.log("initTooltip--mouseleave");
+                    }).off('focusout').off('mouseleave').mouseleave(function (e) {
+                        if (debug) console.log('initTooltip--mouseleave')
                         if (selector.is(':focus')) {
-                            if(debug) console.log("initTooltip--mouseleave selector:is(':focus')");
-                            e.preventDefault();
-                            e.stopImmediatePropagation();
-                            //selector.tooltip('open');
-                            return false;
+                            if (debug) console.log("initTooltip--mouseleave selector:is(':focus')")
+                            e.preventDefault()
+                            e.stopImmediatePropagation()
+                            // selector.tooltip('open');
+                            return false
                         }
-                    }).on("blur", function (e) {
-                        if(debug) console.log("initTooltip-->on-blur.  relatedTarget:", e.relatedTarget);
-                        if(e.relatedTarget && e.relatedTarget.id == "cron-plus-tt-help-button"){
-                            if(debug) console.log('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-link-button"');
-                            if(type == "cron")
-                                showCronHelp();
-                            else if(type == "solar")
-                                showSolarHelp();
-                            $(this).focus();
-                            return false;
+                    }).on('blur', function (e) {
+                        if (debug) console.log('initTooltip-->on-blur.  relatedTarget:', e.relatedTarget)
+                        if (e.relatedTarget && e.relatedTarget.id === 'cron-plus-tt-help-button') {
+                            if (debug) console.log('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-link-button"')
+                            if (type === 'cron') { showCronHelp() } else if (type === 'solar') { showSolarHelp() }
+                            $(this).focus()
+                            return false
                         }
-                        $(this).tooltip("close").tooltip("disable");
-                    }).on("focusin change keyup", function (e) {
-                        if(debug) console.log("initTooltip--focusin change keyup", e );
-                        const $this = $(this);
+                        $(this).tooltip('close').tooltip('disable')
+                    }).on('focusin change keyup', function (e) {
+                        if (debug) console.log('initTooltip--focusin change keyup', e)
+                        const $this = $(this)
 
-                        let $timeZone = $("#node-input-timeZone");
-                        const $expressionType = $this.closest("li").find(".node-input-option-expressionType");
-                        const expressionType = $expressionType.val();
-                        const $location = $this.closest("li").find(".node-input-option-location");
-                        const $expression = $this.closest("li").find(".node-input-option-expression");
+                        const $timeZone = $('#node-input-timeZone')
+                        const $expressionType = $this.closest('li').find('.node-input-option-expressionType')
+                        const expressionType = $expressionType.val()
+                        const $location = $this.closest('li').find('.node-input-option-location')
+                        const $expression = $this.closest('li').find('.node-input-option-expression')
                         let expression
                         if (expressionType === 'solar') {
-                            const defLocation = $("#node-input-defaultLocation").typedInput('value')
-                            const defLocationType = $("#node-input-defaultLocationType").typedInput('type')
-                            if(defLocationType === 'env' || defLocationType === 'fixed') {
+                            const defLocation = $('#node-input-defaultLocation').typedInput('value')
+                            const defLocationType = $('#node-input-defaultLocation').typedInput('type')
+                            if (defLocationType === 'env' || defLocationType === 'fixed') {
                                 expression = defLocation
                             } else {
                                 expression = $location.val()
@@ -1463,52 +1535,54 @@ copies or substantial portions of the Software.
                         } else {
                             expression = $expression.val()
                         }
-                        if(!expression){
-                            $this.tooltip("close").tooltip("disable");
-                            return;
+                        if (!expression) {
+                            $this.tooltip('close').tooltip('disable')
+                            return
                         }
-                        const $offset = $this.closest("li").find(".node-input-option-offset");
-                        const $solarEvents = $this.closest("li").find(".node-input-option-solarEvents");
-                        $this.tooltip("enable").tooltip("open");
-                        $this.tooltip("option", "position", pos);
-                        $this.tooltip({ 
+                        const $offset = $this.closest('li').find('.node-input-option-offset')
+                        const $solarEvents = $this.closest('li').find('.node-input-option-solarEvents')
+                        $this.tooltip('enable').tooltip('open')
+                        $this.tooltip('option', 'position', pos)
+                        $this.tooltip({
                             position: pos,
                             disabled: false,
-                            show: { effect: "fade" },
+                            show: { effect: 'fade' },
                             content: function (callback) {
-                                if(debug) console.log("initTooltip-->content");
+                                if (debug) console.log('initTooltip-->content')
 
-                                const solarType = $solarEvents.typedInput("type");
-                                const solarEvents = $solarEvents.typedInput("value");
-                                const expressionType = $expressionType.val();
-                                const offset = $offset.val();
-                                let timeZone = $timeZone.val();
-                                let title_html;
-                                let e = { expressionType: expressionType };
-                                if (timeZone) e.timeZone = timeZone;
-                                if (expressionType == "solar"){
-                                    title_html = (expr) => {
-                                        let title = '<b>solar events</b> at <span class="cron-plus-expression">' + expr.slice(0, 100) + (expr.length > 100 ? "..." : "") + '</span>';
-                                        if(offset != undefined && offset != null && offset != "0" && offset != 0){
-                                            title_html += '<b>';
-                                            if(offset > 0) title_html += ' +';
-                                            title_html += offset + ' minute';
-                                            if(offset != "1" && offset != "-1") title_html += 's';
-                                            title_html += '</b>';
+                                const solarType = $solarEvents.typedInput('type')
+                                const solarEvents = $solarEvents.typedInput('value')
+                                const expressionType = $expressionType.val()
+                                const offset = $offset.val()
+                                const timeZone = $timeZone.val()
+                                let titleHtml
+                                const e = { expressionType }
+                                if (timeZone) e.timeZone = timeZone
+                                if (expressionType === 'solar') {
+                                    titleHtml = (expr) => {
+                                        const title = '<b>solar events</b> at <span class="cron-plus-expression">' + expr.slice(0, 100) + (expr.length > 100 ? '...' : '') + '</span>'
+                                        // eslint-disable-next-line eqeqeq
+                                        if (offset != null && offset !== '0' && offset !== 0) {
+                                            titleHtml += '<b>'
+                                            if (offset > 0) titleHtml += ' +'
+                                            titleHtml += offset + ' minute'
+                                            // eslint-disable-next-line eqeqeq
+                                            if (offset != '1' && offset != '-1') titleHtml += 's'
+                                            titleHtml += '</b>'
                                         }
                                         return title
                                     }
-                                    e.offset = offset;
-                                    e.location = expression;
-                                    e.solarType = solarType;
-                                    e.solarEvents = solarEvents;
-                                    e.defaultLocationType = $("#node-input-defaultLocation").typedInput('type')
-                                    e.defaultLocation = $("#node-input-defaultLocation").typedInput('value')
+                                    e.offset = offset
+                                    e.location = expression
+                                    e.solarType = solarType
+                                    e.solarEvents = solarEvents
+                                    e.defaultLocationType = $('#node-input-defaultLocation').typedInput('type')
+                                    e.defaultLocation = $('#node-input-defaultLocation').typedInput('value')
                                     e.flowId = node.z
                                     e.nodeId = node.id
                                     e.nodeGroupId = node.g
-                                    const env = [];
-                                    if(node.g) {
+                                    const env = []
+                                    if (node.g) {
                                         let gId = node.g
                                         let group = RED.nodes.group(gId)
                                         while (group) {
@@ -1519,13 +1593,13 @@ copies or substantial portions of the Software.
                                             group = RED.nodes.group(gId)
                                         }
                                     }
-                                    if(node.z && RED.nodes.workspace(node.z) && RED.nodes.workspace(node.z).env) {
+                                    if (node.z && RED.nodes.workspace(node.z) && RED.nodes.workspace(node.z).env) {
                                         env.push(...RED.nodes.workspace(node.z).env)
                                     }
                                     e.env = env
                                 } else {
-                                    title_html = (expr) => 'Description of <span class="cron-plus-expression">' + expr.slice(0, 50) + (expr.length > 50 ? "..." : "") + '</span>';
-                                    e.expression = expression;
+                                    titleHtml = (expr) => 'Description of <span class="cron-plus-expression">' + expr.slice(0, 50) + (expr.length > 50 ? '...' : '') + '</span>'
+                                    e.expression = expression
                                 }
 
                                 $.ajax({
@@ -1534,415 +1608,413 @@ copies or substantial portions of the Software.
                                     data: e,
                                     datatype: 'json'
                                 })
-                                .done(function (data) {
-                                    if(debug) console.log("initTooltip-->Ajax done, data...", data);
-                                    let nextInfo = "";
-                                    let desc = data.description;
-                                    if (data.prettyNext) {
-                                        nextInfo = "Next event: " + data.prettyNext;
-                                        if (data.nextDates && data.nextDates.length) {
-                                            nextInfo = nextInfo + " then...";
-                                            var makeTR = function(x){
-                                                var v = x, s = '<i class="fa fa-clock-o"></i>';
-                                                if(typeof x === "object" && x.timeOffset){
-                                                    v = x.timeOffset;
-                                                    s = x.event || "unknown";
+                                    .done(function (data) {
+                                        if (debug) console.log('initTooltip-->Ajax done, data...', data)
+                                        let nextInfo = ''
+                                        const desc = data.description
+                                        if (data.prettyNext) {
+                                            nextInfo = 'Next event: ' + data.prettyNext
+                                            if (data.nextDates && data.nextDates.length) {
+                                                nextInfo = nextInfo + ' then...'
+                                                const makeTR = function (x) {
+                                                    let v = x; let s = '<i class="fa fa-clock-o"></i>'
+                                                    if (typeof x === 'object' && x.timeOffset) {
+                                                        v = x.timeOffset
+                                                        s = x.event || 'unknown'
+                                                    }
+                                                    const fd = formatDateTimeWithTZ(v, timeZone)
+                                                    v = fd || undefined
+                                                    return '<tr><td>' + s + '</td><td>' + v + '</td></tr>'
                                                 }
-                                                let fd = formatDateTimeWithTZ(v, timeZone);
-                                                v = fd ? fd : undefined;
-                                                return "<tr><td>" + s + "</td><td>" + v + "</td></tr>";
-                                            };
-                                            var map1 = data.nextDates.map(makeTR);
-                                            nextInfo += "<table class=>" + map1.join("\n") + "</table>"; 
+                                                const map1 = data.nextDates.map(makeTR)
+                                                nextInfo += '<table class=>' + map1.join('\n') + '</table>'
+                                            }
                                         }
-                                    }
-                                    var okContent = function(){
-                                        setTimeout(function(){
-                                            if(debug) console.log("initTooltip-->callback-->setTimeout--> option-->position");
-                                            $this.tooltip("option", "position", pos);
-                                            $this.tooltip("enable").tooltip("open");
-                                            $this.tooltip("option", "position", pos);
-                                        }, 200);
-                                        const expr = data.expressionType === 'solar' ? data.location : data.expression
-                                        return buildExpressionTip(title_html(expr), desc, nextInfo, expressionType);
-                                    }; 
-                                    callback(okContent);
-                                    $this.tooltip("option", "position", pos);
-                                })
-                                .fail(function (jqXHR, textStatus, errorThrown) {
-                                    console.error(jqXHR, textStatus, errorThrown);
-                                    var errContent = buildExpressionTip("Error...", "Cannot get description from node-red", "", expressionType);
-                                    callback(errContent);
-                                });
-                            } 
-                        });
-                    });
+                                        const okContent = function () {
+                                            setTimeout(function () {
+                                                if (debug) console.log('initTooltip-->callback-->setTimeout--> option-->position')
+                                                $this.tooltip('option', 'position', pos)
+                                                $this.tooltip('enable').tooltip('open')
+                                                $this.tooltip('option', 'position', pos)
+                                            }, 200)
+                                            const expr = data.expressionType === 'solar' ? data.location : data.expression
+                                            return buildExpressionTip(titleHtml(expr), desc, nextInfo, expressionType)
+                                        }
+                                        callback(okContent)
+                                        $this.tooltip('option', 'position', pos)
+                                    })
+                                    .fail(function (jqXHR, textStatus, errorThrown) {
+                                        console.error(jqXHR, textStatus, errorThrown)
+                                        const errContent = buildExpressionTip('Error...', 'Cannot get description from node-red', '', expressionType)
+                                        callback(errContent)
+                                    })
+                            }
+                        })
+                    })
                 }
 
-                let container, nameField, topicField, payloadField;
-                let expressionTypeField, expressionField, solarEventsField, offsetField;
-                //build options row
-                container = $('<li/>', { style: "margin:0px 0px 5px 0px; padding:0px;" });
-                const row = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
-                const row2 = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container);
+                // build options row
+                const container = $('<li/>', { style: 'margin:0px 0px 5px 0px; padding:0px;' })
+                const row = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container)
+                const row2 = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container)
 
-                const div = row.append( '<div/>' );
+                const div = row.append('<div/>')
 
-                const span = $('<span/>', { style: "float:right; margin-right:5px;" }).appendTo(div);
-                const deleteButton = $('<a/>', { href: "#", class: "editor-button editor-button-small", style: "margin-top:27px; margin-left:5px;" }).appendTo(span);
-                $('<i/>', { class: "fa fa-remove" }).appendTo(deleteButton);
+                const span = $('<span/>', { style: 'float:right; margin-right:5px;' }).appendTo(div)
+                const deleteButton = $('<a/>', { href: '#', class: 'editor-button editor-button-small', style: 'margin-top:27px; margin-left:5px;' }).appendTo(span)
+                $('<i/>', { class: 'fa fa-remove' }).appendTo(deleteButton)
 
-                //generate the name field
-                const nameClass = "node-input-option-name" + ((!option.name || dupCheck[option.name]) ? " input-error" : "");
-                nameField = $('<input/>', { class: nameClass, type: "text", style: "margin-left:0px; width:calc(22% - 16px);", placeholder: 'name', title: "name", value: option.name }).appendTo(div);
-                dupCheck[option.name] = true;
+                // generate the name field
+                const nameClass = 'node-input-option-name' + ((!option.name || dupCheck[option.name]) ? ' input-error' : '')
+                const nameField = $('<input/>', { class: nameClass, type: 'text', style: 'margin-left:0px; width:calc(22% - 16px);', placeholder: 'name', title: 'name', value: option.name }).appendTo(div)
+                dupCheck[option.name] = true
 
-                //generate the topic field
-                const topicClass = "node-input-option-topic" + ((!option.topic) ? " input-error" : "");
-                topicField = $('<input/>', { class: topicClass, type: "text", style: "margin-left:5px; width:calc(32% - 36px);", placeholder: 'topic', title: "topic", value: option.topic }).appendTo(div);
+                // generate the topic field
+                const topicClass = 'node-input-option-topic' + ((!option.topic) ? ' input-error' : '')
+                const topicField = $('<input/>', { class: topicClass, type: 'text', style: 'margin-left:5px; width:calc(32% - 36px);', placeholder: 'topic', title: 'topic', value: option.topic }).appendTo(div)
 
-                //generate the payload field
-                payloadField = $('<input/>', { class: "node-input-option-payload", type: "text", style: "margin-left:5px; width:calc(40% - 25px);", placeholder: 'payload', value: option.payload || "" }).appendTo(div);
+                // generate the payload field
+                const payloadField = $('<input/>', { class: 'node-input-option-payload', type: 'text', style: 'margin-left:5px; width:calc(40% - 25px);', placeholder: 'payload', value: option.payload || '' }).appendTo(div)
                 payloadField.typedInput({
                     default: option.payloadType || 'default',
                     types: [{
-                        icon: "fa fa-envelope",
-                        value: "default",
-                        label: "Default Payload",
-                        hasValue: false 
+                        icon: 'fa fa-envelope',
+                        value: 'default',
+                        label: 'Default Payload',
+                        hasValue: false
                     }, 'flow', 'global', 'str', 'num', 'bool', 'json', 'jsonata', 'bin', 'date', 'env']
-                });
+                })
 
-                //generate a dropdown for trigger type
-                const expressionType = option.expressionType || "cron";
-                expressionTypeField = $('<select/>', { class: "node-input-option-expressionType", type: "text", placeholder: "cron" }).css({ "width": "calc(22% - 16px)", "margin-right": "5px" }).appendTo(row2);
-                $('<option />', { value: "cron", text: "cron" }).appendTo(expressionTypeField);
-                $('<option />', { value: "dates", text: "date sequence" }).appendTo(expressionTypeField);
-                $('<option />', { value: "solar", text: "solar events" }).appendTo(expressionTypeField);
-                expressionTypeField.val(expressionType);
-                expressionTypeField.prop("title", "Expression Type");   
+                // generate a dropdown for trigger type
+                const expressionType = option.expressionType || 'cron'
+                const expressionTypeField = $('<select/>', { class: 'node-input-option-expressionType', type: 'text', placeholder: 'cron' }).css({ width: 'calc(22% - 16px)', 'margin-right': '5px' }).appendTo(row2)
+                $('<option />', { value: 'cron', text: 'cron' }).appendTo(expressionTypeField)
+                $('<option />', { value: 'dates', text: 'date sequence' }).appendTo(expressionTypeField)
+                $('<option />', { value: 'solar', text: 'solar events' }).appendTo(expressionTypeField)
+                expressionTypeField.val(expressionType)
+                expressionTypeField.prop('title', 'Expression Type')
 
-                //generate a combo for cron expression
-                const expression = option.expression == null ? "0 * * * * * *" : option.expression;
-                const expressionClass = "node-input-option-expression" + ((!expression) ? " input-error" : "");
+                // generate a combo for cron expression
+                const expression = option.expression == null ? '0 * * * * * *' : option.expression
+                const expressionClass = 'node-input-option-expression' + ((!expression) ? ' input-error' : '')
                 const expressionMenuData = [
-                        { label: "Easy Expression Builder", value: "EEB" },
-                        { label: "Every Second (* * * * * *)", value: "* * * * * *" },
-                        { label: "Every minute (0 * * * * *)", value: "0 * * * * *" },
-                        { label: "Every 10 minutes (0 */10 * * * *)", value: "0 */10 * * * *" },
-                        { label: "Every day at noon - 12pm (0 0 12 * * *)", value: "0 0 12 * * *" },
-                        { label: "Every 20 minutes, at 9:00 AM and 5:00 PM (0 */20 9,17 * * *)", value: "0 */20 9,17 * * *" },
-                        { label: "At 15, 30, and 45 minutes past the hour (0 15,30,45 * * * *)", value: "0 15,30,45 * * * *" },
-                        { label: "At 02:00 AM, on day 29 of Feb (0 0 2 29 FEB * 2020/4)", value: "0 0 2 29 FEB * 2020/4" },
-                        { label: "At 07:00 AM, on the 1st Mon of the month (0 0 7 * * MON#1 *)", value: "0 0 7 * * MON#1 *" },
-                        { label: "Every day at noon in Jan, Mar & Dec (0 0 12 * JAN,MAR,DEC *)", value: "0 0 12 * JAN,MAR,DEC *" },
-                        { label: "Every minute, on the 1st weekday of the month (* * 1W * *)", value: "* * 1W * *" },
-                        { label: "Every minute, on the third Tue of the month (* * * * Tue#3)", value: "* * * * Tue#3" },
-                        { label: "At 12:00 PM, on the last Monday of the month (0 12 * * MONL)", value: "0 12 * * MONL" },
-                    ];
+                    { label: 'Easy Expression Builder', value: 'EEB' },
+                    { label: 'Every Second (* * * * * *)', value: '* * * * * *' },
+                    { label: 'Every minute (0 * * * * *)', value: '0 * * * * *' },
+                    { label: 'Every 10 minutes (0 */10 * * * *)', value: '0 */10 * * * *' },
+                    { label: 'Every day at noon - 12pm (0 0 12 * * *)', value: '0 0 12 * * *' },
+                    { label: 'Every 20 minutes, at 9:00 AM and 5:00 PM (0 */20 9,17 * * *)', value: '0 */20 9,17 * * *' },
+                    { label: 'At 15, 30, and 45 minutes past the hour (0 15,30,45 * * * *)', value: '0 15,30,45 * * * *' },
+                    { label: 'At 02:00 AM, on day 29 of Feb (0 0 2 29 FEB * 2020/4)', value: '0 0 2 29 FEB * 2020/4' },
+                    { label: 'At 07:00 AM, on the 1st Mon of the month (0 0 7 * * MON#1 *)', value: '0 0 7 * * MON#1 *' },
+                    { label: 'Every day at noon in Jan, Mar & Dec (0 0 12 * JAN,MAR,DEC *)', value: '0 0 12 * JAN,MAR,DEC *' },
+                    { label: 'Every minute, on the 1st weekday of the month (* * 1W * *)', value: '* * 1W * *' },
+                    { label: 'Every minute, on the third Tue of the month (* * * * Tue#3)', value: '* * * * Tue#3' },
+                    { label: 'At 12:00 PM, on the last Monday of the month (0 12 * * MONL)', value: '0 12 * * MONL' }
+                ]
 
-                expressionField = $('<input/>', { class: expressionClass, type: "text", style: "margin-left:0px; width:calc(72% - 56px);", placeholder: '* * * * * * *', list: "cron-expression-example-list", title: "cron expression", value: option.expression }).appendTo(row2);
-                expressionField.appendTo(row2);
-   
-                //setup the expression combo
+                const expressionField = $('<input/>', { class: expressionClass, type: 'text', style: 'margin-left:0px; width:calc(72% - 56px);', placeholder: '* * * * * * *', list: 'cron-expression-example-list', title: 'cron expression', value: option.expression }).appendTo(row2)
+                expressionField.appendTo(row2)
+
+                // setup the expression combo
                 expressionField.combobox({
                     menu: {
                         menu: expressionMenuData,
-                        options: { beforeSelect: function(opt) {
-                            if(opt && opt.value == "EEB") {
-                                $( "#cron-plus-expression-builder-dialog" ).data("opener", expressionField);
-                                $( "#cron-plus-expression-builder-dialog" ).dialog( "open" );
-                                return true; //return true to let widget know - we have handled this
+                        options: {
+                            beforeSelect: function (opt) {
+                                if (opt && opt.value === 'EEB') {
+                                    $('#cron-plus-expression-builder-dialog').data('opener', expressionField)
+                                    $('#cron-plus-expression-builder-dialog').dialog('open')
+                                    return true // return true to let widget know - we have handled this
+                                }
                             }
-                        } },
+                        }
                     },
-                    validate: function(value){
-                        return (!!value) && value.length >= 9 ;//better validation required?
+                    validate: function (value) {
+                        return (!!value) && value.length >= 9// better validation required?
                     }
-                });
+                })
                 try {
-                    expressionField.combobox().button.prop("title", "Expression examples...");
-                    expressionField.combobox("instance").button.prop("title", "Expression examples...");                
-                // eslint-disable-next-line no-empty
-                } catch (error) {}
-                expressionField.combobox("value", option.expression || "");
+                    expressionField.combobox().button.prop('title', 'Expression examples...')
+                    expressionField.combobox('instance').button.prop('title', 'Expression examples...')
+                    // eslint-disable-next-line no-empty
+                } catch (error) { }
+                expressionField.combobox('value', option.expression || '')
 
-                //generate the solar events field
-                solarEventsField = $('<input/>', { class: "node-input-option-solarEvents", type: "text", style: "margin-left:0px; width:calc(32% - 36px);", placeholder: 'select solar events', value: option.solarEvents || "" }).appendTo(row2);
+                // generate the solar events field
+                const solarEventsField = $('<input/>', { class: 'node-input-option-solarEvents', type: 'text', style: 'margin-left:0px; width:calc(32% - 36px);', placeholder: 'select solar events', value: option.solarEvents || '' }).appendTo(row2)
                 solarEventsField.typedInput({
-                    default: "all",
+                    default: 'all',
                     types: [
                         {
-                            value: "selected",
-                            label: "Selected Solar Events", 
-                            title: "Selected Solar Events", 
-                            icon: "fa fa-list",
+                            value: 'selected',
+                            label: 'Selected Solar Events',
+                            title: 'Selected Solar Events',
+                            icon: 'fa fa-list',
                             showLabel: false,
                             multiple: true,
                             options: solarChoices,
-                            default: ["sunrise", "sunset"]
+                            default: ['sunrise', 'sunset']
                         },
                         {
-                            value: "all",
-                            label: "All Solar Events",
-                            title: "All Solar Events",
-                            icon: "fa fa-sun-o",
+                            value: 'all',
+                            label: 'All Solar Events',
+                            title: 'All Solar Events',
+                            icon: 'fa fa-sun-o',
                             hasValue: false,
-                            showLabel: true 
+                            showLabel: true
                         }
                     ]
-                });
-                solarEventsField.typedInput("type", option.solarType || "all");
-                solarEventsField.typedInput("value", option.solarEvents || "");//added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
+                })
+                solarEventsField.typedInput('type', option.solarType || 'all')
+                solarEventsField.typedInput('value', option.solarEvents || '')// added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
 
-                //generate location 
+                // generate location
                 const locationGroup = $('<div class="red-ui-typedInput-container node-input-option-location-group" style="margin-left:5px; width: calc(25% - 16px);">' +
-                        '<button class="red-ui-typedInput-type-select" style="width:25px" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
-                        '<div class="red-ui-typedInput-input red-ui-typedInput-input-wrap" style="left: 25px; right: 0px;">' +
-                        '<input class="red-ui-typedInput-input node-input-option-location" type="text" value="" placeholder="lat lng"></div> </div>');                
-                const locationField = locationGroup.find("input");
-                const locationButton = locationGroup.find("button");
-                locationField.prop("title", "Location coordinates...");
-                locationButton.prop("title", "Show Map...");
-                if(!option.location){
-                    locationGroup.addClass("input-error");
+                    '<button class="red-ui-typedInput-type-select" style="width:25px" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
+                    '<div class="red-ui-typedInput-input red-ui-typedInput-input-wrap" style="left: 25px; right: 0px;">' +
+                    '<input class="red-ui-typedInput-input node-input-option-location" type="text" value="" placeholder="lat lng"></div> </div>')
+                const locationField = locationGroup.find('input')
+                const locationButton = locationGroup.find('button')
+                locationField.prop('title', 'Location coordinates...')
+                locationButton.prop('title', 'Show Map...')
+                if (!option.location) {
+                    locationGroup.addClass('input-error')
                 } else {
-                    locationField.val(option.location);
+                    locationField.val(option.location)
                 }
-                locationGroup.appendTo(row2);
+                locationGroup.appendTo(row2)
 
-                locationButton.on( "click", function() {
-                    selectedLocationInput = $(this).closest("li").find(".node-input-option-location");
-                    $( "#cron-plus-map-dialog" ).dialog( "open" );
-                    if(navigator.onLine === true){
-                        $(".cron-plus-map-not-loaded").show();
-                        $(".cron-plus-map-loading").hide();
-                        $("#cron-plus-map").hide();
-                        let proto = location.protocol === 'https:' ? location.protocol : "http:";
-                        checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css", "css", function(){
-                            checkLoadJsCssFile(proto + "//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js", "js", function(){
-                                createMap(selectedLocationInput);
-                            });
-                        });
-
+                locationButton.on('click', function () {
+                    $('#cron-plus-map-dialog').dialog('open')
+                    selectedLocationInput = $(this).closest('li').find('.node-input-option-location')
+                    if (navigator.onLine === true) {
+                        $('.cron-plus-map-not-loaded').show()
+                        $('.cron-plus-map-loading').hide()
+                        $('#cron-plus-map').hide()
+                        const proto = location.protocol === 'https:' ? location.protocol : 'http:'
+                        checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css', 'css', function () {
+                            checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js', 'js', function () {
+                            })
+                            createMap(selectedLocationInput)
+                        })
                     } else {
-                        $(".cron-plus-map-not-loaded").show();
-                        $(".cron-plus-map-loading").hide();
-                        $("#cron-plus-map").hide();
-                        return;
+                        $('.cron-plus-map-not-loaded').show()
+                        $('.cron-plus-map-loading').hide()
+                        $('#cron-plus-map').hide()
                     }
-                });
+                })
 
-                //offset fields
-                offsetField = $('<input/>', { class: "node-input-option-offset", type: "number", min: -1439, max: 1439, style: "margin-left:7px; width:calc(15% - 16px);", value: option.offset || 0, placeholder: "offset" }).appendTo(row2);
-                offsetField.prop("title", "Minutes Offset +/- 1439");  
+                // offset fields
+                const offsetField = $('<input/>', { class: 'node-input-option-offset', type: 'number', min: -1439, max: 1439, style: 'margin-left:7px; width:calc(15% - 16px);', value: option.offset || 0, placeholder: 'offset' }).appendTo(row2)
+                offsetField.prop('title', 'Minutes Offset +/- 1439')
 
-                //init tooltips
-                initTooltip(offsetField, "solar", { my: "right top", at: "right bottom+5", of: offsetField, collision: "flipfit" });
-                initTooltip(locationField, "solar", { my: "right top", at: "right bottom+5", of: offsetField, collision: "flipfit" });
-                initTooltip(expressionField, "cron", { my: "right top", at: "right bottom+5", of: expressionField /*expDropButton*/, collision: "flipfit" });
+                // init tooltips
+                initTooltip(offsetField, 'solar', { my: 'right top', at: 'right bottom+5', of: offsetField, collision: 'flipfit' })
+                initTooltip(locationField, 'solar', { my: 'right top', at: 'right bottom+5', of: offsetField, collision: 'flipfit' })
+                initTooltip(expressionField, 'cron', { my: 'right top', at: 'right bottom+5', of: expressionField /* expDropButton */, collision: 'flipfit' })
 
-                locationField.keyup(function() {
-                    var f = $(this);
-                    var fg = locationGroup;
+                locationField.keyup(function () {
+                    const f = $(this)
+                    const fg = locationGroup
                     if (f.val() && fg.hasClass('input-error')) {
-                        fg.removeClass('input-error');
+                        fg.removeClass('input-error')
                     } else if (!f.val()) {
-                        fg.addClass('input-error');
+                        fg.addClass('input-error')
                     }
-                });
+                })
 
-                nameField.keyup(function() {
+                nameField.keyup(function () {
                     if ($(this).val() && $(this).hasClass('input-error')) {
-                        $(this).removeClass('input-error');
+                        $(this).removeClass('input-error')
                     } else if (!$(this).val()) {
-                        $(this).addClass('input-error');
+                        $(this).addClass('input-error')
                     }
-                });
+                })
 
-                locationField.change(function() {
-                    if ($(this).val() && locationGroup.hasClass("input-error")) {
-                        locationGroup.removeClass('input-error');
+                locationField.change(function () {
+                    if ($(this).val() && locationGroup.hasClass('input-error')) {
+                        locationGroup.removeClass('input-error')
                     } else if (!$(this).val()) {
-                        locationGroup.removeClass('input-error');
+                        locationGroup.removeClass('input-error')
                     }
-                });
+                })
 
-                topicField.keyup(function() {
+                topicField.keyup(function () {
                     if ($(this).val() && $(this).hasClass('input-error')) {
-                        $(this).removeClass('input-error');
+                        $(this).removeClass('input-error')
                     } else if (!$(this).val()) {
-                        $(this).addClass('input-error');
+                        $(this).addClass('input-error')
                     }
-                });
+                })
 
-                deleteButton.click(function() {
-                    container.css({ "background": "#fee" });
-                    container.fadeOut(300, function() {
-                        $(this).remove();
-                    });
-                });
+                deleteButton.click(function () {
+                    container.css({ background: '#fee' })
+                    container.fadeOut(300, function () {
+                        $(this).remove()
+                    })
+                })
 
-                expressionTypeField.change(function(){
-                    var value = expressionTypeField.val();
+                expressionTypeField.change(function () {
+                    const value = expressionTypeField.val()
                     const showLocationGroup = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
                     locationGroup.toggleClass('cron-plus-hide-per-location', !showLocationGroup)
                     switch (value) {
-                        case "solar":
-                            expressionField.combobox("hide");
-                            solarEventsField.typedInput("show");
-                            solarEventsField.css("display", "inline-block");
-                            locationGroup.removeClass('cron-plus-hide-location')
-                            offsetField.show();
-                            break;
-                        case "dates":
-                            expressionField.combobox("show");
-                            expressionField.combobox("hideMenu");
-                            solarEventsField.typedInput("hide");
-                            locationGroup.addClass('cron-plus-hide-location')
-                            offsetField.hide();
-                            break;
-                        default: //cron
-                            expressionField.combobox("show");
-                            expressionField.combobox("showMenu");
-                            solarEventsField.typedInput("hide");
-                            locationGroup.addClass('cron-plus-hide-location')
-                            offsetField.hide();
-                            break;
+                    case 'solar':
+                        expressionField.combobox('hide')
+                        solarEventsField.typedInput('show')
+                        solarEventsField.css('display', 'inline-block')
+                        locationGroup.removeClass('cron-plus-hide-location')
+                        offsetField.show()
+                        break
+                    case 'dates':
+                        expressionField.combobox('show')
+                        expressionField.combobox('hideMenu')
+                        solarEventsField.typedInput('hide')
+                        locationGroup.addClass('cron-plus-hide-location')
+                        offsetField.hide()
+                        break
+                    default: // cron
+                        expressionField.combobox('show')
+                        expressionField.combobox('showMenu')
+                        solarEventsField.typedInput('hide')
+                        locationGroup.addClass('cron-plus-hide-location')
+                        offsetField.hide()
+                        break
                     }
-                });
-                expressionTypeField.triggerHandler("change")
-                $("#node-input-option-container").append(container);
+                })
+                expressionTypeField.triggerHandler('change')
+                $('#node-input-option-container').append(container)
             }
 
-            $("#node-input-outputField").typedInput({ types: [{ label: "msg.", value: "str" }] });
+            $('#node-input-outputField').typedInput({ types: [{ label: 'msg.', value: 'str' }] })
 
-            $("#node-input-add-option").click(function() {
-                generateOption($("#node-input-option-container").children().length, {});
-                $("#node-input-option-container-div").scrollTop($("#node-input-option-container-div").get(0).scrollHeight);
-            });
+            $('#node-input-add-option').click(function () {
+                generateOption($('#node-input-option-container').children().length, {})
+                $('#node-input-option-container-div').scrollTop($('#node-input-option-container-div').get(0).scrollHeight)
+            })
 
-            $("#node-input-show-dynamic").click(function() {
-                $( "#cron-plus-dynamic-nodes-dialog" ).dialog( "open" );
-            });
+            $('#node-input-show-dynamic').click(function () {
+                $('#cron-plus-dynamic-nodes-dialog').dialog('open')
+            })
 
             for (let i = 0; i < this.options.length; i++) {
-                const option = this.options[i];
+                const option = this.options[i]
                 try {
-                    generateOption(i, option);
+                    generateOption(i, option)
                 } catch (error) {
-                    console.warn("generateOption caused an error: ", option, error);
+                    console.warn('generateOption caused an error: ', option, error)
                 }
             }
 
-            $( "#node-input-option-container" ).sortable({
-                axis: "y",
-                handle: ".node-input-option-handle",
-                cursor: "move"
-            });
+            $('#node-input-option-container').sortable({
+                axis: 'y',
+                handle: '.node-input-option-handle',
+                cursor: 'move'
+            })
 
-            updateEditorLayout();
+            updateEditorLayout()
         },
         oneditsave: function () {
-            const node = this;
-            const options = $("#node-input-option-container").children();
-            node.options = [];
+            const node = this
+            const options = $('#node-input-option-container').children()
+            node.options = []
             // eslint-disable-next-line no-unused-vars
-            options.each(function(i) {
-                const option = $(this);
+            options.each(function (i) {
+                const option = $(this)
                 const o = {
-                    name: option.find(".node-input-option-name").val(),
-                    topic: option.find(".node-input-option-topic").val(),
-                    payloadType: option.find(".node-input-option-payload").typedInput('type'),
-                    payload: option.find(".node-input-option-payload").typedInput('value'),
-                    expressionType: option.find(".node-input-option-expressionType").val(),
-                    expression: option.find(".node-input-option-expression").val(),
-                    location: option.find(".node-input-option-location").val(),
-                    offset: option.find(".node-input-option-offset").val(),
-                    solarType: option.find(".node-input-option-solarEvents").typedInput("type") || "all",
-                    solarEvents: option.find(".node-input-option-solarEvents").typedInput("value")
-                };
-                if (option.find(".node-input-option-value").typedInput('type') === "num") {
-                    o.payload = Number(o.value);
+                    name: option.find('.node-input-option-name').val(),
+                    topic: option.find('.node-input-option-topic').val(),
+                    payloadType: option.find('.node-input-option-payload').typedInput('type'),
+                    payload: option.find('.node-input-option-payload').typedInput('value'),
+                    expressionType: option.find('.node-input-option-expressionType').val(),
+                    expression: option.find('.node-input-option-expression').val(),
+                    location: option.find('.node-input-option-location').val(),
+                    offset: option.find('.node-input-option-offset').val(),
+                    solarType: option.find('.node-input-option-solarEvents').typedInput('type') || 'all',
+                    solarEvents: option.find('.node-input-option-solarEvents').typedInput('value')
                 }
-                if (option.find(".node-input-option-value").typedInput('type') === "bool") {
-                    o.payload = (o.value == "true");
+                if (option.find('.node-input-option-value').typedInput('type') === 'num') {
+                    o.payload = Number(o.value)
                 }
-                node.options.push(o);
-            });
-            const o = $("#node-input-commandResponseMsgOutput").val();
-            node.commandResponseMsgOutput = ["output1", "output2", "fanOut"].indexOf(o) >= 0 ? o : "output1";
-            const fanOut = node.commandResponseMsgOutput === "fanOut";
-            node.outputs = node.commandResponseMsgOutput === "output1" ? 1 : 2;
-            node.defaultLocationType = $("#node-input-defaultLocation").typedInput('type')
-            node.defaultLocation = $("#node-input-defaultLocation").typedInput('value')
+                if (option.find('.node-input-option-value').typedInput('type') === 'bool') {
+                    // eslint-disable-next-line eqeqeq
+                    o.payload = (o.value == 'true')
+                }
+                node.options.push(o)
+            })
+            const o = $('#node-input-commandResponseMsgOutput').val()
+            node.commandResponseMsgOutput = ['output1', 'output2', 'fanOut'].indexOf(o) >= 0 ? o : 'output1'
+            const fanOut = node.commandResponseMsgOutput === 'fanOut'
+            node.outputs = node.commandResponseMsgOutput === 'output1' ? 1 : 2
+            node.defaultLocationType = $('#node-input-defaultLocation').typedInput('type')
+            node.defaultLocation = $('#node-input-defaultLocation').typedInput('value')
             if (fanOut && options && options.length) {
-                node.outputs = options.length + 2; // in fanout mode, we add a separate output for dynamic schedules & command responses
+                node.outputs = options.length + 2 // in fanout mode, we add a separate output for dynamic schedules & command responses
             }
-            $("#node-input-timeZone").off();
-            $("#node-input-crontab").off();
+            $('#node-input-timeZone').off()
+            $('#node-input-crontab').off()
         },
         button: {
             visible: function () {
-                if(this.options && this.options.length == 1){
-                    return true;
+                if (this.options && this.options.length === 1) {
+                    return true
                 }
-                return false;
+                return false
             },
             enabled: function () {
-                return !this.changed;
+                return !this.changed
             },
             onclick: function () {
-                const node = this;
+                const node = this
                 if (node.changed) {
-                    return RED.notify(RED._("notification.warning", { message: RED._("notification.warnings.undeployedChanges") }), "warning");
+                    return RED.notify(RED._('notification.warning', { message: RED._('notification.warnings.undeployedChanges') }), 'warning')
                 }
-                let label = node._def.label.call(node);
+                let label = node._def.label.call(node)
                 if (label.length > 30) {
-                    label = label.substring(0, 50) + "...";
+                    label = label.substring(0, 50) + '...'
                 }
-                label = label.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                label = label.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 $.ajax({
-                    url: "cronplusinject/" + node.id,
-                    type: "POST",
+                    url: 'cronplusinject/' + node.id,
+                    type: 'POST',
                     // eslint-disable-next-line no-unused-vars
                     success: function (response) {
-                        RED.notify(node._("inject.success", { label: label }), { type: "success", id: "inject" });
+                        RED.notify(node._('inject.success', { label }), { type: 'success', id: 'inject' })
                     },
                     // eslint-disable-next-line no-unused-vars
                     error: function (jqXHR, textStatus, errorThrown) {
-                        if (jqXHR.status == 404) {
-                            RED.notify(node._("common.notification.error", { message: node._("common.notification.errors.not-deployed") }), "error");
-                        } else if (jqXHR.status == 500) {
-                            RED.notify(node._("common.notification.error", { message: node._("inject.errors.failed") }), "error");
-                        } else if (jqXHR.status == 0) {
-                            RED.notify(node._("common.notification.error", { message: node._("common.notification.errors.no-response") }), "error");
+                        if (jqXHR.status === 404) {
+                            RED.notify(node._('common.notification.error', { message: node._('common.notification.errors.not-deployed') }), 'error')
+                        } else if (jqXHR.status === 500) {
+                            RED.notify(node._('common.notification.error', { message: node._('inject.errors.failed') }), 'error')
+                        } else if (jqXHR.status === 0) {
+                            RED.notify(node._('common.notification.error', { message: node._('common.notification.errors.no-response') }), 'error')
                         } else {
-                            RED.notify(node._("common.notification.error", { message: node._("common.notification.errors.unexpected", { status: jqXHR.status, message: textStatus }) }), "error");
+                            RED.notify(node._('common.notification.error', { message: node._('common.notification.errors.unexpected', { status: jqXHR.status, message: textStatus }) }), 'error')
                         }
                     }
-                });
+                })
             }
         },
-        oneditresize: function(){
+        oneditresize: function () {
             // console.log("RESIZING")
-            updateEditorLayout();
-            //HACK for old versions of node-red - prior to typedInput resizing changed from code to CSS
-            if(RED.settings.version && RED.settings.version.split(".")[0] < 1){
-                const tics = $(".red-ui-typedInput-container");
-                if(tics && tics.length){
+            updateEditorLayout()
+            // HACK for old versions of node-red - prior to typedInput resizing changed from code to CSS
+            if (RED.settings.version && RED.settings.version.split('.')[0] < 1) {
+                const tics = $('.red-ui-typedInput-container')
+                if (tics && tics.length) {
                     for (let idx = 0; idx < tics.length; idx++) {
-                        const element = $(tics[idx]);
-                        if(element && element.length && element.is(":visible") ){
-                            element.css("display", "inline-block");
+                        const element = $(tics[idx])
+                        if (element && element.length && element.is(':visible')) {
+                            element.css('display', 'inline-block')
                         }
                     }
-                } 
+                }
             }
         }
-    });
-
-})();
+    })
+})(jQuery)
 
 function _popoutCronPlusHelp(tag) {
     const startTag = (name) => `<${name}>`
@@ -2227,7 +2299,7 @@ function _popoutCronPlusHelp(tag) {
     <div id="cron-plus-expression-builder-dialog" style="display: none;" title="Easy Expression Builder...">
         <div id="cron-plus-expression-builder" >
         </div>
-    </div>    
+    </div>
     <div class="form-row cron-plus-form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
         <input type="text" id="node-input-name" style="width: calc(100% - 130px)" placeholder="Name">
@@ -2235,7 +2307,7 @@ function _popoutCronPlusHelp(tag) {
     <div class="form-row cron-plus-form-row">
         <label for="node-input-outputField"><i class="fa fa-sign-out"></i> Output property</label>
         <input type="text" id="node-input-outputField" style="width: calc(100% - 130px)" placeholder="payload">
-    </div>         
+    </div>
     <div class="form-row cron-plus-form-row">
         <label for="node-input-timeZone"><i class="fa fa-globe"></i> Timezone</label>
         <input type="text" id="node-input-timeZone" style="width: calc(100% - 130px)" placeholder="Leave empty for none/system">
@@ -2251,7 +2323,7 @@ function _popoutCronPlusHelp(tag) {
           <option value="output2">2 outputs: Schedule messages to output 1, command responses to output 2</option>
           <option value="fanOut" >Fan out: Separate outputs for static, dynamic and command messages</option>
         </select>
-    </div> 
+    </div>
     <div class="form-row cron-plus-form-row">
         <label>&nbsp;</label>
         <input type="checkbox" id="node-input-persistDynamic" style="display:inline-block; width:15px; vertical-align:baseline;" autocomplete="off">
@@ -2263,7 +2335,7 @@ function _popoutCronPlusHelp(tag) {
             style="min-width: 300px; box-sizing: border-box; border-radius: 5px; padding: 5px; overflow-y:scroll;display: inline-block; width: 100%; height: calc(100% - 28px); min-height: 150px;">
             <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;"></ol>
         </div>
-    </div> 
+    </div>
     <div class="form-row cron-plus-form-row">
         <a href="#" class="editor-button editor-button-small" id="node-input-add-option" style="margin-top: 4px;"><i class="fa fa-plus"></i> <span>add</span></a>
         <a href="#" class="editor-button editor-button-small" id="node-input-show-dynamic" style="margin-top: 4px;"><i class="fa fa-table"></i> <span>view dynamic schedules</span></a>
@@ -2474,6 +2546,7 @@ function _popoutCronPlusHelp(tag) {
             This includes the <code>-all</code>, <code>-all-dynamic</code>, <code>-all-static</code>, <code>-active</code>,  <code>-active-dynamic</code>,  <code>-active-static</code>, <code>-inactive</code>, <code>-inactive-dynamic</code> and <code>-inactive-static</code> command topics (e.g. export-all, stop-all-dynamic, start-all-static, remove-inactive-dynamic)<br>
             See <a href="#cron-plus-commands-info">commands</a> below for details.
         </dd>
+    </dl>
     <dl class="message-properties">
         <dt><i>payload</i> <span class="property-type">string|object|Array</span></dt>
         <dd>It is possible to dynamically add, remove and control schedules by injecting a payload into the node. The format of the payload object (or array of objects) depends on the operation. See below for details.</dd>
