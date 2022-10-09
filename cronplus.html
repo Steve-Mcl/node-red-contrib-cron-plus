@@ -1103,7 +1103,9 @@ copies or substantial portions of the Software.
                         if (options.class) $table.addClass(options.class)
 
                         if (!response || !response.length) {
-                            $('<div class="ui-dialog-title"/>' + (options.emptyMessage || 'no data') + '<div>').appendTo($table)
+                            $spinner.hide()
+                            $table.show()
+                            $('<div/>' + (options.emptyMessage || 'no data') + '<div>').css({padding: '12px', 'font-size': '24px'}).appendTo($table)
                             return
                         }
 
@@ -1655,8 +1657,8 @@ copies or substantial portions of the Software.
 
                 // build options row
                 const container = $('<li/>', { style: 'margin:0px 0px 5px 0px; padding:0px;' })
-                const row = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container)
-                const row2 = $('<div style="margin: 0px 0px 5px 0px"/>').appendTo(container)
+                const row = $('<div style="display: flex; margin: 0px 0px 5px 0px"/>').appendTo(container)
+                const row2 = $('<div style="display: flex; margin: 0px 0px 5px 0px"/>').appendTo(container)
 
                 const div = row.append('<div/>')
 
