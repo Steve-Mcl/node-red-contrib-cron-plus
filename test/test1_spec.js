@@ -11,10 +11,16 @@ describe('cron-plus Node', function () {
 
     beforeEach(done => { helper.startServer(done) })
 
-    afterEach(done => { helper.unload().then(() => helper.stopServer(done)) })
+    afterEach(async () => {
+        if (helper) {
+            await helper.clearFlows()
+            await helper.unload()
+            helper.stopServer()
+        }
+    })
 
     it('should inject within 1 sec from cron expression * * * * * * *', function (done) {
-        this.timeout(1000) // timeout with an error if done() isn't called in time
+        this.timeout(1100) // timeout with an error if done() isn't called in time
         const flow = [
             { id: 't1n1', type: 'cronplus', name: 'every1sec', outputField: 'payload', timeZone: '', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'num', payload: '100', expressionType: 'cron', expression: '* * * * * * *', location: '', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }], wires: [['t1n2']] },
             { id: 't1n2', type: 'helper' }
@@ -123,6 +129,9 @@ describe('cron-plus Node', function () {
         basicTest('topic4', 'my.nested.payload', 'json', valJson, 'object', JSON.parse(valJson))
         const valBuf = '[1,2,3,4,5]'
         basicTest('topic5', 'payload', 'bin', valBuf, 'object', Buffer.from(JSON.parse(valBuf)))
+        const valJsonata = '{"x":1+2}'
+        const valJsonataResult = '{"x":3}'
+        basicTest('topic6', 'my.nested.payload', 'jsonata', valJsonata, 'object', JSON.parse(valJsonataResult))
 
         const opts = { defaultLocationType: 'fixed', defaultLocation: '55.555, 0.5555', schedule: 'schedule2' }
         const results = [
@@ -144,7 +153,6 @@ describe('cron-plus Node', function () {
     // ]
     // basicTest('topic7', 'payload', 'default', '', 'default', results3, opts3)
 
-    // test set 3 - test dynamic capabilities
     const getTestFlow = (nodeName = 'testNode') => {
         return [
             { id: 'helperNode1', type: 'helper' },
@@ -528,6 +536,72 @@ describe('cron-plus Node', function () {
             } catch (error) {
                 done(error)
             }
+        })
+    })
+
+    // test dynamic capabilities
+    it('should add a schedule dynamically', function (done) {
+        this.timeout(2000) // timeout with an error if done() isn't called in time
+        // flow: tab1, cronplus --> helper
+        const flow = [
+            { id: 'tab1', type: 'tab', label: 'Flow 1', env: [{ name: 'tabpos', value: '51.1, 1.1', type: 'str' }] },
+            { id: 'cron.node', type: 'cronplus', name: 'test1', outputField: 'payload', commandResponseMsgOutput: 'output1', outputs: 1, options: [], wires: [['helper.node']], z: 'tab1' },
+            { id: 'helper.node', type: 'helper', z: 'tab1' }
+        ]
+
+        helper.load(cronplusNode, flow, function () {
+            const cronNode = helper.getNode('cron.node')
+            const helperNode = helper.getNode('helper.node')
+
+            helperNode.on('input', function (msg) {
+                try {
+                    msg.should.have.property('topic', 'dynamic1')
+                    msg.should.have.property('payload')
+                    done()
+                } catch (err) {
+                    done(err)
+                }
+            })
+            // inject a cronplus schedule named dynamic1
+            cronNode.receive({ payload: { command: 'add', name: 'dynamic1', topic: 'dynamic1', expressionType: 'cron', expression: '0 * * * * * *', payloadType: 'default', limit: 1 } })
+            cronNode.receive({ topic: 'trigger', payload: 'dynamic1' }) // trigger schedule
+        })
+    })
+    it('should remove a schedule dynamically', function (done) {
+        this.timeout(2000) // timeout with an error if done() isn't called in time
+        // static cron schedules
+        const options = [
+            { name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 * * * * * *', location: '', offset: '0' },
+            { name: 'schedule2', topic: 'schedule2', payloadType: 'default', payload: '', expressionType: 'dates', expression: [Date.now() + 60000, Date.now() + 120000], location: '', offset: '0' },
+            { name: 'schedule3', topic: 'schedule3', payloadType: 'default', payload: '', expressionType: 'solar', expression: '0 * * * * * *', location: '55.0 -1.418', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }
+        ]
+
+        // flow: tab1, cronplus --> helper
+        const flow = [
+            { id: 'tab1', type: 'tab', label: 'Flow 1', env: [{ name: 'tabpos', value: '51.1, 1.1', type: 'str' }] },
+            { id: 'cron.node', type: 'cronplus', name: 'test1', outputField: 'payload', commandResponseMsgOutput: 'output1', outputs: 1, options, wires: [['helper.node']], z: 'tab1' },
+            { id: 'helper.node', type: 'helper', z: 'tab1' }
+        ]
+        helper.load(cronplusNode, flow, function () {
+            const cronNode = helper.getNode('cron.node')
+            const helperNode = helper.getNode('helper.node')
+
+            helperNode.on('input', function (msg) {
+                try {
+                    console.log(msg)
+                    msg.should.have.property('topic', 'schedule2')
+                    msg.should.have.property('payload')
+                    helper.clearFlows().then(function () {
+                        done()
+                    })
+                } catch (err) {
+                    done(err)
+                }
+            })
+            // inject a cronplus schedule named dynamic1
+            cronNode.receive({ topic: 'remove', payload: 'schedule1' })
+            cronNode.receive({ topic: 'trigger', payload: 'schedule1' }) // trigger schedule 1 - should not fire
+            cronNode.receive({ topic: 'trigger', payload: 'schedule2' }) // trigger schedule 2 - should fire
         })
     })
 })
