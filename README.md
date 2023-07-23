@@ -1,6 +1,6 @@
 node-red-contrib-cron-plus
 ============================
-_A flexible timer/scheduler (cron, solar events, simple dates) node for Node-RED with full dynamic control and Timezone support_
+_A flexible timer/scheduler (cron, solar events, simple dates) node for Node-RED with full dynamic control and time zone support_
 
 
 QUICK DEMO...
@@ -16,13 +16,13 @@ FEATURES
   * An Easy Expression Builder to aid cron novices
   * ![easy-expr-builder](https://user-images.githubusercontent.com/44235289/90957177-296c4980-e484-11ea-9705-9a7faf90b5f0.gif)
 * Multiple schedules can be entered by the node editor UI or dynamically at runtime
-* Send a default payload or any of the following: timestamp, string, number, boolean, flow variable, global variable, JSON, Buffer or Env variable as the output.
+* Send a default payload or any of the following: timestamp, string, number, boolean, flow variable, global variable, JSON, JSONata, Buffer or Env variable as the output.
 * Example CRON expressions provided in the dropdown to get you started
 * Map popup to help you enter coordinates for solar events
   * Location coordinates can be per schedule, per cron node or set by an environment variable (as of V2.0.0)
   * NOTE: Map is 100% CDN dynamic and requires and internet connection. If there is no internet, the popup will provide information to help you get location coordinates from another source
   * ![cron-plus-map](https://user-images.githubusercontent.com/44235289/84031948-79ac3300-a98e-11ea-966c-b77200515030.gif)
-* Option to separate command responses from output 1 to separate 2nd output 
+* Option to separate command responses from output 1 to separate 2nd output
 * Fan out option to separate each static schedule to its own output (dynamic and command responses are sent on last 2 output pins) (as of V1.4.0)
 * Settable output variable (normally `msg.payload` but it is up to you)
 * Inject-like button to fire the node (available when only one schedule is added) 
@@ -45,10 +45,14 @@ FEATURES
     * add - add one or more dynamic schedules
     * describe - describe solar events or cron expression (without the need to add a schedule)
       * useful for creating a [dynamic dashboard like this](https://flows.nodered.org/flow/79a66966a6cc655a827872a4af794b94)
+* Persist schedules and state
+  * In local file system (default)
+  * In memory or persistent context (as of V2.0.0)
+  * Persist state of schedules (as of V2.0.0) (i.e. if a schedule is paused, it will remain paused after a restart)
 * Recognises system clock changes and recalculates schedules
   * change detection can now be customised by adding an entry in `settings.js` or an environment variable named `CRONPLUS_MAX_CLOCK_DIFF` (as of V2.0.0)
 * Demo flows demonstrating many of the capabilities. Import via node-red menu > import > examples.
-* Optional timezone setting supporting UTC and Region/Area (e.g. Europe/London)
+* Optional time zone setting supporting UTC and Region/Area (e.g. Europe/London)
 
 Install
 -------
@@ -63,13 +67,13 @@ Install
 Run the following command in the root directory of your Node-RED install.
 (Usually this is `~/.node-red` or `%userprofile%\.node-red`).
 
-  Install from GIT
-
-      npm install Steve-Mcl/node-red-contrib-cron-plus
-
   Install from NPM 
 
       npm install node-red-contrib-cron-plus
+
+  Install from GIT
+
+      npm install Steve-Mcl/node-red-contrib-cron-plus
 
   Alternatively, install from a folder
 
