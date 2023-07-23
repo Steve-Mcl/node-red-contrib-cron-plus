@@ -786,25 +786,19 @@ function getTaskStatus (node, task, opts) {
     return r
 }
 
-let userDir = ''; let persistPath = ''; let persistAvailable = false
+let userDir = ''
+let persistPath = ''
+let FSAvailable = false
+let contextAvailable = false
 const cronplusDir = 'cronplusdata'
 
 module.exports = function (RED) {
-    function evaluateNodeProperty (value, type, node, msg) {
-        return new Promise(function (resolve, reject) {
-            RED.util.evaluateNodeProperty(value, type, node, msg, function (e, r) {
-                if (e) {
-                    reject(e)
-                } else {
-                    resolve(r)
-                }
-            })
-        })
-    }
+    const STORE_NAMES = getStoreNames()
     // when running tests, RED.settings.userDir & RED.settings.settingsFile (amongst others) are undefined
     const testMode = typeof RED.settings.userDir === 'undefined' && typeof RED.settings.settingsFile === 'undefined'
     if (testMode) {
-        persistAvailable = false
+        FSAvailable = false
+        contextAvailable = false
     } else {
         userDir = RED.settings.userDir || ''
         persistPath = path.join(userDir, cronplusDir)
@@ -812,13 +806,14 @@ module.exports = function (RED) {
             if (!fs.existsSync(persistPath)) {
                 fs.mkdirSync(persistPath)
             }
-            persistAvailable = fs.existsSync(persistPath)
+            FSAvailable = fs.existsSync(persistPath)
         } catch (e) {
             if (e.code !== 'EEXIST') {
                 RED.log.error(`cron-plus: Error creating persistence folder '${persistPath}'. ${e.message}`)
-                persistAvailable = false
+                FSAvailable = false
             }
         }
+        contextAvailable = STORE_NAMES.length > 2 // 1st 2 are 'none' and 'file', any others are context stores
     }
 
     function CronPlus (config) {
@@ -831,13 +826,52 @@ module.exports = function (RED) {
         node.crontab = config.crontab
         node.outputField = config.outputField || 'payload'
         node.timeZone = config.timeZone
-        node.persistDynamic = config.persistDynamic || false
+
         node.options = config.options
         node.commandResponseMsgOutput = config.commandResponseMsgOutput || 'output1'
         node.defaultLocation = config.defaultLocation
         node.defaultLocationType = config.defaultLocationType
         node.outputs = 1
         node.fanOut = false
+
+        node.queuedSerialisationRequest = null
+        node.serialisationRequestBusy = null
+
+        setInterval(async function () {
+            if (node.serialisationRequestBusy) return
+            if (node.queuedSerialisationRequest) {
+                node.serialisationRequestBusy = node.queuedSerialisationRequest
+                await serialise()
+                node.queuedSerialisationRequest = null
+                node.serialisationRequestBusy = null
+            }
+        }, 2500) // 2.5 seconds
+        // convert node.persistDynamic to a getter/setter
+        Object.defineProperty(node, 'persistDynamic', {
+            get: function () {
+                return !!node.storeName
+            }
+        })
+
+        // inherit/upgrade deprecated properties from config
+        const hasStoreNameProperty = Object.prototype.hasOwnProperty.call(config, 'storeName') && typeof config.storeName === 'string'
+        const hasDeprecatedPersistDynamic = Object.prototype.hasOwnProperty.call(config, 'persistDynamic') && typeof config.persistDynamic === 'boolean'
+        if (hasStoreNameProperty) {
+            // not an upgrade - let use this property
+            node.storeName = config.storeName
+        } else if (hasDeprecatedPersistDynamic) {
+            // upgrade from older version
+            node.storeName = config.persistDynamic ? 'file' : ''
+        } else {
+            // default
+            node.storeName = ''
+        }
+
+        if (node.storeName && node.storeName !== 'file' && STORE_NAMES.indexOf(node.storeName) < 0) {
+            node.warn(`Invalid store name specified '${node.storeName}' - state will not be persisted for this node`)
+            contextAvailable = false
+        }
+
         if (config.commandResponseMsgOutput === 'output2') {
             node.outputs = 2 // 1 output pins (all messages), 2 outputs (schedules out of pin1, command responses out of pin2)
         } else if (config.commandResponseMsgOutput === 'fanOut') {
@@ -855,7 +889,7 @@ module.exports = function (RED) {
             const timeDiff = newTime - oldTime
             timeChecker.oldTime = newTime
             if (Math.abs(timeDiff) >= MAX_CLOCK_DIFF) {
-                node.log('System Time Change Detected - refreshing schedules! If the system time was not changed then typically occurs due to blocking code elsewhere in your application')
+                node.log('System Time Change Detected - refreshing schedules! If the system time was not changed then this typically occurs due to blocking code elsewhere in your application')
                 await refreshTasks(node)
             }
         }, 1000)
@@ -988,9 +1022,9 @@ module.exports = function (RED) {
             }
         })()
 
-        node.on('close', function (done) {
+        node.on('close', async function (done) {
             try {
-                serialise()
+                await serialise()
             } catch (error) {
                 node.error(error)
             }
@@ -1172,43 +1206,43 @@ module.exports = function (RED) {
                     case 'update': // single
                         await updateTask(node, cmd, msg)
                         updateNextStatus(node, true)
-                        serialise()// update persistence
+                        requestSerialisation()// update persistence
                         break
                     case 'clear':
                     case 'remove-': // multiple
                     case 'delete-': // multiple
                         deleteAllTasks(node, cmdFilter)
                         updateNextStatus(node, true)
-                        serialise()// update persistence
+                        requestSerialisation()// update persistence
                         break
                     case 'remove': // single
                     case 'delete': // single
                         deleteTask(node, cmd.name)
                         updateNextStatus(node, true)
-                        serialise()// update persistence
+                        requestSerialisation()// update persistence
                         break
                     case 'start': // single
                         startTask(node, cmd.name)
                         updateNextStatus(node, true)
-                        serialise()// update persistence
+                        requestSerialisation()// update persistence
                         break
                     case 'start-': // multiple
                         startAllTasks(node, cmdFilter)
                         updateNextStatus(node, true)
-                        serialise()// update persistence
+                        requestSerialisation()// update persistence
                         break
                     case 'stop': // single
                     case 'pause': // single
                         stopTask(node, cmd.name, cmd.command === 'stop')
                         updateNextStatus(node, true)
-                        serialise()// update persistence
+                        requestSerialisation()// update persistence
                         break
                     case 'stop-': // multiple
                     case 'pause-': {
                         const resetCounter = cmd.command.startsWith('stop-')
                         stopAllTasks(node, resetCounter, cmdFilter)
                         updateNextStatus(node, true)
-                        serialise()// update persistence
+                        requestSerialisation()// update persistence
                     }
                         break
                     case 'next':
@@ -1490,6 +1524,7 @@ module.exports = function (RED) {
                     t.isDynamic = isDynamic
                 }
             }
+            requestSerialisation()// request persistent state be written
         }
         async function createTask (node, opt, index, _static) {
             opt = opt || {}
@@ -1534,7 +1569,7 @@ module.exports = function (RED) {
             task.node_expression = opt.expression
             task.node_payloadType = opt.payloadType
             task.node_payload = opt.payload
-            task.node_count = 0
+            task.node_count = opt.count || 0
             task.node_locationType = opt.locationType
             task.node_location = opt.location
             task.node_solarType = opt.solarType
@@ -1562,41 +1597,76 @@ module.exports = function (RED) {
                     if (task.node_expressionType === 'solar') {
                         await updateTask(node, task.node_opt, null)
                     }
+                    requestSerialisation()// request persistent state be written
                 })
             })
                 .on('ended', () => {
                     node.debug(`ended '${task.name}' ~ '${task.node_topic}'`)
                     updateNextStatus(node)
+                    requestSerialisation()// request persistent state be written
                 })
                 .on('started', () => {
                     node.debug(`started '${task.name}' ~ '${task.node_topic}'`)
                     process.nextTick(function () {
                         updateNextStatus(node)
                     })
+                    requestSerialisation()// request persistent state be written
                 })
                 .on('stopped', () => {
                     node.debug(`stopped '${task.name}' ~ '${task.node_topic}'`)
                     updateNextStatus(node)
+                    requestSerialisation()// request persistent state be written
                 })
             task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-            if (!(opt.dontStartTheTask === true)) {
+            if (opt.dontStartTheTask !== true) {
                 task.start()
             }
             node.tasks.push(task)
             return task
         }
-        function serialise () {
+        function requestSerialisation () {
+            if (node.serialisationRequestBusy) {
+                return
+            }
+            node.queuedSerialisationRequest = Date.now()
+        }
+        async function serialise () {
             let filePath = ''
             try {
-                if (!persistAvailable || !node.persistDynamic) {
+                if (!node.persistDynamic) {
                     return
                 }
-                filePath = getPersistFilePath()
+                if (!FSAvailable && node.storeName === 'file') {
+                    return
+                }
                 const dynNodes = node.tasks.filter((e) => e && e.isDynamic)
                 const statNodes = node.tasks.filter((e) => e && e.isDynamic !== true)
                 const exp = (task) => exportTask(task, true)
                 const dynNodesExp = dynNodes.map(exp)
                 const statNodesExp = statNodes.map(exp)
+                const state = {
+                    version: 2,
+                    dynamicSchedules: dynNodesExp,
+                    staticSchedules: statNodesExp
+                }
+                if (node.storeName === 'file') {
+                    try {
+                        filePath = getPersistFilePath()
+                        const fileData = JSON.stringify(state)
+                        fs.writeFileSync(filePath, fileData)
+                    } catch (err) {
+                        node.error(`An error occurred while writing state to file '${filePath}' - (${err.message})`)
+                        return
+                    }
+                } else {
+                    const contextKey = 'state'
+                    const storeName = node.storeName || 'default'
+                    if (!contextAvailable || STORE_NAMES.indexOf(storeName) === -1) {
+                        return
+                    }
+                    await contextSet(node.context(), contextKey, state, storeName)
+                }
+
                 /* if(!dynNodesExp || !dynNodesExp.length){
                     //FUTURE TODO: Sanity check before deletion
                     //and only if someone asks for it :)
@@ -1604,39 +1674,34 @@ module.exports = function (RED) {
                     fs.unlinkSync(filePath);
                     return;
                 } */
-                const data = {
-                    version: 2,
-                    dynamicSchedules: dynNodesExp,
-                    staticSchedules: statNodesExp
-                }
-                const fileData = JSON.stringify(data)
-                fs.writeFileSync(filePath, fileData)
             } catch (e) {
-                RED.log.error(`cron-plus: Error saving persistence data '${filePath}'. ${e.message}`)
+                node.error(`Error saving persistence data. ${e.message}`)
+            } finally {
+                node.queuedSerialisationRequest = null
             }
         }
         async function deserialise () {
             let filePath = ''
             try {
-                if (!persistAvailable || !node.persistDynamic) {
+                if (!node.persistDynamic) {
                     return
                 }
-                filePath = getPersistFilePath()
-                if (fs.existsSync(filePath)) {
-                    const fileData = fs.readFileSync(filePath)
-                    const data = JSON.parse(fileData)
-                    if (!data) {
+                if (!FSAvailable && node.storeName === 'file') {
+                    return
+                }
+                const restoreState = async (state) => {
+                    if (!state) {
                         return // nothing to add
                     }
-                    if (data.version !== 1 && data.version !== 2) {
+                    if (state.version !== 1 && state.version !== 2) {
                         throw new Error('Invalid version - cannot load dynamic schedules')
                     }
-                    if (data.version === 2 && data.staticSchedules && data.staticSchedules.length) {
-                        for (let iOpt = 0; iOpt < data.staticSchedules.length; iOpt++) {
-                            const opt = data.staticSchedules[iOpt]
+                    if (state.version === 2 && state.staticSchedules && state.staticSchedules.length) {
+                        for (let iOpt = 0; iOpt < state.staticSchedules.length; iOpt++) {
+                            const opt = state.staticSchedules[iOpt]
                             const task = node.tasks.find(e => e.name === opt.name)
                             if (task) {
-                                task.count = opt.count
+                                task.node_count = opt.count
                             }
                             if (opt.isRunning === false) {
                                 stopTask(node, opt.name)
@@ -1646,21 +1711,21 @@ module.exports = function (RED) {
                         }
                         updateNodeNextInfo(node)
                     }
-                    if (data.version === 1) {
-                        data.dynamicSchedules = data.schedules
+                    if (state.version === 1) {
+                        state.dynamicSchedules = state.schedules
                     }
-                    if (data.dynamicSchedules && data.dynamicSchedules.length) {
-                        for (let iOpt = 0; iOpt < data.dynamicSchedules.length; iOpt++) {
-                            const opt = data.dynamicSchedules[iOpt]
+                    if (state.dynamicSchedules && state.dynamicSchedules.length) {
+                        for (let iOpt = 0; iOpt < state.dynamicSchedules.length; iOpt++) {
+                            const opt = state.dynamicSchedules[iOpt]
                             let task
                             opt.name = opt.name || opt.topic
-                            if (data.version === 1) {
+                            if (state.version === 1) {
                                 task = await createTask(node, opt, iOpt, false)
-                            } else if (data.version === 2) {
-                                opt.dontStartTheTask = opt.isRunning
+                            } else if (state.version === 2) {
+                                opt.dontStartTheTask = !opt.isRunning
                                 task = await createTask(node, opt, iOpt, false)
                                 if (task) {
-                                    task.count = opt.count
+                                    task.node_count = opt.count
                                     task.isRunning = opt.isRunning
                                     task.isDynamic = true
                                 }
@@ -1673,11 +1738,28 @@ module.exports = function (RED) {
                         }
                         updateNodeNextInfo(node)
                     }
+                }
+                if (node.storeName === 'file') {
+                    filePath = getPersistFilePath()
+                    if (fs.existsSync(filePath)) {
+                        const fileData = fs.readFileSync(filePath)
+                        const state = JSON.parse(fileData)
+                        await restoreState(state)
+                    } else {
+                        RED.log.debug(`cron-plus: no persistence data found for node '${node.id}'.`)
+                    }
                 } else {
-                    RED.log.log(`cron-plus: no persistence data found for node '${node.id}'.`)
+                    // use context
+                    const storeName = node.storeName || 'default'
+                    const contextKey = 'state'
+                    if (!contextAvailable || !STORE_NAMES.indexOf(storeName)) {
+                        return
+                    }
+                    const state = await contextGet(node.context(), contextKey, storeName)
+                    await restoreState(state)
                 }
             } catch (error) {
-                RED.log.error(`cron-plus: Error loading persistence data '${filePath}'. ${error.message}`)
+                node.error(`cron-plus: Error loading persistence data '${filePath}'. ${error.message}`)
             }
         }
         function getPersistFilePath () {
@@ -1777,6 +1859,54 @@ module.exports = function (RED) {
             return arr
         }
     }
+
+    function evaluateNodeProperty (value, type, node, msg) {
+        return new Promise(function (resolve, reject) {
+            RED.util.evaluateNodeProperty(value, type, node, msg, function (e, r) {
+                if (e) {
+                    reject(e)
+                } else {
+                    resolve(r)
+                }
+            })
+        })
+    }
+
+    function contextGet (context, contextKey, storeName) {
+        return new Promise(function (resolve, reject) {
+            context.get(contextKey, storeName, function (e, r) {
+                if (e) {
+                    reject(e)
+                } else {
+                    resolve(r)
+                }
+            })
+        })
+    }
+
+    function contextSet (context, contextKey, value, storeName) {
+        return new Promise(function (resolve, reject) {
+            context.set(contextKey, value, storeName, function (e, r) {
+                if (e) {
+                    reject(e)
+                } else {
+                    resolve()
+                }
+            })
+        })
+    }
+
+    function getStoreNames () {
+        const stores = ['', 'file']
+        if (!RED.settings.contextStorage) {
+            return stores
+        }
+        if (typeof RED.settings.contextStorage !== 'object') {
+            return stores
+        }
+        return [...stores, ...Object.keys(RED.settings.contextStorage)]
+    }
+
     RED.nodes.registerType('cronplus', CronPlus)
 
     RED.httpAdmin.post('/cronplusinject/:id', RED.auth.needsPermission('cronplus.write'), function (req, res) {

@@ -900,7 +900,8 @@ copies or substantial portions of the Software.
             // FUTURE config: { type: "CRON-PLUS Config" },
             outputField: { value: 'payload' },
             timeZone: { value: '' },
-            persistDynamic: { value: false },
+            persistDynamic: { value: undefined },
+            storeName: { value: '' },
             commandResponseMsgOutput: { value: 'output1' },
             defaultLocation: { value: '' },
             defaultLocationType: { value: '' },
@@ -985,6 +986,49 @@ copies or substantial portions of the Software.
 
             // eslint-disable-next-line no-undef
             initMap()
+            
+            // inherit/upgrade deprecated properties from config
+            const hasStoreNameProperty = Object.prototype.hasOwnProperty.call(node, 'storeName') && typeof node.storeName === 'string'
+            const hasDeprecatedPersistDynamic = Object.prototype.hasOwnProperty.call(node, 'persistDynamic') && typeof node.persistDynamic === 'boolean'
+            if (hasStoreNameProperty) {
+                // not an upgrade - accept node.storeName property value
+            } else if (hasDeprecatedPersistDynamic) {
+                // upgrade from older version
+                node.storeName = node.persistDynamic ? 'file' : '' // default to file - that was the only option before
+            }
+
+            // populate store names
+            const currentStore = node.storeName || ''
+            $('#node-input-storeName').empty()
+            $('#node-input-storeName').append(`<option value="">None: Don't persist state</option>`)
+            $('#node-input-storeName').append(`<option value="file">File: local file system</option>`)
+            RED.settings.context.stores.forEach(function(item){
+                const defaultStore = RED.settings.hasOwnProperty('context') ? RED.settings.context.default : ''
+                if (!item) {
+                    return // skip empty store names
+                }
+                let name = item 
+                if (item === defaultStore) {
+                    name += ' (default)'
+                }
+                const opt = $(`<option value="${item}">${"Node Context: " + name}</option>`)
+                $('#node-input-storeName').append(opt)
+            })
+
+            // if the store does not exist, add it to the dropdown and select it (appended with the text "NOT AVAILABLE!")
+            if (currentStore && currentStore !== 'file' && RED.settings.context.stores.indexOf(currentStore) === -1) {
+                const opt = $(`<option selected disabled style="color: var(--red-ui-text-color-error) !important;" value="${currentStore}">${"Node Context: " + currentStore + " (INVALID)"}</option>`)
+                $('#node-input-storeName').append(opt)
+            } else {
+                // select the current option
+                $('#node-input-storeName').val(currentStore)
+            }
+
+            // // hook up the persistDynamic change event - enable/disable storeName select
+            // $("#node-input-persistDynamic").on("change", function(e) { 
+            //     // $("#node-input-storeName").prop("disabled", !$(this).prop("checked"))
+            //     $('#node-input-storeName').toggle($(this).prop("checked"))
+            // });
 
             // create common location typed input
             $('#node-input-defaultLocation').typedInput({
@@ -2013,6 +2057,8 @@ copies or substantial portions of the Software.
             if (RED._cron_plus_debug) { console.log('oneditsave - cronplus') }
             const node = this
             const options = $('#node-input-option-container').children()
+            delete node.persistDynamic // remove deprecated property
+
             node.options = []
             // eslint-disable-next-line no-unused-vars
             options.each(function (i) {
@@ -2432,9 +2478,8 @@ function _popoutCronPlusHelp(tag) {
         </select>
     </div>
     <div class="form-row cron-plus-form-row">
-        <label>&nbsp;</label>
-        <input type="checkbox" id="node-input-persistDynamic" style="display:inline-block; width:15px; vertical-align:baseline;" autocomplete="off">
-        <label style="width: 30% !important;" for="node-input-persistDynamic" title="Auto save and reload dynamic schedules">Persist dynamic schedules</label>
+        <label for="node-input-storeName"><i class="fa fa-database"></i> Save State</label>
+        <select type="text" id="node-input-storeName" style="width: calc(100% - 130px);"></select>
     </div>
     <div id="node-cronplus-tab-static-schedules" class="form-row cron-plus-form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%; min-height: 200px; max-width: min-content;">
         <label for="node-input-option-container-div" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
