@@ -349,7 +349,7 @@ copies or substantial portions of the Software.
 }(jQuery));
 
 (function () {
-    const debug = false
+    RED._cron_plus_debug = false // set true at runtime to enable debug output
     let map, mapPopup, selectedLocation, selectedLocationInput
     const filesAdded = [] // list of files already added
 
@@ -495,13 +495,14 @@ copies or substantial portions of the Software.
             },
             // eslint-disable-next-line no-unused-vars
             close: function (event, ui) {
-                if (debug) console.log('destroying map')
+                if (RED._cron_plus_debug) console.log('destroying map')
                 if (map) map.remove()
             }
         })
     }
 
     function createMap (srcInput) {
+        console.log('createMap', srcInput)
         $('.cron-plus-map-loading').hide()
         if (!window.L || navigator.onLine === false) {
             $('.cron-plus-map-not-loaded').show()
@@ -528,18 +529,18 @@ copies or substantial portions of the Software.
                 lon = arrLatlon[1]
             }
         }
-        if (debug) console.log('createMap', lat, lon)
+        if (RED._cron_plus_debug) console.log('createMap', lat, lon)
         let zoom = 3// by default, zoomed out
         let showPopupOnOpen = false
-        if (!lat && !lon) {
+        if (lat && lon) {
             showPopupOnOpen = true
             zoom = 5// if location is set, zoom in a bit
         }
         lat = safeFloat(lat, 50.0)
         lon = safeFloat(lon, 0.0)
-        if (debug) console.log('lat/lon', lat, lon)
+        if (RED._cron_plus_debug) console.log('lat/lon', lat, lon)
         selectedLocation = window.L.latLng(lat, lon)
-        if (debug) console.log('selectedLocation', selectedLocation.lat, selectedLocation.lng)
+        if (RED._cron_plus_debug) console.log('selectedLocation', selectedLocation.lat, selectedLocation.lng)
 
         // create leaflet map
         map = window.L.map('cron-plus-map', {
@@ -550,7 +551,7 @@ copies or substantial portions of the Software.
         mapPopup = window.L.popup()
 
         map.on('click', function (e) {
-            if (debug) console.log(e)
+            if (RED._cron_plus_debug) console.log(e)
             const normaliseLat = function (x) {
                 while (x > 90.0 || x < -90.0) {
                     if (x > 90.0) { x = -(90.0 - (x - 90)) }
@@ -611,7 +612,7 @@ copies or substantial portions of the Software.
 
                 // eslint-disable-next-line no-unused-vars
                 layer.on('featureClick', function (e, latlng, pos, data, layer) {
-                    if (debug) console.log('click', latlng, data)
+                    if (RED._cron_plus_debug) console.log('click', latlng, data)
                 })
                 $('#cron-plus-map-dialog').dialog('option', 'position', { my: 'center', at: 'center', of: window })
             })
@@ -637,7 +638,7 @@ copies or substantial portions of the Software.
     }
 
     function updateEditorLayout () {
-        if (debug) console.log('cronplus-updateEditorLayout')
+        if (RED._cron_plus_debug) console.log('cronplus-updateEditorLayout')
         const dlg = $('#dialog-form')
         let height = dlg.height() - 5
         const expandRow = dlg.find('.form-row-auto-height')
@@ -650,7 +651,7 @@ copies or substantial portions of the Software.
             expandRow.css('height', height + 'px')
         }
         const show = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
-        $('.node-input-option-location-group').toggleClass('cron-plus-hide-per-location', !show)
+        $('.cron-node-input-option-location-div').toggleClass('cron-plus-hide-per-location', !show)
     }
 
     $.widget('custom.combobox', {
@@ -658,9 +659,10 @@ copies or substantial portions of the Software.
             const that = this
             this.input = this.element
             this.input.addClass('red-ui-typedInput-input')
-            this.elementDiv = this.input.wrap('<div>').parent().addClass('red-ui-typedInput-input-wrap')
-            this.uiSelect = this.elementDiv.wrap('<div>').parent()
-            const attrStyle = this.element.attr('style')
+            this.elementDiv = $(this.input).wrap('<div>').parent().addClass('red-ui-typedInput-input-wrap')
+            this.uiSelect = $(this.elementDiv).wrap($('<div>', { style: this.options.style })).parent()
+            
+            const attrStyle = this.options.style || this.element.attr('style')
             this.uiWidth = this.input.outerWidth()
             this.input.css('paddingLeft', 5)
 
@@ -704,7 +706,7 @@ copies or substantial portions of the Software.
             this.menu = this._createMenu(this.options.menu)
         },
         _createMenu: function (options) {
-            if (debug) console.log('combobox -> _createMenu  options:', options)
+            if (RED._cron_plus_debug) console.log('combobox -> _createMenu  options:', options)
             const that = this
             this.disarmClick = false
             options = options || {}
@@ -852,20 +854,20 @@ copies or substantial portions of the Software.
             }
         },
         validate: function () {
-            let result
+            let ok
             const value = this.value()
-            const val = this.options.validate// || this.validate;
-            if (!val || typeof val !== 'function') {
-                result = true
+            const _validate = this.options.validate// || this.validate;
+            if (!_validate || typeof _validate !== 'function') {
+                ok = true
             } else {
-                result = val(value)
+                ok = _validate(value)
             }
-            if (result) {
+            if (ok) {
                 this.uiSelect.removeClass('input-error')
             } else {
                 this.uiSelect.addClass('input-error')
             }
-            return result
+            return ok
         },
         showMenu: function () {
             this.button.show()
@@ -1004,7 +1006,7 @@ copies or substantial portions of the Software.
             $('#node-input-defaultLocation').typedInput('value', node.defaultLocation || '')
             $('#node-input-defaultLocation').on('change', function () {
                 const show = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
-                $('.node-input-option-location-group').toggleClass('cron-plus-hide-per-location', !show)
+                $('.cron-node-input-option-location-div').toggleClass('cron-plus-hide-per-location', !show)
             })
 
             // create the popup dialog for the cron builder
@@ -1083,19 +1085,24 @@ copies or substantial portions of the Software.
             }
 
             function drawDynamicSchedulesTable (nodeId, table, spinner, options, callback) {
-                if (debug) console.log('drawDynamicSchedulesTable...')
+                if (RED._cron_plus_debug) console.log('drawDynamicSchedulesTable...')
                 const $table = $(table)
                 const $spinner = $(spinner)
                 $table.hide()
                 $spinner.show()
                 $table.empty()
                 $.ajax({
-                    url: 'cronplus/' + nodeId + '/getDynamic',
                     type: 'POST',
-                    datatype: 'json'
+                    url: 'cronplus/' + nodeId + '/getDynamic',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    dataType: 'json',
+                    data: '{}' // dummy data
                 })
                     .done(function (response) {
-                        if (debug) console.log('cronplus/' + nodeId + '/getDynamic => response:', response)
+                        if (RED._cron_plus_debug) console.log('cronplus/' + nodeId + '/getDynamic => response:', response)
 
                         options = options || {}
                         if (options.width) $table.width(options.width)
@@ -1285,7 +1292,7 @@ copies or substantial portions of the Software.
 
             const dnRepositionResize = function () {
                 const w = ($(document).width() < 1025) ? '95%' : '60%'
-                if (debug) console.log('dialog-open-drawDynamicSchedulesTable done - should now center and resize width', w)
+                if (RED._cron_plus_debug) console.log('dialog-open-drawDynamicSchedulesTable done - should now center and resize width', w)
                 $('#cron-plus-dynamic-nodes-dialog').dialog('option', 'width', w)
                 $('#cron-plus-dynamic-nodes-dialog').dialog('option', 'position', { my: 'center', at: 'center', of: window })
             }
@@ -1328,9 +1335,14 @@ copies or substantial portions of the Software.
 
             let tzData
             $.ajax({
-                url: 'cronplus/0/tz',
                 type: 'POST',
-                datatype: 'json'
+                url: 'cronplus/0/tz',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                dataType: 'json',
+                data: '{}' // dummy data
             })
                 .done(function (data) {
                     tzData = data
@@ -1490,7 +1502,13 @@ copies or substantial portions of the Software.
                         '<pre class="cron-plus-form-tip form-tips">' + text + '</pre></div>'
                 }
                 function initTooltip (selector, type, pos) {
-                    selector.off('mouseenter').tooltip({
+                    if (selector.typedInput('instance') && selector.typedInput('instance').input) {
+                        selector = selector.typedInput('instance').input
+                    }
+                    const $selector = $(selector)
+                    //clear any title attr to prevent default tooltip & permit the jquery tooltip plugin to work
+                    $selector.attr('title', ' ')
+                    $selector.off('mouseenter').tooltip({
                         show: { effect: 'fade' },
                         tooltipClass: 'cron-plus-expression-tip form-tips',
                         position: pos,
@@ -1499,25 +1517,25 @@ copies or substantial portions of the Software.
                         },
                         disabled: true
                     }).off('focusout').off('mouseleave').mouseleave(function (e) {
-                        if (debug) console.log('initTooltip--mouseleave')
-                        if (selector.is(':focus')) {
-                            if (debug) console.log("initTooltip--mouseleave selector:is(':focus')")
+                        if (RED._cron_plus_debug) console.log('initTooltip--mouseleave')
+                        if ($selector.is(':focus')) {
+                            if (RED._cron_plus_debug) console.log("initTooltip--mouseleave selector:is(':focus')")
                             e.preventDefault()
                             e.stopImmediatePropagation()
                             // selector.tooltip('open');
                             return false
                         }
                     }).on('blur', function (e) {
-                        if (debug) console.log('initTooltip-->on-blur.  relatedTarget:', e.relatedTarget)
+                        if (RED._cron_plus_debug) console.log('initTooltip-->on-blur.  relatedTarget:', e.relatedTarget)
                         if (e.relatedTarget && e.relatedTarget.id === 'cron-plus-tt-help-button') {
-                            if (debug) console.log('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-link-button"')
+                            if (RED._cron_plus_debug) console.log('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-link-button"')
                             if (type === 'cron') { showCronHelp() } else if (type === 'solar') { showSolarHelp() }
                             $(this).focus()
                             return false
                         }
                         $(this).tooltip('close').tooltip('disable')
                     }).on('focusin change keyup', function (e) {
-                        if (debug) console.log('initTooltip--focusin change keyup', e)
+                        if (RED._cron_plus_debug) console.log('initTooltip--focusin change keyup', e)
                         const $this = $(this)
 
                         const $timeZone = $('#node-input-timeZone')
@@ -1532,7 +1550,7 @@ copies or substantial portions of the Software.
                             if (defLocationType === 'env' || defLocationType === 'fixed') {
                                 expression = defLocation
                             } else {
-                                expression = $location.val()
+                                expression = $location.typedInput('value')
                             }
                         } else {
                             expression = $expression.val()
@@ -1550,7 +1568,7 @@ copies or substantial portions of the Software.
                             disabled: false,
                             show: { effect: 'fade' },
                             content: function (callback) {
-                                if (debug) console.log('initTooltip-->content')
+                                if (RED._cron_plus_debug) console.log('initTooltip-->content')
 
                                 const solarType = $solarEvents.typedInput('type')
                                 const solarEvents = $solarEvents.typedInput('value')
@@ -1603,15 +1621,19 @@ copies or substantial portions of the Software.
                                     titleHtml = (expr) => 'Description of <span class="cron-plus-expression">' + expr.slice(0, 50) + (expr.length > 50 ? '...' : '') + '</span>'
                                     e.expression = expression
                                 }
-
+                                if (RED._cron_plus_debug) console.log('initTooltip-->Ajax start, e...', e)
                                 $.ajax({
-                                    url: `cronplus/${node.id}/expressionTip`,
                                     type: 'POST',
-                                    data: e,
-                                    datatype: 'json'
+                                    url: `cronplus/${node.id}/expressionTip`,
+                                    headers: {
+                                        'Accept': 'application/json',
+                                        'Content-Type': 'application/json'
+                                    },
+                                    dataType: 'json',
+                                    data: JSON.stringify(e)
                                 })
                                     .done(function (data) {
-                                        if (debug) console.log('initTooltip-->Ajax done, data...', data)
+                                        if (RED._cron_plus_debug) console.log('initTooltip-->Ajax done, data...', data)
                                         let nextInfo = ''
                                         const desc = data.description
                                         if (data.prettyNext) {
@@ -1634,7 +1656,7 @@ copies or substantial portions of the Software.
                                         }
                                         const okContent = function () {
                                             setTimeout(function () {
-                                                if (debug) console.log('initTooltip-->callback-->setTimeout--> option-->position')
+                                                if (RED._cron_plus_debug) console.log('initTooltip-->callback-->setTimeout--> option-->position')
                                                 $this.tooltip('option', 'position', pos)
                                                 $this.tooltip('enable').tooltip('open')
                                                 $this.tooltip('option', 'position', pos)
@@ -1655,28 +1677,49 @@ copies or substantial portions of the Software.
                     })
                 }
 
+                // styles for the option row 1
+                const nameStyle = 'display: flex; flex-grow: 0; flex-basis:128px; margin-right:5px;'
+                const topicStyle = 'display: flex; flex-grow: 1; flex-basis: 140px; margin-right: 5px;'
+                const payloadStyle = 'display: flex; flex-grow: 2; flex-basis: 250px;'
+                // styles for the option row 2
+                const scheduleTypeStyle = 'display: flex; flex-grow: 0; flex-basis:128px; margin-right:5px; padding-left: 2px; padding-right: 10px;' // padding hack for text alignment
+                const row2Col2Style = 'display: flex; flex-grow: 1;'
+                // row 2 col 2 child styles (for solar)
+                const solarEventsStyle = 'display: flex; flex-grow: 1; flex-basis: 140px; margin-right: 5px;'
+                const locationStyle = 'display: flex; flex-grow: 3; width:100%; margin-right:5px;'
+                const solarOffsetStyle = 'display: flex; flex-grow: 0; flex-basis:180px;'
+
+                // control buttons container styles
+                const controlsContainerStyle = 'float: right; height: 74px; margin-left: 5px; flex-direction: column; display: flex; justify-content: space-evenly; align-items: center; border-left: var(--red-ui-form-button-background) 1px solid; padding-left: 5px;'
+
                 // build options row
-                const container = $('<li/>', { style: 'margin:0px 0px 5px 0px; padding:0px;' })
-                const row = $('<div style="display: flex; margin: 0px 0px 5px 0px"/>').appendTo(container)
-                const row2 = $('<div style="display: flex; margin: 0px 0px 5px 0px"/>').appendTo(container)
+                const container = $('<li/>')
+                // const container = $('<li/>', { style: 'max-width: 600px' })
 
-                const div = row.append('<div/>')
-
-                const span = $('<span/>', { style: 'float:right; margin-right:5px;' }).appendTo(div)
-                const deleteButton = $('<a/>', { href: '#', class: 'editor-button editor-button-small', style: 'margin-top:27px; margin-left:5px;' }).appendTo(span)
+                // control buttons
+                const controlsContainer = $('<span/>', { style: controlsContainerStyle }).appendTo(container)
+                const deleteButton = $('<a/>', { href: '#', class: 'editor-button editor-button-small', style: '' }).appendTo(controlsContainer)
                 $('<i/>', { class: 'fa fa-remove' }).appendTo(deleteButton)
+                RED.popover.tooltip(deleteButton, 'Delete');
+                const sortHandle = $('<a/>', { href: '#', class: 'editor-button editor-button-small node-input-option-handle', style: 'cursor: grab' }).appendTo(controlsContainer)
+                $('<i/>', { class: 'fa fa-bars' }).appendTo(sortHandle)
+                RED.popover.tooltip(sortHandle, 'Move');
+
+                // #### ROW 1 ####
+                const row1 = $('<div style="display: flex; margin: 0px 0px 5px 0px"/>').appendTo(container)
 
                 // generate the name field
                 const nameClass = 'node-input-option-name' + ((!option.name || dupCheck[option.name]) ? ' input-error' : '')
-                const nameField = $('<input/>', { class: nameClass, type: 'text', style: 'margin-left:0px; width:calc(22% - 16px);', placeholder: 'name', title: 'name', value: option.name }).appendTo(div)
+                const nameField = $('<input/>', { class: nameClass, type: 'text', style: nameStyle, placeholder: 'name', title: 'name', value: option.name }).appendTo(row1)
                 dupCheck[option.name] = true
 
                 // generate the topic field
                 const topicClass = 'node-input-option-topic' + ((!option.topic) ? ' input-error' : '')
-                const topicField = $('<input/>', { class: topicClass, type: 'text', style: 'margin-left:5px; width:calc(32% - 36px);', placeholder: 'topic', title: 'topic', value: option.topic }).appendTo(div)
+                const topicField = $('<input/>', { class: topicClass, type: 'text', style: topicStyle, placeholder: 'topic', title: 'topic', value: option.topic }).appendTo(row1)
 
                 // generate the payload field
-                const payloadField = $('<input/>', { class: 'node-input-option-payload', type: 'text', style: 'margin-left:5px; width:calc(40% - 25px);', placeholder: 'payload', value: option.payload || '' }).appendTo(div)
+                const payloadDiv = $('<div/>', { style: payloadStyle }).appendTo(row1)
+                const payloadField = $('<input/>', { class: 'node-input-option-payload', type: 'text', style: 'width: 100%', placeholder: 'payload', value: option.payload || '' }).appendTo(payloadDiv)
                 payloadField.typedInput({
                     default: option.payloadType || 'default',
                     types: [{
@@ -1687,14 +1730,22 @@ copies or substantial portions of the Software.
                     }, 'flow', 'global', 'str', 'num', 'bool', 'json', 'jsonata', 'bin', 'date', 'env']
                 })
 
-                // generate a dropdown for trigger type
-                const expressionType = option.expressionType || 'cron'
-                const expressionTypeField = $('<select/>', { class: 'node-input-option-expressionType', type: 'text', placeholder: 'cron' }).css({ width: 'calc(22% - 16px)', 'margin-right': '5px' }).appendTo(row2)
-                $('<option />', { value: 'cron', text: 'cron' }).appendTo(expressionTypeField)
-                $('<option />', { value: 'dates', text: 'date sequence' }).appendTo(expressionTypeField)
-                $('<option />', { value: 'solar', text: 'solar events' }).appendTo(expressionTypeField)
-                expressionTypeField.val(expressionType)
-                expressionTypeField.prop('title', 'Expression Type')
+                // #### ROW 2 ####
+                const row2 = $('<div style="display: flex; margin: 0px 0px 5px 0px"/>').appendTo(container)
+
+                // generate a dropdown for schedule type
+                const scheduleType = option.expressionType || 'cron'
+                const scheduleTypeField = $('<select/>', { class: 'node-input-option-expressionType', type: 'text', placeholder: 'cron', style: scheduleTypeStyle }).appendTo(row2)
+                $('<option />', { value: 'cron', text: 'cron' }).appendTo(scheduleTypeField)
+                $('<option />', { value: 'dates', text: 'date sequence' }).appendTo(scheduleTypeField)
+                $('<option />', { value: 'solar', text: 'solar events' }).appendTo(scheduleTypeField)
+                scheduleTypeField.val(scheduleType)
+                scheduleTypeField.prop('title', 'Expression Type')
+
+                // generate cell2 
+                const cell2Cron = $('<div>', { style: row2Col2Style}).appendTo(row2)
+                const cell2Solar = $('<div>', { style: row2Col2Style}).appendTo(row2)
+
 
                 // generate a combo for cron expression
                 const expression = option.expression == null ? '0 * * * * * *' : option.expression
@@ -1715,11 +1766,19 @@ copies or substantial portions of the Software.
                     { label: 'At 12:00 PM, on the last Monday of the month (0 12 * * MONL)', value: '0 12 * * MONL' }
                 ]
 
-                const expressionField = $('<input/>', { class: expressionClass, type: 'text', style: 'margin-left:0px; width:calc(72% - 56px);', placeholder: '* * * * * * *', list: 'cron-expression-example-list', title: 'cron expression', value: option.expression }).appendTo(row2)
-                expressionField.appendTo(row2)
+                const expressionField = $('<input/>', {
+                    class: expressionClass,
+                    type: 'text',
+                    placeholder: '* * * * * * *',
+                    list: 'cron-expression-example-list',
+                    title: 'cron expression',
+                    value: option.expression
+                })
+                expressionField.appendTo(cell2Cron)
 
                 // setup the expression combo
                 expressionField.combobox({
+                    style: 'width: 100%',
                     menu: {
                         menu: expressionMenuData,
                         options: {
@@ -1744,7 +1803,9 @@ copies or substantial portions of the Software.
                 expressionField.combobox('value', option.expression || '')
 
                 // generate the solar events field
-                const solarEventsField = $('<input/>', { class: 'node-input-option-solarEvents', type: 'text', style: 'margin-left:0px; width:calc(32% - 36px);', placeholder: 'select solar events', value: option.solarEvents || '' }).appendTo(row2)
+                console.log('setting up solar events field')
+                const solarEventsDiv = $('<div/>', { style: solarEventsStyle }).appendTo(cell2Solar)
+                const solarEventsField = $('<input/>', { class: 'node-input-option-solarEvents', type: 'text', style: 'width: 100%', placeholder: 'select solar events', value: option.solarEvents || '' }).appendTo(solarEventsDiv)
                 solarEventsField.typedInput({
                     default: 'all',
                     types: [
@@ -1772,59 +1833,78 @@ copies or substantial portions of the Software.
                 solarEventsField.typedInput('value', option.solarEvents || '')// added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
 
                 // generate location
-                const locationGroup = $('<div class="red-ui-typedInput-container node-input-option-location-group" style="margin-left:5px; width: calc(25% - 16px);">' +
-                    '<button class="red-ui-typedInput-type-select" style="width:25px" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
-                    '<div class="red-ui-typedInput-input red-ui-typedInput-input-wrap" style="left: 25px; right: 0px;">' +
-                    '<input class="red-ui-typedInput-input node-input-option-location" type="text" value="" placeholder="lat lng"></div> </div>')
-                const locationField = locationGroup.find('input')
-                const locationButton = locationGroup.find('button')
-                locationField.prop('title', 'Location coordinates...')
-                locationButton.prop('title', 'Show Map...')
-                if (!option.location) {
-                    locationGroup.addClass('input-error')
-                } else {
-                    locationField.val(option.location)
-                }
-                locationGroup.appendTo(row2)
-
-                locationButton.on('click', function () {
-                    $('#cron-plus-map-dialog').dialog('open')
-                    selectedLocationInput = $(this).closest('li').find('.node-input-option-location')
-                    if (navigator.onLine === true) {
-                        $('.cron-plus-map-not-loaded').show()
-                        $('.cron-plus-map-loading').hide()
-                        $('#cron-plus-map').hide()
-                        const proto = location.protocol === 'https:' ? location.protocol : 'http:'
-                        checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css', 'css', function () {
-                            checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js', 'js', function () {
-                            })
-                            createMap(selectedLocationInput)
-                        })
-                    } else {
-                        $('.cron-plus-map-not-loaded').show()
-                        $('.cron-plus-map-loading').hide()
-                        $('#cron-plus-map').hide()
-                    }
+                const locationFieldDiv = $('<div/>', { class: 'cron-node-input-option-location-div', style: locationStyle }).appendTo(cell2Solar)
+                const locationField = $('<input/>', { class: 'node-input-option-location', type: 'text', style: 'width: 100%', placeholder: 'lat lng', value: option.location || '' }).appendTo(locationFieldDiv)
+                locationField.typedInput({
+                    default: 'fixed',
+                    types: [
+                        {
+                            value: 'fixed',
+                            label: 'Fixed Location',
+                            icon: 'fa fa-map-pin',
+                            expand: function () {
+                                // eslint-disable-next-line no-undef
+                                showMap(locationField)
+                            },
+                            validate: function (v, opt) { return !!v && v.length >= 3 }
+                        }
+                    ]
                 })
+                locationField.typedInput('value', option.location || '')
+
+                // const locationGroup = $('<div class="red-ui-typedInput-container node-input-option-location" style="' + locationStyle + '">' +
+                //     '<button class="red-ui-typedInput-type-select" style="width:25px" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
+                //     '<div class="red-ui-typedInput-input red-ui-typedInput-input-wrap" style="left: 25px; right: 0px;">' +
+                //     '<input class="red-ui-typedInput-input node-input-option-location" type="text" value="" placeholder="lat lng"></div> </div>')
+                // const locationField = locationGroup.find('input')
+                // const locationButton = locationGroup.find('button')
+                // locationField.prop('title', 'Location coordinates...')
+                // locationButton.prop('title', 'Show Map...')
+                // if (!option.location) {
+                //     locationGroup.addClass('input-error')
+                // } else {
+                //     locationField.val(option.location)
+                // }
+                // locationGroup.appendTo(cell2)
+
+                // locationButton.on('click', function () {
+                //     $('#cron-plus-map-dialog').dialog('open')
+                //     selectedLocationInput = $(this).closest('li').find('.node-input-option-location')
+                //     if (navigator.onLine === true) {
+                //         $('.cron-plus-map-not-loaded').show()
+                //         $('.cron-plus-map-loading').hide()
+                //         $('#cron-plus-map').hide()
+                //         const proto = location.protocol === 'https:' ? location.protocol : 'http:'
+                //         checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css', 'css', function () {
+                //             checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js', 'js', function () {
+                //             })
+                //             createMap(selectedLocationInput)
+                //         })
+                //     } else {
+                //         $('.cron-plus-map-not-loaded').show()
+                //         $('.cron-plus-map-loading').hide()
+                //         $('#cron-plus-map').hide()
+                //     }
+                // })
 
                 // offset fields
-                const offsetField = $('<input/>', { class: 'node-input-option-offset', type: 'number', min: -1439, max: 1439, style: 'margin-left:7px; width:calc(15% - 16px);', value: option.offset || 0, placeholder: 'offset' }).appendTo(row2)
+                const offsetField = $('<input/>', { class: 'node-input-option-offset', type: 'number', min: -1439, max: 1439, style: solarOffsetStyle, value: option.offset || 0, placeholder: 'offset' }).appendTo(cell2Solar)
                 offsetField.prop('title', 'Minutes Offset +/- 1439')
 
                 // init tooltips
-                initTooltip(offsetField, 'solar', { my: 'right top', at: 'right bottom+5', of: offsetField, collision: 'flipfit' })
-                initTooltip(locationField, 'solar', { my: 'right top', at: 'right bottom+5', of: offsetField, collision: 'flipfit' })
-                initTooltip(expressionField, 'cron', { my: 'right top', at: 'right bottom+5', of: expressionField /* expDropButton */, collision: 'flipfit' })
+                initTooltip(offsetField, 'solar', { my: 'right top', at: 'right bottom+5', of: cell2Solar, collision: 'flipfit' })
+                initTooltip(locationField, 'solar', { my: 'right top', at: 'right bottom+5', of: cell2Solar, collision: 'flipfit' })
+                initTooltip(expressionField, 'cron', { my: 'right top', at: 'right bottom+5', of: cell2Cron, collision: 'flipfit' })
 
-                locationField.keyup(function () {
-                    const f = $(this)
-                    const fg = locationGroup
-                    if (f.val() && fg.hasClass('input-error')) {
-                        fg.removeClass('input-error')
-                    } else if (!f.val()) {
-                        fg.addClass('input-error')
-                    }
-                })
+                // locationField.keyup(function () {
+                //     const f = $(this)
+                //     const fg = locationGroup
+                //     if (f.val() && fg.hasClass('input-error')) {
+                //         fg.removeClass('input-error')
+                //     } else if (!f.val()) {
+                //         fg.addClass('input-error')
+                //     }
+                // })
 
                 nameField.keyup(function () {
                     if ($(this).val() && $(this).hasClass('input-error')) {
@@ -1834,13 +1914,13 @@ copies or substantial portions of the Software.
                     }
                 })
 
-                locationField.change(function () {
-                    if ($(this).val() && locationGroup.hasClass('input-error')) {
-                        locationGroup.removeClass('input-error')
-                    } else if (!$(this).val()) {
-                        locationGroup.removeClass('input-error')
-                    }
-                })
+                // locationField.change(function () {
+                //     if ($(this).val() && locationGroup.hasClass('input-error')) {
+                //         locationGroup.removeClass('input-error')
+                //     } else if (!$(this).val()) {
+                //         locationGroup.removeClass('input-error')
+                //     }
+                // })
 
                 topicField.keyup(function () {
                     if ($(this).val() && $(this).hasClass('input-error')) {
@@ -1857,35 +1937,28 @@ copies or substantial portions of the Software.
                     })
                 })
 
-                expressionTypeField.change(function () {
-                    const value = expressionTypeField.val()
+                scheduleTypeField.change(function () {
+                    const value = scheduleTypeField.val()
                     const showLocationGroup = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
-                    locationGroup.toggleClass('cron-plus-hide-per-location', !showLocationGroup)
+                    locationFieldDiv.toggleClass('cron-plus-hide-per-location', !showLocationGroup)
                     switch (value) {
                     case 'solar':
-                        expressionField.combobox('hide')
-                        solarEventsField.typedInput('show')
-                        solarEventsField.css('display', 'inline-block')
-                        locationGroup.removeClass('cron-plus-hide-location')
-                        offsetField.show()
+                        cell2Cron.hide()
+                        cell2Solar.show()
                         break
-                    case 'dates':
-                        expressionField.combobox('show')
+                        case 'dates':
+                        cell2Cron.show()
+                        cell2Solar.hide()
                         expressionField.combobox('hideMenu')
-                        solarEventsField.typedInput('hide')
-                        locationGroup.addClass('cron-plus-hide-location')
-                        offsetField.hide()
                         break
                     default: // cron
-                        expressionField.combobox('show')
+                        cell2Cron.show()
+                        cell2Solar.hide()
                         expressionField.combobox('showMenu')
-                        solarEventsField.typedInput('hide')
-                        locationGroup.addClass('cron-plus-hide-location')
-                        offsetField.hide()
                         break
                     }
                 })
-                expressionTypeField.triggerHandler('change')
+                scheduleTypeField.triggerHandler('change')
                 $('#node-input-option-container').append(container)
             }
 
@@ -1912,10 +1985,22 @@ copies or substantial portions of the Software.
             $('#node-input-option-container').sortable({
                 axis: 'y',
                 handle: '.node-input-option-handle',
-                cursor: 'move'
+                cursor: 'grabbing',
+                cursorAt: { right: 5 },
+                // placeholder: "ui-corner-all"
+                snap: "#node-input-option-container", snapMode: "inner",
+                forceHelperSize: true,
+                forcePlaceholderSize: true,
+                tolerance: 'pointer',
+                appendTo:  $('#node-input-option-container'),
             })
 
             updateEditorLayout()
+
+            // give the form a chance to render then remove the max width restriction
+            setTimeout(function () {
+                $('#node-cronplus-tab-static-schedules').css('max-width', '')
+            }, 200)
         },
         oneditsave: function () {
             const node = this
@@ -1931,7 +2016,7 @@ copies or substantial portions of the Software.
                     payload: option.find('.node-input-option-payload').typedInput('value'),
                     expressionType: option.find('.node-input-option-expressionType').val(),
                     expression: option.find('.node-input-option-expression').val(),
-                    location: option.find('.node-input-option-location').val(),
+                    location: option.find('.node-input-option-location').typedInput('value'),
                     offset: option.find('.node-input-option-offset').val(),
                     solarType: option.find('.node-input-option-solarEvents').typedInput('type') || 'all',
                     solarEvents: option.find('.node-input-option-solarEvents').typedInput('value')
@@ -2104,6 +2189,17 @@ function _popoutCronPlusHelp(tag) {
 
 <script type="text/html" data-template-name="cronplus">
     <style>
+        #cron-plus-map > div.leaflet-map-pane > div.leaflet-objects-pane > div.leaflet-popup-pane > div > div.leaflet-popup-content-wrapper,
+        #cron-plus-map > div.leaflet-map-pane > div.leaflet-objects-pane > div.leaflet-popup-pane > div > div.leaflet-popup-tip-container > div {
+            background-color: var(--red-ui-primary-background);
+            color: var(--red-ui-primary-text-color);
+        }
+        #cron-plus-map > div.leaflet-control-container > div.leaflet-top.leaflet-left > div > a.leaflet-control-zoom-in,
+        #cron-plus-map > div.leaflet-control-container > div.leaflet-top.leaflet-left > div > a.leaflet-control-zoom-out {
+            background-color: var(--red-ui-primary-background);
+            color: var(--red-ui-primary-text-color);
+        }
+
         .cron-select-period {
             padding: 5px 5px 0px 5px;
         }
@@ -2331,7 +2427,7 @@ function _popoutCronPlusHelp(tag) {
         <input type="checkbox" id="node-input-persistDynamic" style="display:inline-block; width:15px; vertical-align:baseline;" autocomplete="off">
         <label style="width: 30% !important;" for="node-input-persistDynamic" title="Auto save and reload dynamic schedules">Persist dynamic schedules</label>
     </div>
-    <div id="node-cronplus-tab-static-schedules" class="form-row cron-plus-form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%; min-height: 200px">
+    <div id="node-cronplus-tab-static-schedules" class="form-row cron-plus-form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%; min-height: 200px; max-width: min-content;">
         <label for="node-input-option-container-div" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
         <div class="red-ui-editableList-border red-ui-editableList-container" id="node-input-option-container-div" 
             style="min-width: 300px; box-sizing: border-box; border-radius: 5px; padding: 5px; overflow-y:scroll;display: inline-block; width: 100%; height: calc(100% - 28px); min-height: 150px;">

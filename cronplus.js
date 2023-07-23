@@ -191,7 +191,7 @@ function validateOpt (opt, permitDefaults = true) {
     if (!opt.payloadType === 'default' && opt.payload === null) {
         throw new Error(`Schedule '${opt.name}' - payload property missing`)
     }
-    const okTypes = ['default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date', 'env']
+    const okTypes = ['default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'jsonata', 'bin', 'date', 'env']
     // eslint-disable-next-line eqeqeq
     const typeOK = okTypes.find(el => { return el == opt.payloadType })
     if (!typeOK) {
@@ -790,6 +790,17 @@ let userDir = ''; let persistPath = ''; let persistAvailable = false
 const cronplusDir = 'cronplusdata'
 
 module.exports = function (RED) {
+    function evaluateNodeProperty (value, type, node, msg) {
+        return new Promise(function (resolve, reject) {
+            RED.util.evaluateNodeProperty(value, type, node, msg, function (e, r) {
+                if (e) {
+                    reject(e)
+                } else {
+                    resolve(r)
+                }
+            })
+        })
+    }
     // when running tests, RED.settings.userDir & RED.settings.settingsFile (amongst others) are undefined
     const testMode = typeof RED.settings.userDir === 'undefined' && typeof RED.settings.settingsFile === 'undefined'
     if (testMode) {
@@ -838,14 +849,14 @@ module.exports = function (RED) {
         node.statusUpdatePending = false
 
         const MAX_CLOCK_DIFF = Number(RED.settings.CRONPLUS_MAX_CLOCK_DIFF || process.env.CRONPLUS_MAX_CLOCK_DIFF || 5000)
-        const clockMonitor = setInterval(function timeChecker () {
+        const clockMonitor = setInterval(async function timeChecker () {
             const oldTime = timeChecker.oldTime || new Date()
             const newTime = new Date()
             const timeDiff = newTime - oldTime
             timeChecker.oldTime = newTime
             if (Math.abs(timeDiff) >= MAX_CLOCK_DIFF) {
                 node.log('System Time Change Detected - refreshing schedules! If the system time was not changed then typically occurs due to blocking code elsewhere in your application')
-                refreshTasks(node)
+                await refreshTasks(node)
             }
         }, 1000)
 
@@ -861,7 +872,6 @@ module.exports = function (RED) {
             }
             set(msg, field, value)
         }
-
         const updateNodeNextInfo = (node, now) => {
             const t = getNextTask(node.tasks)
             if (t) {
@@ -879,7 +889,6 @@ module.exports = function (RED) {
                 node.nextIndicator = ''
             }
         }
-
         const updateDoneStatus = (node, task) => {
             let indicator = 'dot'
             if (task) {
@@ -899,8 +908,7 @@ module.exports = function (RED) {
                 }, 4000)
             }
         }
-
-        const sendMsg = (node, task, cronTimestamp, manualTrigger) => {
+        const sendMsg = async (node, task, cronTimestamp, manualTrigger) => {
             const msg = { cronplus: {} }
             msg.topic = task.node_topic
             msg.cronplus.triggerTimestamp = cronTimestamp
@@ -931,553 +939,54 @@ module.exports = function (RED) {
                         pl = msg.cronplus
                         delete msg.cronplus // To delete or not?
                     } else {
-                        pl = RED.util.evaluateNodeProperty(task.node_payload, task.node_payloadType, node, msg)
+                        pl = await evaluateNodeProperty(task.node_payload, task.node_payloadType, node, msg)
                     }
                     setProperty(msg, node.outputField, pl)
                     node.send(generateSendMsg(node, msg, taskType, index))
                     updateDoneStatus(node, task)
                 } else {
-                    RED.util.evaluateNodeProperty(task.node_payload, task.node_payloadType, node, msg, function (err, res) {
-                        if (err) {
-                            node.error(err, msg)
-                        } else {
-                            setProperty(msg, node.outputField, res)
-                            node.send(generateSendMsg(node, msg, taskType, index))
-                            updateDoneStatus(node, task)
-                        }
-                    })
+                    const res = await evaluateNodeProperty(task.node_payload, task.node_payloadType, node, msg)
+                    setProperty(msg, node.outputField, res)
+                    node.send(generateSendMsg(node, msg, taskType, index))
+                    updateDoneStatus(node, task)
                 }
             } catch (err) {
                 node.error(err, msg)
             }
         }
 
-        function getTask (node, name) {
-            const task = node.tasks.find(function (task) {
-                return task.name === name
-            })
-            return task
-        }
-
-        function refreshTasks (node) {
-            const tasks = node.tasks
-            node.debug('Refreshing running schedules')
-            if (tasks) {
-                try {
-                    // let now = new Date();
-                    if (!tasks || !tasks.length) { return null }
-                    const tasksToRefresh = tasks.filter(function (task) {
-                        return task._sequence || (task.isRunning && task._expression && !isTaskFinished(task))
-                    })
-                    if (!tasksToRefresh || !tasksToRefresh.length) {
-                        return null
-                    }
-                    for (let index = 0; index < node.tasks.length; index++) {
-                        const task = node.tasks[index]
-                        if (task.node_expressionType === 'cron') {
-                            task.stop()
-                            task.start()
-                        } else {
-                            updateTask(node, task.node_opt, null)
-                        }
-                        // task.runScheduledTasks();
-                        // index--;
-                    }
-                } catch (e) { }
-                updateNextStatus(node)
-            }
-        }
-        function taskFilterMatch (task, filter) {
-            if (!task) return false
-            // eslint-disable-next-line eqeqeq
-            const isActive = function (task) { return isTaskFinished(task) == false && task.isRunning == true }
-            // eslint-disable-next-line eqeqeq
-            const isInactive = function (task) { return isTaskFinished(task) || task.isRunning == false }
-            // eslint-disable-next-line eqeqeq
-            const isStatic = function (task) { return (task.isStatic == true || task.isDynamic == false) }
-            // eslint-disable-next-line eqeqeq
-            const isDynamic = function (task) { return (task.isDynamic == true || task.isStatic == false) }
-            switch (filter) {
-            case 'all':
-                return true
-            case 'static':
-                return isStatic(task)
-            case 'dynamic':
-                return isDynamic(task)
-            case 'active':
-                return isActive(task)
-            case 'inactive':
-                return isInactive(task)
-            case 'active-dynamic':
-                return isActive(task) && isDynamic(task)
-            case 'active-static':
-                return isActive(task) && isStatic(task)
-            case 'inactive-dynamic':
-                return isInactive(task) && isDynamic(task)
-            case 'inactive-static':
-                return isInactive(task) && isStatic(task)
-            }
-            return false
-        }
-        function stopTask (node, name, resetCounter) {
-            const task = getTask(node, name)
-            if (task) {
-                task.stop()
-                if (resetCounter) { task.node_count = 0 }
-            }
-            return task
-        }
-        function stopAllTasks (node, resetCounter, filter) {
-            if (node.tasks) {
-                for (let index = 0; index < node.tasks.length; index++) {
-                    const task = node.tasks[index]
-                    if (task) {
-                        let skip = false
-                        if (filter) skip = (taskFilterMatch(task, filter) === false)
-                        if (!skip) {
-                            task.stop()
-                            if (resetCounter) { task.node_count = 0 }
-                        }
-                    }
-                }
-            }
-        }
-        function startTask (node, name) {
-            const task = getTask(node, name)
-            if (task) {
-                if (isTaskFinished(task)) {
-                    task.node_count = 0
-                }
-                task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-                task.start()
-            }
-            return task
-        }
-        function startAllTasks (node, filter) {
-            if (node.tasks) {
-                for (let index = 0; index < node.tasks.length; index++) {
-                    const task = node.tasks[index]
-                    let skip = false
-                    if (filter) skip = (taskFilterMatch(task, filter) === false)
-                    if (!skip && task) {
-                        if (isTaskFinished(task)) {
-                            task.node_count = 0
-                        }
-                        task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-                        task.start()
-                    }
-                }
-            }
-        }
-        function deleteAllTasks (node, filter) {
-            if (node.tasks) {
-                for (let index = 0; index < node.tasks.length; index++) {
-                    try {
-                        const task = node.tasks[index]
-                        if (task) {
-                            let skip = false
-                            if (filter) skip = (taskFilterMatch(task, filter) === false)
-                            if (!skip) {
-                                _deleteTask(task)
-                                node.tasks[index] = null
-                                node.tasks.splice(index, 1)
-                                index--
-                            }
-                        }
-                    // eslint-disable-next-line no-empty
-                    } catch (error) { }
-                }
-            }
-        }
-        function deleteTask (node, name) {
-            let task = getTask(node, name)
-            if (task) {
-                _deleteTask(task)
-                node.tasks = node.tasks.filter(t => t && t.name !== name)
-                task = null
-            }
-        }
-        function _deleteTask (task) {
+        (async function () {
             try {
-                task.off('run')
-                task.off('ended')
-                task.off('started')
-                task.off('stopped')
-                task.stop()
-                task = null
-            // eslint-disable-next-line no-empty
-            } catch (error) {}
-        }
-        function updateTask (node, options, msg) {
-            if (!options || typeof options !== 'object') {
-                node.warn('schedule settings are not valid', msg)
-                return null
-            }
-
-            // eslint-disable-next-line eqeqeq
-            if (Array.isArray(options) == false) {
-                options = [options]
-            }
-
-            for (let index = 0; index < options.length; index++) {
-                const opt = options[index]
-                opt.payloadType = opt.payloadType || opt.type
-                if (opt.payloadType == null && typeof opt.payload === 'string' && opt.payload.length) {
-                    opt.payloadType = 'str'
-                }
-                opt.payloadType = opt.payloadType || 'default'
-                delete opt.type
-                try {
-                    validateOpt(opt)
-                } catch (error) {
-                    node.warn(error, msg)
-                    return
-                }
-            }
-
-            for (let index = 0; index < options.length; index++) {
-                const opt = options[index]
-                const task = getTask(node, opt.name)
-                const isDynamic = !task || task.isDynamic
-                // let isStatic = task && task.isStatic;
-                let opCount = 0; let modified = false
-                if (task) {
-                    modified = true
-                    opCount = task.node_count || 0
-                    deleteTask(node, opt.name)
-                }
-                const taskCount = node.tasks ? node.tasks.length : 0
-                const taskIndex = task && node.fanOut ? (task.node_index || 0) : taskCount
-                const t = createTask(node, opt, taskIndex, !isDynamic)
-                if (t) {
-                    if (modified) t.node_modified = true
-                    t.node_count = opCount
-                    t.isDynamic = isDynamic
-                }
-            }
-        }
-
-        function createTask (node, opt, index, _static) {
-            opt = opt || {}
-            try {
-                node.debug(`createTask - index: ${index}, static: ${_static}, opt: ${JSON.stringify(opt)}`)
-            } catch (error) {
-                node.error(error)
-            }
-            applyOptionDefaults(node, opt, index)
-            try {
-                validateOpt(opt)
-            } catch (error) {
-                node.warn(error)
-                const indicator = _static ? 'dot' : 'ring'
-                node.status({ fill: 'red', shape: indicator, text: error.message })
-                return null
-            }
-            const cronOpts = node.timeZone ? { timezone: node.timeZone } : undefined
-            let task
-            if (opt.expressionType === 'cron') {
-                const expression = cronosjs.CronosExpression.parse(opt.expression, cronOpts)
-                task = new cronosjs.CronosTask(expression)
-            } else if (opt.expressionType === 'solar') {
-                if (node.defaultLocationType === 'env' || node.defaultLocationType === 'fixed') {
-                    opt.locationType = node.defaultLocationType
-                    opt.location = RED.util.evaluateNodeProperty(node.defaultLocation, node.defaultLocationType, node)
-                } else { // per schedule
-                    opt.location = RED.util.evaluateNodeProperty(opt.location, 'str', node)
-                }
-                const ds = parseSolarTimes(opt)
-                task = ds.task
-                task.node_solarEventTimes = ds.solarEventTimes
-            } else {
-                const ds = parseDateSequence(opt.expression)
-                task = ds.task
-            }
-            task.isDynamic = !_static
-            task.isStatic = _static
-            task.name = '' + opt.name
-            task.node_topic = opt.topic
-            task.node_expressionType = opt.expressionType
-            task.node_expression = opt.expression
-            task.node_payloadType = opt.payloadType
-            task.node_payload = opt.payload
-            task.node_count = 0
-            task.node_locationType = opt.locationType
-            task.node_location = opt.location
-            task.node_solarType = opt.solarType
-            task.node_solarEvents = opt.solarEvents
-            task.node_offset = opt.offset
-            task.node_index = index
-            task.node_opt = opt
-            task.node_limit = opt.limit || 0
-            task.stop()
-            task.on('run', (timestamp) => {
-                node.debug(`running '${task.name}' ~ '${task.node_topic}'\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
-                const indicator = task.isDynamic ? 'ring' : 'dot'
-                node.status({ fill: 'green', shape: indicator, text: 'Running ' + formatShortDateTimeWithTZ(timestamp, node.timeZone) })
-                if (isTaskFinished(task)) {
-                    process.nextTick(function () {
-                        // using nextTick is a work around for an issue (#3) in cronosjs where the job restarts itself after this event handler has exited
-                        task.stop()
-                        updateNextStatus(node)
-                    })
-                    return
-                }
-                task.node_count = task.node_count + 1// ++ stops at 2147483647
-                sendMsg(node, task, timestamp)
-                process.nextTick(function () {
-                    if (task.node_expressionType === 'solar') {
-                        updateTask(node, task.node_opt, null)
-                    }
-                })
-            })
-                .on('ended', () => {
-                    node.debug(`ended '${task.name}' ~ '${task.node_topic}'`)
-                    updateNextStatus(node)
-                })
-                .on('started', () => {
-                    node.debug(`started '${task.name}' ~ '${task.node_topic}'`)
-                    process.nextTick(function () {
-                        updateNextStatus(node)
-                    })
-                })
-                .on('stopped', () => {
-                    node.debug(`stopped '${task.name}' ~ '${task.node_topic}'`)
-                    updateNextStatus(node)
-                })
-            task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-            if (!(opt.dontStartTheTask === true)) {
-                task.start()
-            }
-            node.tasks.push(task)
-            return task
-        }
-
-        function serialise () {
-            let filePath = ''
-            try {
-                if (!persistAvailable || !node.persistDynamic) {
-                    return
-                }
-                filePath = getPersistFilePath()
-                const dynNodes = node.tasks.filter((e) => e && e.isDynamic)
-                const statNodes = node.tasks.filter((e) => e && e.isDynamic !== true)
-                const exp = (task) => exportTask(task, true)
-                const dynNodesExp = dynNodes.map(exp)
-                const statNodesExp = statNodes.map(exp)
-                /* if(!dynNodesExp || !dynNodesExp.length){
-                    //FUTURE TODO: Sanity check before deletion
-                    //and only if someone asks for it :)
-                    //other wise, file clean up is a manual task
-                    fs.unlinkSync(filePath);
-                    return;
-                } */
-                const data = {
-                    version: 2,
-                    dynamicSchedules: dynNodesExp,
-                    staticSchedules: statNodesExp
-                }
-                const fileData = JSON.stringify(data)
-                fs.writeFileSync(filePath, fileData)
-            } catch (e) {
-                RED.log.error(`cron-plus: Error saving persistence data '${filePath}'. ${e.message}`)
-            }
-        }
-
-        function deserialise () {
-            let filePath = ''
-            try {
-                if (!persistAvailable || !node.persistDynamic) {
-                    return
-                }
-                filePath = getPersistFilePath()
-                if (fs.existsSync(filePath)) {
-                    const fileData = fs.readFileSync(filePath)
-                    const data = JSON.parse(fileData)
-                    if (!data) {
-                        return // nothing to add
-                    }
-                    if (data.version !== 1 && data.version !== 2) {
-                        throw new Error('Invalid version - cannot load dynamic schedules')
-                    }
-                    if (data.version === 2 && data.staticSchedules && data.staticSchedules.length) {
-                        for (let iOpt = 0; iOpt < data.staticSchedules.length; iOpt++) {
-                            const opt = data.staticSchedules[iOpt]
-                            const task = node.tasks.find(e => e.name === opt.name)
-                            if (task) {
-                                task.count = opt.count
-                            }
-                            if (opt.isRunning === false) {
-                                stopTask(node, opt.name)
-                            } else if (opt.isRunning === true) {
-                                startTask(node, opt.name)
-                            }
-                        }
-                        updateNodeNextInfo(node)
-                    }
-                    if (data.version === 1) {
-                        data.dynamicSchedules = data.schedules
-                    }
-                    if (data.dynamicSchedules && data.dynamicSchedules.length) {
-                        for (let iOpt = 0; iOpt < data.dynamicSchedules.length; iOpt++) {
-                            const opt = data.dynamicSchedules[iOpt]
-                            let task
-                            opt.name = opt.name || opt.topic
-                            if (data.version === 1) {
-                                task = createTask(node, opt, iOpt, false)
-                            } else if (data.version === 2) {
-                                opt.dontStartTheTask = opt.isRunning
-                                task = createTask(node, opt, iOpt, false)
-                                if (task) {
-                                    task.count = opt.count
-                                    task.isRunning = opt.isRunning
-                                    task.isDynamic = true
-                                }
-                                if (opt.isRunning === false) {
-                                    stopTask(node, opt.name)
-                                } else if (opt.isRunning === true) {
-                                    startTask(node, opt.name)
-                                }
-                            }
-                        }
-                        updateNodeNextInfo(node)
-                    }
-                } else {
-                    RED.log.log(`cron-plus: no persistence data found for node '${node.id}'.`)
-                }
-            } catch (error) {
-                RED.log.error(`cron-plus: Error loading persistence data '${filePath}'. ${error.message}`)
-            }
-        }
-
-        function getPersistFilePath () {
-            const fileName = `node-${node.id}.json`
-            return path.join(persistPath, fileName)
-        }
-
-        try {
-            node.status({})
-            node.nextDate = null
-
-            if (!node.options) {
-                node.status({ fill: 'grey', shape: 'dot', text: 'Nothing set' })
-                return
-            }
-
-            node.tasks = []
-            for (let iOpt = 0; iOpt < node.options.length; iOpt++) {
-                const opt = node.options[iOpt]
-                opt.name = opt.name || opt.topic
-                node.statusUpdatePending = true// prevent unnecessary status updates while loading
-                createTask(node, opt, iOpt, true)
-            }
-
-            // now load dynamic schedules from file
-            deserialise()
-
-            setTimeout(() => {
-                updateNextStatus(node, true)
-            }, 200)
-        } catch (err) {
-            if (node.tasks) {
-                node.tasks.forEach(task => task.stop())
-            }
-            node.status({ fill: 'red', shape: 'dot', text: 'Error creating schedule' })
-            node.error(err)
-        }
-
-        function updateNextStatus (node, force) {
-            const now = new Date()
-            updateNodeNextInfo(node, now)
-            if (node.statusUpdatePending === true) {
-                if (force) {
-                    node.statusUpdatePending = false
-                } else {
-                    return
-                }
-            }
-
-            if (node.tasks) {
-                const indicator = node.nextIndicator || 'dot'
-                if (node.nextDate) {
-                    const d = formatShortDateTimeWithTZ(node.nextDate, node.timeZone) || 'Never'
-                    node.status({ fill: 'blue', shape: indicator, text: (node.nextEvent || 'Next') + ': ' + d })
-                } else if (node.tasks && node.tasks.length) {
-                    node.status({ fill: 'grey', shape: indicator, text: 'All stopped' })
-                } else {
-                    node.status({ }) // no tasks
-                }
-            } else {
                 node.status({})
-            }
-        }
+                node.nextDate = null
 
-        function getNextTask (tasks) {
-            try {
-                const now = new Date()
-                if (!tasks || !tasks.length) { return null }
-                const runningTasks = tasks.filter(function (task) {
-                    const finished = isTaskFinished(task)
-                    return task.isRunning && (task._expression || task._sequence) && !finished
-                })
-                if (!runningTasks || !runningTasks.length) {
-                    return null
+                if (!node.options) {
+                    node.status({ fill: 'grey', shape: 'dot', text: 'Nothing set' })
+                    return
                 }
 
-                let nextToRunTask
-                if (runningTasks.length === 1) {
-                    // let x = (runningTasks[0]._expression || runningTasks[0]._sequence)
-                    nextToRunTask = runningTasks[0]
-                    // d = x.nextDate(now);
-                } else {
-                    nextToRunTask = runningTasks.reduce(function (prev, current) {
-                        // let p, c;
-                        if (!prev) return current
-                        if (!current) return prev
-                        const px = (prev._expression || prev._sequence)
-                        const cx = (current._expression || current._sequence)
-                        return (px.nextDate(now) < cx.nextDate(now)) ? prev : current
-                    })
+                node.tasks = []
+                for (let iOpt = 0; iOpt < node.options.length; iOpt++) {
+                    const opt = node.options[iOpt]
+                    opt.name = opt.name || opt.topic
+                    node.statusUpdatePending = true// prevent unnecessary status updates while loading
+                    await createTask(node, opt, iOpt, true)
                 }
-                return nextToRunTask
-            } catch (error) {
-                node.debug(error)
-            }
-            return null
-        }
-        function generateSendMsg (node, msg, type, index) {
-            const outputCount = node.outputs
-            const fanOut = node.fanOut
-            const hasCommandOutputPin = !!((node.commandResponseMsgOutput === 'output2' || fanOut))
-            const optionCount = node.options ? node.options.length : 0
-            let staticOutputPinIndex = 0
-            let dynOutputPinIndex = 0
-            let cmdOutputPin = 0
-            if (fanOut) {
-                dynOutputPinIndex = optionCount
-                cmdOutputPin = optionCount + 1
-                staticOutputPinIndex = index || 0
-            }
-            if (!fanOut && hasCommandOutputPin) {
-                cmdOutputPin = 1
-            }
 
-            let idx = 0
-            switch (type) {
-            case 'static':
-                idx = staticOutputPinIndex
-                break
-            case 'dynamic':
-                idx = dynOutputPinIndex
-                break
-            case 'command-response':
-                idx = cmdOutputPin
-                break
+                // now load dynamic schedules from file
+                await deserialise()
+
+                setTimeout(() => {
+                    updateNextStatus(node, true)
+                }, 200)
+            } catch (err) {
+                if (node.tasks) {
+                    node.tasks.forEach(task => task.stop())
+                }
+                node.status({ fill: 'red', shape: 'dot', text: 'Error creating schedule' })
+                node.error(err)
             }
-            const arr = Array(outputCount || (idx + 1))
-            arr.fill(null)
-            arr[idx] = msg
-            return arr
-        }
+        })()
 
         node.on('close', function (done) {
             try {
@@ -1490,7 +999,7 @@ module.exports = function (RED) {
             if (done && typeof done === 'function') done()
         })
 
-        this.on('input', function (msg, send, done) {
+        this.on('input', async function (msg, send, done) {
             send = send || function () { node.send.apply(node, arguments) }
             done = done || function (err) {
                 if (err) {
@@ -1499,7 +1008,7 @@ module.exports = function (RED) {
             }
             // is this an button press?...
             if (!msg.payload && !msg.topic) { // TODO: better method of differentiating between bad input and button press
-                sendMsg(node, node.tasks[0], Date.now(), true)
+                await sendMsg(node, node.tasks[0], Date.now(), true)
                 done()
                 return
             }
@@ -1661,7 +1170,7 @@ module.exports = function (RED) {
                         break
                     case 'add': // single
                     case 'update': // single
-                        updateTask(node, cmd, msg)
+                        await updateTask(node, cmd, msg)
                         updateNextStatus(node, true)
                         serialise()// update persistence
                         break
@@ -1778,6 +1287,495 @@ module.exports = function (RED) {
                 // node.error(error,msg);
             }
         })
+
+        function getTask (node, name) {
+            const task = node.tasks.find(function (task) {
+                return task.name === name
+            })
+            return task
+        }
+        async function refreshTasks (node) {
+            const tasks = node.tasks
+            node.debug('Refreshing running schedules')
+            if (tasks) {
+                try {
+                    // let now = new Date();
+                    if (!tasks || !tasks.length) { return null }
+                    const tasksToRefresh = tasks.filter(function (task) {
+                        return task._sequence || (task.isRunning && task._expression && !isTaskFinished(task))
+                    })
+                    if (!tasksToRefresh || !tasksToRefresh.length) {
+                        return null
+                    }
+                    for (let index = 0; index < node.tasks.length; index++) {
+                        const task = node.tasks[index]
+                        if (task.node_expressionType === 'cron') {
+                            task.stop()
+                            task.start()
+                        } else {
+                            await updateTask(node, task.node_opt, null)
+                        }
+                        // task.runScheduledTasks();
+                        // index--;
+                    }
+                } catch (e) { }
+                updateNextStatus(node)
+            }
+        }
+        function taskFilterMatch (task, filter) {
+            if (!task) return false
+            // eslint-disable-next-line eqeqeq
+            const isActive = function (task) { return isTaskFinished(task) == false && task.isRunning == true }
+            // eslint-disable-next-line eqeqeq
+            const isInactive = function (task) { return isTaskFinished(task) || task.isRunning == false }
+            // eslint-disable-next-line eqeqeq
+            const isStatic = function (task) { return (task.isStatic == true || task.isDynamic == false) }
+            // eslint-disable-next-line eqeqeq
+            const isDynamic = function (task) { return (task.isDynamic == true || task.isStatic == false) }
+            switch (filter) {
+            case 'all':
+                return true
+            case 'static':
+                return isStatic(task)
+            case 'dynamic':
+                return isDynamic(task)
+            case 'active':
+                return isActive(task)
+            case 'inactive':
+                return isInactive(task)
+            case 'active-dynamic':
+                return isActive(task) && isDynamic(task)
+            case 'active-static':
+                return isActive(task) && isStatic(task)
+            case 'inactive-dynamic':
+                return isInactive(task) && isDynamic(task)
+            case 'inactive-static':
+                return isInactive(task) && isStatic(task)
+            }
+            return false
+        }
+        function stopTask (node, name, resetCounter) {
+            const task = getTask(node, name)
+            if (task) {
+                task.stop()
+                if (resetCounter) { task.node_count = 0 }
+            }
+            return task
+        }
+        function stopAllTasks (node, resetCounter, filter) {
+            if (node.tasks) {
+                for (let index = 0; index < node.tasks.length; index++) {
+                    const task = node.tasks[index]
+                    if (task) {
+                        let skip = false
+                        if (filter) skip = (taskFilterMatch(task, filter) === false)
+                        if (!skip) {
+                            task.stop()
+                            if (resetCounter) { task.node_count = 0 }
+                        }
+                    }
+                }
+            }
+        }
+        function startTask (node, name) {
+            const task = getTask(node, name)
+            if (task) {
+                if (isTaskFinished(task)) {
+                    task.node_count = 0
+                }
+                task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
+                task.start()
+            }
+            return task
+        }
+        function startAllTasks (node, filter) {
+            if (node.tasks) {
+                for (let index = 0; index < node.tasks.length; index++) {
+                    const task = node.tasks[index]
+                    let skip = false
+                    if (filter) skip = (taskFilterMatch(task, filter) === false)
+                    if (!skip && task) {
+                        if (isTaskFinished(task)) {
+                            task.node_count = 0
+                        }
+                        task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
+                        task.start()
+                    }
+                }
+            }
+        }
+        function deleteAllTasks (node, filter) {
+            if (node.tasks) {
+                for (let index = 0; index < node.tasks.length; index++) {
+                    try {
+                        const task = node.tasks[index]
+                        if (task) {
+                            let skip = false
+                            if (filter) skip = (taskFilterMatch(task, filter) === false)
+                            if (!skip) {
+                                _deleteTask(task)
+                                node.tasks[index] = null
+                                node.tasks.splice(index, 1)
+                                index--
+                            }
+                        }
+                    // eslint-disable-next-line no-empty
+                    } catch (error) { }
+                }
+            }
+        }
+        function deleteTask (node, name) {
+            let task = getTask(node, name)
+            if (task) {
+                _deleteTask(task)
+                node.tasks = node.tasks.filter(t => t && t.name !== name)
+                task = null
+            }
+        }
+        function _deleteTask (task) {
+            try {
+                task.off('run')
+                task.off('ended')
+                task.off('started')
+                task.off('stopped')
+                task.stop()
+                task = null
+            // eslint-disable-next-line no-empty
+            } catch (error) {}
+        }
+        async function updateTask (node, options, msg) {
+            if (!options || typeof options !== 'object') {
+                node.warn('schedule settings are not valid', msg)
+                return null
+            }
+
+            // eslint-disable-next-line eqeqeq
+            if (Array.isArray(options) == false) {
+                options = [options]
+            }
+
+            for (let index = 0; index < options.length; index++) {
+                const opt = options[index]
+                opt.payloadType = opt.payloadType || opt.type
+                if (opt.payloadType == null && typeof opt.payload === 'string' && opt.payload.length) {
+                    opt.payloadType = 'str'
+                }
+                opt.payloadType = opt.payloadType || 'default'
+                delete opt.type
+                try {
+                    validateOpt(opt)
+                } catch (error) {
+                    node.warn(error, msg)
+                    return
+                }
+            }
+
+            for (let index = 0; index < options.length; index++) {
+                const opt = options[index]
+                const task = getTask(node, opt.name)
+                const isDynamic = !task || task.isDynamic
+                // let isStatic = task && task.isStatic;
+                let opCount = 0; let modified = false
+                if (task) {
+                    modified = true
+                    opCount = task.node_count || 0
+                    deleteTask(node, opt.name)
+                }
+                const taskCount = node.tasks ? node.tasks.length : 0
+                const taskIndex = task && node.fanOut ? (task.node_index || 0) : taskCount
+                const t = await createTask(node, opt, taskIndex, !isDynamic)
+                if (t) {
+                    if (modified) t.node_modified = true
+                    t.node_count = opCount
+                    t.isDynamic = isDynamic
+                }
+            }
+        }
+        async function createTask (node, opt, index, _static) {
+            opt = opt || {}
+            try {
+                node.debug(`createTask - index: ${index}, static: ${_static}, opt: ${JSON.stringify(opt)}`)
+            } catch (error) {
+                node.error(error)
+            }
+            applyOptionDefaults(node, opt, index)
+            try {
+                validateOpt(opt)
+            } catch (error) {
+                node.warn(error)
+                const indicator = _static ? 'dot' : 'ring'
+                node.status({ fill: 'red', shape: indicator, text: error.message })
+                return null
+            }
+            const cronOpts = node.timeZone ? { timezone: node.timeZone } : undefined
+            let task
+            if (opt.expressionType === 'cron') {
+                const expression = cronosjs.CronosExpression.parse(opt.expression, cronOpts)
+                task = new cronosjs.CronosTask(expression)
+            } else if (opt.expressionType === 'solar') {
+                if (node.defaultLocationType === 'env' || node.defaultLocationType === 'fixed') {
+                    opt.locationType = node.defaultLocationType
+                    opt.location = await evaluateNodeProperty(node.defaultLocation, node.defaultLocationType, node)
+                } else { // per schedule
+                    opt.location = await evaluateNodeProperty(opt.location, 'str', node)
+                }
+                const ds = parseSolarTimes(opt)
+                task = ds.task
+                task.node_solarEventTimes = ds.solarEventTimes
+            } else {
+                const ds = parseDateSequence(opt.expression)
+                task = ds.task
+            }
+            task.isDynamic = !_static
+            task.isStatic = _static
+            task.name = '' + opt.name
+            task.node_topic = opt.topic
+            task.node_expressionType = opt.expressionType
+            task.node_expression = opt.expression
+            task.node_payloadType = opt.payloadType
+            task.node_payload = opt.payload
+            task.node_count = 0
+            task.node_locationType = opt.locationType
+            task.node_location = opt.location
+            task.node_solarType = opt.solarType
+            task.node_solarEvents = opt.solarEvents
+            task.node_offset = opt.offset
+            task.node_index = index
+            task.node_opt = opt
+            task.node_limit = opt.limit || 0
+            task.stop()
+            task.on('run', (timestamp) => {
+                node.debug(`running '${task.name}' ~ '${task.node_topic}'\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
+                const indicator = task.isDynamic ? 'ring' : 'dot'
+                node.status({ fill: 'green', shape: indicator, text: 'Running ' + formatShortDateTimeWithTZ(timestamp, node.timeZone) })
+                if (isTaskFinished(task)) {
+                    process.nextTick(function () {
+                        // using nextTick is a work around for an issue (#3) in cronosjs where the job restarts itself after this event handler has exited
+                        task.stop()
+                        updateNextStatus(node)
+                    })
+                    return
+                }
+                task.node_count = task.node_count + 1// ++ stops at 2147483647
+                sendMsg(node, task, timestamp)
+                process.nextTick(async function () {
+                    if (task.node_expressionType === 'solar') {
+                        await updateTask(node, task.node_opt, null)
+                    }
+                })
+            })
+                .on('ended', () => {
+                    node.debug(`ended '${task.name}' ~ '${task.node_topic}'`)
+                    updateNextStatus(node)
+                })
+                .on('started', () => {
+                    node.debug(`started '${task.name}' ~ '${task.node_topic}'`)
+                    process.nextTick(function () {
+                        updateNextStatus(node)
+                    })
+                })
+                .on('stopped', () => {
+                    node.debug(`stopped '${task.name}' ~ '${task.node_topic}'`)
+                    updateNextStatus(node)
+                })
+            task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
+            if (!(opt.dontStartTheTask === true)) {
+                task.start()
+            }
+            node.tasks.push(task)
+            return task
+        }
+        function serialise () {
+            let filePath = ''
+            try {
+                if (!persistAvailable || !node.persistDynamic) {
+                    return
+                }
+                filePath = getPersistFilePath()
+                const dynNodes = node.tasks.filter((e) => e && e.isDynamic)
+                const statNodes = node.tasks.filter((e) => e && e.isDynamic !== true)
+                const exp = (task) => exportTask(task, true)
+                const dynNodesExp = dynNodes.map(exp)
+                const statNodesExp = statNodes.map(exp)
+                /* if(!dynNodesExp || !dynNodesExp.length){
+                    //FUTURE TODO: Sanity check before deletion
+                    //and only if someone asks for it :)
+                    //other wise, file clean up is a manual task
+                    fs.unlinkSync(filePath);
+                    return;
+                } */
+                const data = {
+                    version: 2,
+                    dynamicSchedules: dynNodesExp,
+                    staticSchedules: statNodesExp
+                }
+                const fileData = JSON.stringify(data)
+                fs.writeFileSync(filePath, fileData)
+            } catch (e) {
+                RED.log.error(`cron-plus: Error saving persistence data '${filePath}'. ${e.message}`)
+            }
+        }
+        async function deserialise () {
+            let filePath = ''
+            try {
+                if (!persistAvailable || !node.persistDynamic) {
+                    return
+                }
+                filePath = getPersistFilePath()
+                if (fs.existsSync(filePath)) {
+                    const fileData = fs.readFileSync(filePath)
+                    const data = JSON.parse(fileData)
+                    if (!data) {
+                        return // nothing to add
+                    }
+                    if (data.version !== 1 && data.version !== 2) {
+                        throw new Error('Invalid version - cannot load dynamic schedules')
+                    }
+                    if (data.version === 2 && data.staticSchedules && data.staticSchedules.length) {
+                        for (let iOpt = 0; iOpt < data.staticSchedules.length; iOpt++) {
+                            const opt = data.staticSchedules[iOpt]
+                            const task = node.tasks.find(e => e.name === opt.name)
+                            if (task) {
+                                task.count = opt.count
+                            }
+                            if (opt.isRunning === false) {
+                                stopTask(node, opt.name)
+                            } else if (opt.isRunning === true) {
+                                startTask(node, opt.name)
+                            }
+                        }
+                        updateNodeNextInfo(node)
+                    }
+                    if (data.version === 1) {
+                        data.dynamicSchedules = data.schedules
+                    }
+                    if (data.dynamicSchedules && data.dynamicSchedules.length) {
+                        for (let iOpt = 0; iOpt < data.dynamicSchedules.length; iOpt++) {
+                            const opt = data.dynamicSchedules[iOpt]
+                            let task
+                            opt.name = opt.name || opt.topic
+                            if (data.version === 1) {
+                                task = await createTask(node, opt, iOpt, false)
+                            } else if (data.version === 2) {
+                                opt.dontStartTheTask = opt.isRunning
+                                task = await createTask(node, opt, iOpt, false)
+                                if (task) {
+                                    task.count = opt.count
+                                    task.isRunning = opt.isRunning
+                                    task.isDynamic = true
+                                }
+                                if (opt.isRunning === false) {
+                                    stopTask(node, opt.name)
+                                } else if (opt.isRunning === true) {
+                                    startTask(node, opt.name)
+                                }
+                            }
+                        }
+                        updateNodeNextInfo(node)
+                    }
+                } else {
+                    RED.log.log(`cron-plus: no persistence data found for node '${node.id}'.`)
+                }
+            } catch (error) {
+                RED.log.error(`cron-plus: Error loading persistence data '${filePath}'. ${error.message}`)
+            }
+        }
+        function getPersistFilePath () {
+            const fileName = `node-${node.id}.json`
+            return path.join(persistPath, fileName)
+        }
+        function updateNextStatus (node, force) {
+            const now = new Date()
+            updateNodeNextInfo(node, now)
+            if (node.statusUpdatePending === true) {
+                if (force) {
+                    node.statusUpdatePending = false
+                } else {
+                    return
+                }
+            }
+
+            if (node.tasks) {
+                const indicator = node.nextIndicator || 'dot'
+                if (node.nextDate) {
+                    const d = formatShortDateTimeWithTZ(node.nextDate, node.timeZone) || 'Never'
+                    node.status({ fill: 'blue', shape: indicator, text: (node.nextEvent || 'Next') + ': ' + d })
+                } else if (node.tasks && node.tasks.length) {
+                    node.status({ fill: 'grey', shape: indicator, text: 'All stopped' })
+                } else {
+                    node.status({ }) // no tasks
+                }
+            } else {
+                node.status({})
+            }
+        }
+        function getNextTask (tasks) {
+            try {
+                const now = new Date()
+                if (!tasks || !tasks.length) { return null }
+                const runningTasks = tasks.filter(function (task) {
+                    const finished = isTaskFinished(task)
+                    return task.isRunning && (task._expression || task._sequence) && !finished
+                })
+                if (!runningTasks || !runningTasks.length) {
+                    return null
+                }
+
+                let nextToRunTask
+                if (runningTasks.length === 1) {
+                    // let x = (runningTasks[0]._expression || runningTasks[0]._sequence)
+                    nextToRunTask = runningTasks[0]
+                    // d = x.nextDate(now);
+                } else {
+                    nextToRunTask = runningTasks.reduce(function (prev, current) {
+                        // let p, c;
+                        if (!prev) return current
+                        if (!current) return prev
+                        const px = (prev._expression || prev._sequence)
+                        const cx = (current._expression || current._sequence)
+                        return (px.nextDate(now) < cx.nextDate(now)) ? prev : current
+                    })
+                }
+                return nextToRunTask
+            } catch (error) {
+                node.debug(error)
+            }
+            return null
+        }
+        function generateSendMsg (node, msg, type, index) {
+            const outputCount = node.outputs
+            const fanOut = node.fanOut
+            const hasCommandOutputPin = !!((node.commandResponseMsgOutput === 'output2' || fanOut))
+            const optionCount = node.options ? node.options.length : 0
+            let staticOutputPinIndex = 0
+            let dynOutputPinIndex = 0
+            let cmdOutputPin = 0
+            if (fanOut) {
+                dynOutputPinIndex = optionCount
+                cmdOutputPin = optionCount + 1
+                staticOutputPinIndex = index || 0
+            }
+            if (!fanOut && hasCommandOutputPin) {
+                cmdOutputPin = 1
+            }
+
+            let idx = 0
+            switch (type) {
+            case 'static':
+                idx = staticOutputPinIndex
+                break
+            case 'dynamic':
+                idx = dynOutputPinIndex
+                break
+            case 'command-response':
+                idx = cmdOutputPin
+                break
+            }
+            const arr = Array(outputCount || (idx + 1))
+            arr.fill(null)
+            arr[idx] = msg
+            return arr
+        }
     }
     RED.nodes.registerType('cronplus', CronPlus)
 
@@ -1796,7 +1794,7 @@ module.exports = function (RED) {
         }
     })
 
-    RED.httpAdmin.post('/cronplus/:id/:operation', RED.auth.needsPermission('cronplus.read'), function (req, res) {
+    RED.httpAdmin.post('/cronplus/:id/:operation', RED.auth.needsPermission('cronplus.read'), async function (req, res) {
         // console.log("/cronplus", req.body);
         try {
             const operation = req.params.operation
@@ -1825,19 +1823,19 @@ module.exports = function (RED) {
                                 for (let index = 0; index < req.body.env.length; index++) {
                                     const envVar = req.body.env[index]
                                     if (envVar.name === req.body.defaultLocation) {
-                                        pos = RED.util.evaluateNodeProperty(envVar.value, envVar.type, fakeNode())
+                                        pos = await evaluateNodeProperty(envVar.value, envVar.type, fakeNode())
                                         break
                                     }
                                 }
                             }
                             if (!pos && node) {
-                                pos = RED.util.evaluateNodeProperty(node.defaultLocation, node.defaultLocationType, node)
+                                pos = await evaluateNodeProperty(node.defaultLocation, node.defaultLocationType, node)
                             }
                         } else if (req.body.defaultLocationType === 'fixed') {
                             if (node) {
-                                pos = RED.util.evaluateNodeProperty(req.body.defaultLocation, req.body.defaultLocationType, node)
+                                pos = await evaluateNodeProperty(req.body.defaultLocation, req.body.defaultLocationType, node)
                             } else {
-                                pos = RED.util.evaluateNodeProperty(req.body.defaultLocation, req.body.defaultLocationType, fakeNode())
+                                pos = await evaluateNodeProperty(req.body.defaultLocation, req.body.defaultLocationType, fakeNode())
                             }
                         } else { // per schedule
                             let loc = (req.body.location + '').trim()
@@ -1850,12 +1848,12 @@ module.exports = function (RED) {
                                 for (let index = 0; index < req.body.env.length; index++) {
                                     const envVar = req.body.env[index]
                                     if (envVar.name === loc) {
-                                        pos = RED.util.evaluateNodeProperty(envVar.value, envVar.type, node || fakeNode())
+                                        pos = await evaluateNodeProperty(envVar.value, envVar.type, node || fakeNode())
                                         break
                                     }
                                 }
                             } else {
-                                pos = RED.util.evaluateNodeProperty(loc, 'str', node || fakeNode())
+                                pos = await evaluateNodeProperty(loc, 'str', node || fakeNode())
                             }
                         }
                         opts.location = pos || ''
@@ -1916,7 +1914,7 @@ module.exports = function (RED) {
             }
         } catch (err) {
             res.sendStatus(500)
-            console.error(err)
+            console.debug(err)
         }
     })
 }
