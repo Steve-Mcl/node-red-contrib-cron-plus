@@ -468,7 +468,6 @@ copies or substantial portions of the Software.
                 OK: function () {
                     $('#cron-plus-map-dialog').dialog('close')
                     if (selectedLocation && selectedLocationInput) {
-                        debugger
                         if (selectedLocationInput.typedInput('instance')) {
                             selectedLocationInput.typedInput('value', selectedLocation.lat + ' ' + selectedLocation.lng)
                         } else {
