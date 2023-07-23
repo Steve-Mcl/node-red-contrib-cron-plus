@@ -468,12 +468,17 @@ copies or substantial portions of the Software.
                 OK: function () {
                     $('#cron-plus-map-dialog').dialog('close')
                     if (selectedLocation && selectedLocationInput) {
+                        debugger
                         if (selectedLocationInput.typedInput('instance')) {
                             selectedLocationInput.typedInput('value', selectedLocation.lat + ' ' + selectedLocation.lng)
                         } else {
                             selectedLocationInput.val(selectedLocation.lat + ' ' + selectedLocation.lng)
                         }
                         selectedLocationInput.focus()
+                        // if selectedLocationInput is a typedInput, trigger focus on that
+                        if (selectedLocationInput.typedInput('instance')) {
+                            selectedLocationInput.typedInput('focus')
+                        }
                         selectedLocationInput.change()
                     }
                 }
@@ -502,7 +507,9 @@ copies or substantial portions of the Software.
     }
 
     function createMap (srcInput) {
-        console.log('createMap', srcInput)
+        if (RED._cron_plus_debug) {
+            console.log('createMap', srcInput)
+        }
         $('.cron-plus-map-loading').hide()
         if (!window.L || navigator.onLine === false) {
             $('.cron-plus-map-not-loaded').show()
@@ -970,6 +977,7 @@ copies or substantial portions of the Software.
         },
 
         oneditprepare: function () {
+            if (RED._cron_plus_debug) { console.log('oneditprepare - cronplus') }
             const node = this
             const dupCheck = {}
             let selectedLocationInput = null
@@ -1489,6 +1497,7 @@ copies or substantial portions of the Software.
              * @param {object} option The option object to present
             */
             function generateOption (optionIndex, option) {
+                if (RED._cron_plus_debug) { console.log('generating option', optionIndex, option) }
                 applyOptionDefaults(optionIndex, option)
                 function buildExpressionTip (title, desc, text, type) {
                     const helpFunc = type === 'solar' ? 'showSolarHelp();' : 'showCronHelp();'
@@ -1676,7 +1685,7 @@ copies or substantial portions of the Software.
                         })
                     })
                 }
-
+                if (RED._cron_plus_debug) { console.log('setting up schedule fields') }
                 // styles for the option row 1
                 const nameStyle = 'display: flex; flex-grow: 0; flex-basis:128px; margin-right:5px;'
                 const topicStyle = 'display: flex; flex-grow: 1; flex-basis: 140px; margin-right: 5px;'
@@ -1803,7 +1812,6 @@ copies or substantial portions of the Software.
                 expressionField.combobox('value', option.expression || '')
 
                 // generate the solar events field
-                console.log('setting up solar events field')
                 const solarEventsDiv = $('<div/>', { style: solarEventsStyle }).appendTo(cell2Solar)
                 const solarEventsField = $('<input/>', { class: 'node-input-option-solarEvents', type: 'text', style: 'width: 100%', placeholder: 'select solar events', value: option.solarEvents || '' }).appendTo(solarEventsDiv)
                 solarEventsField.typedInput({
@@ -2003,6 +2011,7 @@ copies or substantial portions of the Software.
             }, 200)
         },
         oneditsave: function () {
+            if (RED._cron_plus_debug) { console.log('oneditsave - cronplus') }
             const node = this
             const options = $('#node-input-option-container').children()
             node.options = []
@@ -2053,6 +2062,7 @@ copies or substantial portions of the Software.
                 return !this.changed
             },
             onclick: function () {
+                if  (RED._cron_plus_debug) { console.log('button.onclick - cronplus') }
                 const node = this
                 if (node.changed) {
                     return RED.notify(RED._('notification.warning', { message: RED._('notification.warnings.undeployedChanges') }), 'warning')
