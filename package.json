@@ -50,16 +50,15 @@
     "suncalc2": "^1.8.1"
   },
   "devDependencies": {
-    "eslint": "^8.21.0",
-    "eslint-config-standard": "^17.0.0",
+    "eslint": "^8.45.0",
+    "eslint-config-standard": "^17.1.0",
     "eslint-plugin-html": "^7.1.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-standard": "^5.0.0",
     "install": "^0.13.0",
-    "mocha": "^8.3.2",
-    "node-red": "^1.0.0",
-    "node-red-node-test-helper": "^0.3.0",
-    "npm": "^8.16.0",
+    "mocha": "^10.2.0",
+    "node-red-node-test-helper": "^0.3.2",
+    "npm": "^9.8.1",
     "should": "^13.2.3"
   },
   "maintainers": [
