@@ -1,70 +1,70 @@
 {
-  "name": "node-red-contrib-cron-plus",
-  "version": "2.0.1",
-  "description": "A flexible scheduler (cron, solar events, fixed dates) node for Node-RED with full dynamic control and time zone support",
-  "main": "cronplus.js",
-  "scripts": {
-    "test": "mocha \"test/**/*_spec.js\"",
-    "publish": "npm publish"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Steve-Mcl/node-red-contrib-cron-plus.git"
-  },
-  "keywords": [
-    "node-red",
-    "scheduler",
-    "timer",
-    "cron",
-    "cronplus",
-    "cron plus",
-    "cron-plus",
-    "crontab",
-    "timer",
-    "suntime",
-    "sunrise",
-    "sunset"
-  ],
-  "node-red": {
-    "version": ">=1.0.0",
-    "nodes": {
-      "cronplus": "cronplus.js"
-    }
-  },
-  "engines": {
-    "node": ">=8.0.0"
-  },
-  "author": {
-    "name": "Steve-Mcl"
-  },
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/Steve-Mcl/node-red-contrib-cron-plus/issues"
-  },
-  "homepage": "https://github.com/Steve-Mcl/node-red-contrib-cron-plus#readme",
-  "dependencies": {
-    "coord-parser": "^1.0.0",
-    "cronosjs": "^1.7.1",
-    "cronstrue": "^2.28.0",
-    "pretty-ms": "7.0.1",
-    "suncalc2": "^1.8.1"
-  },
-  "devDependencies": {
-    "eslint": "^8.45.0",
-    "eslint-config-standard": "^17.1.0",
-    "eslint-plugin-html": "^7.1.0",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-standard": "^5.0.0",
-    "install": "^0.13.0",
-    "mocha": "^10.2.0",
-    "node-red-node-test-helper": "^0.3.2",
-    "npm": "^9.8.1",
-    "should": "^13.2.3"
-  },
-  "maintainers": [
-    {
-      "name": "Steve-Mcl",
-      "email": "44235289+Steve-Mcl@users.noreply.github.com"
-    }
-  ]
+    "name": "node-red-contrib-cron-plus",
+    "version": "2.1.0",
+    "description": "A flexible scheduler (cron, solar events, fixed dates) node for Node-RED with full dynamic control and time zone support",
+    "main": "cronplus.js",
+    "scripts": {
+        "test": "mocha \"test/**/*_spec.js\"",
+        "publish": "npm publish"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Steve-Mcl/node-red-contrib-cron-plus.git"
+    },
+    "keywords": [
+        "node-red",
+        "scheduler",
+        "timer",
+        "cron",
+        "cronplus",
+        "cron plus",
+        "cron-plus",
+        "crontab",
+        "timer",
+        "suntime",
+        "sunrise",
+        "sunset"
+    ],
+    "node-red": {
+        "version": ">=1.0.0",
+        "nodes": {
+            "cronplus": "cronplus.js"
+        }
+    },
+    "engines": {
+        "node": ">=8.0.0"
+    },
+    "author": {
+        "name": "Steve-Mcl"
+    },
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/Steve-Mcl/node-red-contrib-cron-plus/issues"
+    },
+    "homepage": "https://github.com/Steve-Mcl/node-red-contrib-cron-plus#readme",
+    "dependencies": {
+        "coord-parser": "^1.0.0",
+        "cronosjs": "^1.7.1",
+        "cronstrue": "^2.28.0",
+        "pretty-ms": "7.0.1",
+        "suncalc2": "^1.8.1"
+    },
+    "devDependencies": {
+        "eslint": "^8.45.0",
+        "eslint-config-standard": "^17.1.0",
+        "eslint-plugin-html": "^7.1.0",
+        "eslint-plugin-node": "^11.1.0",
+        "eslint-plugin-standard": "^5.0.0",
+        "install": "^0.13.0",
+        "mocha": "^10.2.0",
+        "node-red-node-test-helper": "^0.3.2",
+        "npm": "^9.8.1",
+        "should": "^13.2.3"
+    },
+    "maintainers": [
+        {
+            "name": "Steve-Mcl",
+            "email": "44235289+Steve-Mcl@users.noreply.github.com"
+        }
+    ]
 }
