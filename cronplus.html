@@ -353,6 +353,45 @@ copies or substantial portions of the Software.
     let map, mapPopup, selectedLocation, selectedLocationInput
     const filesAdded = [] // list of files already added
 
+    function toggleFullscreen(selector, hideElements, revealElements, callback) {
+        callback = callback || function () {}
+        hideElements = hideElements || []
+        revealElements = revealElements || []
+        const el = document.querySelector(selector || "#node-cronplus-tab-static-schedules");
+        const $el = $(el)
+        if (!document.fullscreenElement) {
+            el.requestFullscreen().then(() => {
+                $el.addClass('cron-plus-fullscreen-element').removeClass('cron-plus-expanded-element')
+                hideElements.forEach((selector) => {
+                    $(selector).addClass('cron-plus-vanish-element')
+                })
+                revealElements.forEach((selector) => {
+                    $(selector).show()
+                })
+                callback()
+            }).catch((err) => {
+                if (callback) {
+                    callback(err)
+                } else {
+                    alert( `Unable to get fullscreen mode: ${err.message}`, );
+                }
+            });
+        } else {
+            $el.removeClass('cron-plus-fullscreen-element').removeClass('cron-plus-expanded-element')
+            hideElements.forEach((selector) => {
+                $(selector).removeClass('cron-plus-vanish-element')
+            })
+            revealElements.forEach((selector) => {
+                $(selector).hide()
+            })
+            try {
+                document.exitFullscreen();
+            } finally {
+                callback()
+            }
+        }
+    }
+
     function checkLoadJsCssFile (filename, filetype, callback) {
         if (filesAdded.indexOf(filename) === -1) {
             loadJsCssFile(filename, filetype, function () {
@@ -644,7 +683,14 @@ copies or substantial portions of the Software.
     }
 
     function updateEditorLayout () {
+         updateScheduleExpandButton()
+
         if (RED._cron_plus_debug) console.log('cronplus-updateEditorLayout')
+        const scheduleList = $('#node-cronplus-tab-static-schedules')
+        const scheduleListFullScreen = scheduleList.css('position') === 'fixed' || document.fullscreenElement
+        if (scheduleListFullScreen) {
+            return // don't update layout if schedules are fullscreen
+        }
         const dlg = $('#dialog-form')
         let height = dlg.height() - 5
         const expandRow = dlg.find('.form-row-auto-height')
@@ -1748,7 +1794,7 @@ copies or substantial portions of the Software.
                 const container = $('<li/>')
                 // const container = $('<li/>', { style: 'max-width: 600px' })
 
-                // control buttons
+                // row buttons
                 const controlsContainer = $('<span/>', { style: controlsContainerStyle }).appendTo(container)
                 const deleteButton = $('<a/>', { href: '#', class: 'editor-button editor-button-small', style: '' }).appendTo(controlsContainer)
                 $('<i/>', { class: 'fa fa-remove' }).appendTo(deleteButton)
@@ -1943,9 +1989,9 @@ copies or substantial portions of the Software.
                 offsetField.prop('title', 'Minutes Offset +/- 1439')
 
                 // init tooltips
-                initTooltip(offsetField, 'solar', { my: 'right top', at: 'right bottom+5', of: cell2Solar, collision: 'flipfit' })
-                initTooltip(locationField, 'solar', { my: 'right top', at: 'right bottom+5', of: cell2Solar, collision: 'flipfit' })
-                initTooltip(expressionField, 'cron', { my: 'right top', at: 'right bottom+5', of: cell2Cron, collision: 'flipfit' })
+                initTooltip(offsetField, 'solar', { my: 'middle top', at: 'middle bottom+5', of: cell2Solar, collision: 'flipfit' })
+                initTooltip(locationField, 'solar', { my: 'middle top', at: 'middle bottom+5', of: cell2Solar, collision: 'flipfit' })
+                initTooltip(expressionField, 'cron', { my: 'middle top', at: 'middle bottom+5', of: cell2Cron, collision: 'flipfit' })
 
                 // locationField.keyup(function () {
                 //     const f = $(this)
@@ -1982,8 +2028,7 @@ copies or substantial portions of the Software.
                 })
 
                 deleteButton.click(function () {
-                    container.css({ background: '#fee' })
-                    container.fadeOut(300, function () {
+                    container.fadeOut(200, function () {
                         $(this).remove()
                     })
                 })
@@ -2018,10 +2063,57 @@ copies or substantial portions of the Software.
             $('#node-input-add-option').click(function () {
                 generateOption($('#node-input-option-container').children().length, {})
                 $('#node-input-option-container-div').scrollTop($('#node-input-option-container-div').get(0).scrollHeight)
+                // focus the input with class .node-input-option-name in the last li added
+                $('#node-input-option-container').children().last().find('.node-input-option-name').focus().select()
             })
 
             $('#node-input-show-dynamic').click(function () {
                 $('#cron-plus-dynamic-nodes-dialog').dialog('open')
+            })
+
+            removeEventListener("fullscreenchange", updateScheduleExpandButton);
+            addEventListener("fullscreenchange", updateScheduleExpandButton);
+            $('#cronplus-expand-schedules-button').click(function (evt) {
+                const selector = '#node-cronplus-tab-static-schedules'
+                const hideElements = ['#node-input-show-dynamic', '#red-ui-workspace-chart', '#red-ui-workspace-chart-grid hide']
+                const $button = $('#cronplus-expand-schedules-button')
+                const $buttonExpandIcon = $button.find('i.fa')
+
+                // prevent the default behaviour - we will handle it
+                const lastly = function () {
+                    if (evt) {
+                        evt.preventDefault()
+                        evt.stopImmediatePropagation()
+                    }
+                }
+
+                // if shift key or middle mouse button or already full screen then toggle full screen
+                if (evt.shiftKey || evt.button === 1 /* middle button */ || document.fullscreenElement) {
+                    toggleFullscreen(selector, hideElements, null, function (err) {
+                        updateEditorLayout()
+                        lastly()
+                    })
+                    return
+                }
+                
+                const el = $(selector)
+                const isSmall = el.css('position') !== 'fixed' && !document.fullscreenElement;
+                if (isSmall) {
+                    // expand 
+                    el.addClass('cron-plus-expanded-element').removeClass('cron-plus-fullscreen-element')
+                    hideElements.forEach((e) => {
+                        $(e).addClass('cron-plus-vanish-element')
+                    })
+                } else {
+                    // shrink
+                    el.removeClass('cron-plus-expanded-element').removeClass('cron-plus-fullscreen-element')
+                    hideElements.forEach((e) => {
+                        $(e).removeClass('cron-plus-vanish-element')
+                    })
+                }
+
+                updateEditorLayout()
+                lastly()
             })
 
             for (let i = 0; i < this.options.length; i++) {
@@ -2052,9 +2144,11 @@ copies or substantial portions of the Software.
             setTimeout(function () {
                 $('#node-cronplus-tab-static-schedules').css('max-width', '')
             }, 200)
+
         },
         oneditsave: function () {
             if (RED._cron_plus_debug) { console.log('oneditsave - cronplus') }
+            removeEventListener("fullscreenchange", updateScheduleExpandButton);
             const node = this
             const options = $('#node-input-option-container').children()
             delete node.persistDynamic // remove deprecated property
@@ -2093,6 +2187,12 @@ copies or substantial portions of the Software.
             if (fanOut && options && options.length) {
                 node.outputs = options.length + 2 // in fanout mode, we add a separate output for dynamic schedules & command responses
             }
+            $('#node-input-timeZone').off()
+            $('#node-input-crontab').off()
+        },
+        oneditcancel: function() {
+            if (RED._cron_plus_debug) { console.log('oneditcancel - cronplus') }
+            removeEventListener("fullscreenchange", updateScheduleExpandButton);
             $('#node-input-timeZone').off()
             $('#node-input-crontab').off()
         },
@@ -2240,6 +2340,17 @@ function _popoutCronPlusHelp(tag) {
         'width=800,height=600'
     )
 }
+
+function updateScheduleExpandButton () {
+    const selector = '#node-cronplus-tab-static-schedules'
+    const $buttonExpandIcon = $('#cronplus-expand-schedules-button').find('i.fa')
+    if ($(selector).css('position') === 'fixed' || document.fullscreenElement) {
+        $buttonExpandIcon.removeClass('fa-expand').addClass('fa-compress')
+    } else {
+        $buttonExpandIcon.removeClass('fa-compress').addClass('fa-expand')
+    }
+}
+
 </script>
 
 <script type="text/html" data-template-name="cronplus">
@@ -2347,6 +2458,28 @@ function _popoutCronPlusHelp(tag) {
             display: none !important;
             visibility: hidden;
         }
+        .cron-plus-fullscreen-element {
+            padding: '15px';
+            z-index: 99999;
+        }
+        .cron-plus-expanded-element {
+            position: fixed;
+            z-index: 99999;
+            top: 0px;
+            left: 0px;
+            bottom: 0px;
+            right: 0px;
+            visibility: visible;
+            height: unset !important;
+            width: unset !important;
+            padding: 15px;
+            margin: 0px;
+            background-color: var(--red-ui-form-background);
+        }
+        .cron-plus-vanish-element {
+            display: none !important;
+            visibility: hidden !important;
+        }
         .cron-plus-map-dialog-content {
             padding: 0px 0px 0px 0px;
         }
@@ -2453,6 +2586,8 @@ function _popoutCronPlusHelp(tag) {
         <div id="cron-plus-expression-builder" >
         </div>
     </div>
+
+    <!-- For Rows -->
     <div class="form-row cron-plus-form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
         <input type="text" id="node-input-name" style="width: calc(100% - 130px)" placeholder="Name">
@@ -2481,18 +2616,34 @@ function _popoutCronPlusHelp(tag) {
         <label for="node-input-storeName"><i class="fa fa-database"></i> Save State</label>
         <select type="text" id="node-input-storeName" style="width: calc(100% - 130px);"></select>
     </div>
-    <div id="node-cronplus-tab-static-schedules" class="form-row cron-plus-form-row form-row-auto-height" style="margin-bottom: 0px;width: 100%; min-height: 200px; max-width: min-content;">
-        <label for="node-input-option-container-div" style="vertical-align:top"><i class="fa fa-list-alt"></i> Schedules</label>
-        <div class="red-ui-editableList-border red-ui-editableList-container" id="node-input-option-container-div" 
-            style="min-width: 300px; box-sizing: border-box; border-radius: 5px; padding: 5px; overflow-y:scroll;display: inline-block; width: 100%; height: calc(100% - 28px); min-height: 150px;">
-            <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;"></ol>
+
+    <div id="node-cronplus-tab-static-schedules" class="form-row cron-plus-form-row form-row-auto-height"
+        style="width: 100%; min-height: 200px; display: flex; flex-flow: column nowrap; max-width: min-content">
+        <!-- Row 1 -->
+        <div style="display: flex; justify-content: space-between;">
+            <label for="node-input-option-container-div" style="vertical-align:top;flex-basis: 120px;">
+                <i class="fa fa-list-alt"></i> 
+                Schedules
+            </label>
+            <div style="flex-grow: 1; column-gap: 2px; margin-bottom: 2px; margin-top: 0px; display: flex; padding: 0px 0px 0px 4px;">
+                <!-- Toolbar -->
+                <a href="#" accesskey="a" title="Add a new schedule [A]" class="editor-button editor-button-small" id="node-input-add-option">
+                    <span><i class="fa fa-plus" style="margin-right: 2px;"></i> <u>a</u>dd</span>
+                </a>
+                <a href="#"  accesskey="s" title="Show dynamic schedules [S]" class="editor-button editor-button-small" id="node-input-show-dynamic">
+                    <span><i class="fa fa-table" style="margin-right: 2px;"></i> dynamic <u>s</u>chedules</span>
+                </a>
+                <a href="#" accesskey="x" class="editor-button editor-button-small" id="cronplus-expand-schedules-button" title="Hold the shift key for fullscreen [X]" style="margin-left: auto;">
+                    <span class="expand-icon"><i class="fa fa-expand" style="margin-right: 2px;"></i> e<u>x</u>pand</span>
+                </a>
+            </div>
+        </div>
+        <!-- Row 2 (the list) -->
+        <div class="red-ui-editableList-border red-ui-editableList-container" id="node-input-option-container-div"
+            style="min-width: 300px;box-sizing: border-box;border-radius: 5px;padding: 5px;overflow-y:scroll;display: inline-block;height: calc(100% - -4px);min-height: 150px;">
+            <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;" class="ui-sortable"></ol>
         </div>
     </div>
-    <div class="form-row cron-plus-form-row">
-        <a href="#" class="editor-button editor-button-small" id="node-input-add-option" style="margin-top: 4px;"><i class="fa fa-plus"></i> <span>add</span></a>
-        <a href="#" class="editor-button editor-button-small" id="node-input-show-dynamic" style="margin-top: 4px;"><i class="fa fa-table"></i> <span>view dynamic schedules</span></a>
-    </div>
-</div>
 
 </script>
 
