@@ -353,21 +353,13 @@ copies or substantial portions of the Software.
     let map, mapPopup, selectedLocation, selectedLocationInput
     const filesAdded = [] // list of files already added
 
-    function toggleFullscreen(selector, hideElements, revealElements, callback) {
+    function toggleFullscreen(selector, callback) {
         callback = callback || function () {}
-        hideElements = hideElements || []
-        revealElements = revealElements || []
         const el = document.querySelector(selector || "#node-cronplus-tab-static-schedules");
         const $el = $(el)
         if (!document.fullscreenElement) {
             el.requestFullscreen().then(() => {
                 $el.addClass('cron-plus-fullscreen-element').removeClass('cron-plus-expanded-element')
-                hideElements.forEach((selector) => {
-                    $(selector).addClass('cron-plus-vanish-element')
-                })
-                revealElements.forEach((selector) => {
-                    $(selector).show()
-                })
                 callback()
             }).catch((err) => {
                 if (callback) {
@@ -378,12 +370,6 @@ copies or substantial portions of the Software.
             });
         } else {
             $el.removeClass('cron-plus-fullscreen-element').removeClass('cron-plus-expanded-element')
-            hideElements.forEach((selector) => {
-                $(selector).removeClass('cron-plus-vanish-element')
-            })
-            revealElements.forEach((selector) => {
-                $(selector).hide()
-            })
             try {
                 document.exitFullscreen();
             } finally {
@@ -683,7 +669,7 @@ copies or substantial portions of the Software.
     }
 
     function updateEditorLayout () {
-         updateScheduleExpandButton()
+         onSchedulesExpandCompress()
 
         if (RED._cron_plus_debug) console.log('cronplus-updateEditorLayout')
         const scheduleList = $('#node-cronplus-tab-static-schedules')
@@ -2071,49 +2057,35 @@ copies or substantial portions of the Software.
                 $('#cron-plus-dynamic-nodes-dialog').dialog('open')
             })
 
-            removeEventListener("fullscreenchange", updateScheduleExpandButton);
-            addEventListener("fullscreenchange", updateScheduleExpandButton);
+            removeEventListener("fullscreenchange", onSchedulesExpandCompress);
+            addEventListener("fullscreenchange", onSchedulesExpandCompress)
+
             $('#cronplus-expand-schedules-button').click(function (evt) {
                 const selector = '#node-cronplus-tab-static-schedules'
-                const hideElements = ['#node-input-show-dynamic', '#red-ui-workspace-chart', '#red-ui-workspace-chart-grid hide']
-                const $button = $('#cronplus-expand-schedules-button')
-                const $buttonExpandIcon = $button.find('i.fa')
-
-                // prevent the default behaviour - we will handle it
-                const lastly = function () {
-                    if (evt) {
-                        evt.preventDefault()
-                        evt.stopImmediatePropagation()
-                    }
+                if (evt) {
+                    // prevent the default behaviour - we will handle it
+                    evt.preventDefault()
+                    evt.stopImmediatePropagation()
                 }
 
                 // if shift key or middle mouse button or already full screen then toggle full screen
                 if (evt.shiftKey || evt.button === 1 /* middle button */ || document.fullscreenElement) {
-                    toggleFullscreen(selector, hideElements, null, function (err) {
+                    toggleFullscreen(selector, function (err) {
                         updateEditorLayout()
-                        lastly()
-                    })
-                    return
-                }
-                
-                const el = $(selector)
-                const isSmall = el.css('position') !== 'fixed' && !document.fullscreenElement;
-                if (isSmall) {
-                    // expand 
-                    el.addClass('cron-plus-expanded-element').removeClass('cron-plus-fullscreen-element')
-                    hideElements.forEach((e) => {
-                        $(e).addClass('cron-plus-vanish-element')
                     })
                 } else {
-                    // shrink
-                    el.removeClass('cron-plus-expanded-element').removeClass('cron-plus-fullscreen-element')
-                    hideElements.forEach((e) => {
-                        $(e).removeClass('cron-plus-vanish-element')
-                    })
+                    //CSS expansion/contraction
+                    const el = $(selector)
+                    const isSmall = el.css('position') !== 'fixed' && !document.fullscreenElement;
+                    if (isSmall) {
+                        // is small - make it big
+                        el.addClass('cron-plus-expanded-element').removeClass('cron-plus-fullscreen-element')
+                    } else {
+                        // is big - make it small
+                        el.removeClass('cron-plus-expanded-element').removeClass('cron-plus-fullscreen-element')
+                    }
+                    updateEditorLayout()
                 }
-
-                updateEditorLayout()
-                lastly()
             })
 
             for (let i = 0; i < this.options.length; i++) {
@@ -2148,7 +2120,7 @@ copies or substantial portions of the Software.
         },
         oneditsave: function () {
             if (RED._cron_plus_debug) { console.log('oneditsave - cronplus') }
-            removeEventListener("fullscreenchange", updateScheduleExpandButton);
+            removeEventListener("fullscreenchange", onSchedulesExpandCompress);
             const node = this
             const options = $('#node-input-option-container').children()
             delete node.persistDynamic // remove deprecated property
@@ -2192,7 +2164,7 @@ copies or substantial portions of the Software.
         },
         oneditcancel: function() {
             if (RED._cron_plus_debug) { console.log('oneditcancel - cronplus') }
-            removeEventListener("fullscreenchange", updateScheduleExpandButton);
+            removeEventListener("fullscreenchange", onSchedulesExpandCompress);
             $('#node-input-timeZone').off()
             $('#node-input-crontab').off()
         },
@@ -2341,13 +2313,19 @@ function _popoutCronPlusHelp(tag) {
     )
 }
 
-function updateScheduleExpandButton () {
+function onSchedulesExpandCompress () {
     const selector = '#node-cronplus-tab-static-schedules'
+    const el = $(selector)
     const $buttonExpandIcon = $('#cronplus-expand-schedules-button').find('i.fa')
-    if ($(selector).css('position') === 'fixed' || document.fullscreenElement) {
+    const isBig = el.css('position') === 'fixed' || document.fullscreenElement;
+    if (isBig) {
+        // is big - set the icon to compress & hide certain elements
         $buttonExpandIcon.removeClass('fa-expand').addClass('fa-compress')
+        $('#node-input-show-dynamic').addClass('cron-plus-vanish-element')
     } else {
+        // is small - set the icon to expand & show elements
         $buttonExpandIcon.removeClass('fa-compress').addClass('fa-expand')
+        $('#node-input-show-dynamic').removeClass('cron-plus-vanish-element')
     }
 }
 
@@ -2459,8 +2437,9 @@ function updateScheduleExpandButton () {
             visibility: hidden;
         }
         .cron-plus-fullscreen-element {
-            padding: '15px';
+            padding: 15px;
             z-index: 99999;
+            background-color: var(--red-ui-form-background);
         }
         .cron-plus-expanded-element {
             position: fixed;
