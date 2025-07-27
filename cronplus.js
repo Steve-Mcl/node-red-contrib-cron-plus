@@ -1514,7 +1514,13 @@ module.exports = function (RED) {
                 let opCount = 0; let modified = false
                 if (task) {
                     modified = true
-                    opCount = task.node_count || 0
+                    opCount = (task.node_count || 0)
+                    // if this is an update or add command, then we will observe resetCounter flag
+                    // msg is only present when it is a user command
+                    if (msg && opt.resetCounter === true) {
+                        opCount = 0
+                    }
+                    opt.count = opCount
                     deleteTask(node, opt.name)
                 }
                 const taskCount = node.tasks ? node.tasks.length : 0
@@ -1620,7 +1626,9 @@ module.exports = function (RED) {
                     requestSerialisation()// request persistent state be written
                 })
             task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-            if (opt.dontStartTheTask !== true) {
+            if (opt.dontStartTheTask === true || isTaskFinished(task)) {
+                // do not start the task
+            } else {
                 task.start()
             }
             node.tasks.push(task)
