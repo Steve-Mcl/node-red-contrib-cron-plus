@@ -34,9 +34,10 @@ FEATURES
 * Full flexibility & dynamic control. 
   * Ability to control via simple topic commands. Examples include...
     * remove, remove-all, remove-all-dynamic, remove-all-static, remove-active, remove-active-dynamic, remove-active-static, remove-inactive, remove-inactive-dynamic, remove-inactive-static
-    * list, list-all, list-all-dynamic, list-all-static, list-active, list-active-dynamic, list-active-static, list-inactive, list-inactive-dynamic, list-inactive-static
     * export, export-all, export-all-dynamic, export-all-static, export-active, export-active-dynamic, export-active-static, export-inactive, export-inactive-dynamic, export-inactive-static
+    * list, list-all, list-all-dynamic, list-all-static, list-active, list-active-dynamic, list-active-static, list-inactive, list-inactive-dynamic, list-inactive-static
     * status, status-all, status-all-dynamic, status-all-static, status-active, status-active-dynamic, status-active-static, status-inactive, status-inactive-dynamic, status-inactive-static
+      * status is an alias for list
     * stop, stop-all, stop-all-dynamic, stop-all-static
     * start, start-all, start-all-dynamic, start-all-static
     * pause, pause-all, pause-all-dynamic, pause-all-static
