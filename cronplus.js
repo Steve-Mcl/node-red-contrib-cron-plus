@@ -1514,7 +1514,11 @@ module.exports = function (RED) {
                 let opCount = 0; let modified = false
                 if (task) {
                     modified = true
-                    opCount = task.node_count || 0
+                    opCount = (task.node_count || 0)
+                    if (Object.prototype.hasOwnProperty.call(opt, 'count') && typeof opt.count === 'number' && opt.count >= 0) {
+                        opCount = opt.count
+                    }
+                    opt.count = opCount
                     deleteTask(node, opt.name)
                 }
                 const taskCount = node.tasks ? node.tasks.length : 0
@@ -1571,7 +1575,6 @@ module.exports = function (RED) {
             task.node_expression = opt.expression
             task.node_payloadType = opt.payloadType
             task.node_payload = opt.payload
-            task.node_count = opt.count || 0
             task.node_locationType = opt.locationType
             task.node_location = opt.location
             task.node_solarType = opt.solarType
@@ -1579,7 +1582,11 @@ module.exports = function (RED) {
             task.node_offset = opt.offset
             task.node_index = index
             task.node_opt = opt
-            task.node_limit = opt.limit || 0
+            task.node_limit = typeof opt.limit === 'number' ? opt.limit : 0
+            task.node_count = typeof opt.count === 'number' ? opt.count : 0
+            if (task.node_limit > 0 && task.node_count > task.node_limit) {
+                task.node_count = task.node_limit
+            }
             task.stop()
             task.on('run', (timestamp) => {
                 node.debug(`running '${task.name}' ~ '${task.node_topic}'\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
@@ -1620,7 +1627,9 @@ module.exports = function (RED) {
                     requestSerialisation()// request persistent state be written
                 })
             task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-            if (opt.dontStartTheTask !== true) {
+            if (opt.dontStartTheTask === true || isTaskFinished(task)) {
+                // do not start the task
+            } else {
                 task.start()
             }
             node.tasks.push(task)

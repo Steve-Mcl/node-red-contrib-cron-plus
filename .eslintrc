@@ -24,7 +24,7 @@
         "indent": ["error", 4],
         "object-shorthand": ["error"],
         "no-console": ["error", { "allow": ["debug", "info", "warn", "error"] }],
-
+        "no-trailing-spaces": ["error"],
         // plugin:no-only-tests
         "no-only-tests/no-only-tests": "error"
 
