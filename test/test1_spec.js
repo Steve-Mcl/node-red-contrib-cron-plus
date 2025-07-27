@@ -4,7 +4,7 @@ const cronplusNode = require('../cronplus.js')
 
 /* global describe, it, beforeEach, afterEach */
 
-// helper.init(require.resolve('node-red'))
+helper.init(require.resolve('node-red'))
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 describe('cron-plus Node', function () {
