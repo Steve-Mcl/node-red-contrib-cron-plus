@@ -2970,7 +2970,7 @@ msg.payload = "name"; //  name of the schedule</code></pre>
         </dd>
         <dd>GENERAL NOTES...<br>
             <ul>
-                <li>Adding a schedule with the same name as an existing schedule will replace the existing one</li>
+                <li>Adding a schedule with the same name as an existing schedule will update the existing one. If the task is finished (count has reached limit) its count will not be reset and it will not be restarted automatically unless the "add"/"update" command options include the flag <code>resetCounter: true</code></li>
                 <li>Adding a schedule with property <code>"limit":3</code> will cause that schedule to be stopped after the third trigger. It can be started again by injecting a payload of <code>{"command":"start" "name": "schedule name"}</code></li>
                 <li>Static (UI added) schedules can be also be updated by using the name specified in the UI</li>
                 <li>When a cron-plus-plus node is modified and deployed (or node-red is restarted), dynamic entries are discarded and must be injected again</li>
