@@ -1317,6 +1317,7 @@ module.exports = function (RED) {
                         break
                     }
                 }
+                done()
             } catch (error) {
                 done(error)
                 // node.error(error,msg);
