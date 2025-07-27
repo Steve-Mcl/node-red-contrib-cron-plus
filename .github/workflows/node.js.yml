@@ -17,20 +17,19 @@ jobs:
     strategy:
       matrix:
         node-version: [18.x, 20.x, 22.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
+    - uses: actions/checkout@v4
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v2
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm' # Step 2: Use npm caching for faster dependency installs.
 
     - name: Install Node.js dependencies
-      run: npm ci # Step 3: Perform a clean install of Node.js dependencies.
-      
+      run: npm ci
+
+    - name: Run lint
+      run: npm run lint
+
     - name: Run tests
-      run: npm test # Step 4: Run tests using the specified Node.js version
+      run: npm test

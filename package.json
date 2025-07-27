@@ -4,7 +4,9 @@
     "description": "A flexible scheduler (cron, solar events, fixed dates) node for Node-RED with full dynamic control and time zone support",
     "main": "cronplus.js",
     "scripts": {
-        "test": "mocha \"test/**/*_spec.js\"",
+        "test": "mocha \"test/**/*_spec.js\" --exit",
+        "lint": "eslint -c .eslintrc --ext js,html \"*.js\" \"*.html\"",
+        "lint:fix": "eslint -c .eslintrc --ext js,html \"*.js\"  \"*.html\" --fix",
         "publish": "npm publish"
     },
     "repository": {
@@ -56,6 +58,7 @@
         "eslint-plugin-n": "^16.6.2",
         "eslint-plugin-standard": "^5.0.0",
         "node-red-node-test-helper": "^0.3.4",
+        "node-red": "^3.0.0",
         "eslint-plugin-no-only-tests": "^3.1.0",
         "mocha": "^11.6.0",
         "should": "^13.2.3",

@@ -1,0 +1,32 @@
+{
+    "root": true,
+    "globals": {
+        "monaco": true,
+        "RED": true
+    },
+    "env": {
+        "browser": true,
+        "commonjs": true,
+        "es2021": true,
+        "mocha": true,
+        "jquery": true
+    },
+    "extends": [
+        "eslint:recommended", 
+        "standard"
+    ],
+    "plugins": [ "eslint-plugin-html", "no-only-tests" ],
+    "parserOptions": {
+        "ecmaVersion": 12
+    },
+    "rules": {
+        // Built-in rules
+        "indent": ["error", 4],
+        "object-shorthand": ["error"],
+        "no-console": ["error", { "allow": ["debug", "info", "warn", "error"] }],
+
+        // plugin:no-only-tests
+        "no-only-tests/no-only-tests": "error"
+
+    }
+}
