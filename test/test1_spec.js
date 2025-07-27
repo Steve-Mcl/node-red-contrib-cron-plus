@@ -236,7 +236,7 @@ describe('cron-plus Node', function () {
             completeHelper = null
         })
 
-        function createAddScheduleMsg ({ name = 'dynCron', topic = 'dynCron', expression = '0 0 * * * * *', expressionType = 'cron', payloadType = 'default', limit = 1, resetCounter = false }) {
+        function createAddScheduleMsg ({ name = 'dynCron', topic = 'dynCron', expression = '0 0 * * * * *', expressionType = 'cron', payloadType = 'default', limit = 1, count = undefined }) {
             return {
                 payload: {
                     command: 'add',
@@ -246,7 +246,7 @@ describe('cron-plus Node', function () {
                     expressionType,
                     payloadType,
                     limit,
-                    resetCounter
+                    count
                 }
             }
         }
@@ -858,7 +858,7 @@ describe('cron-plus Node', function () {
             dyn1.status.should.have.property('count', 1)
             dyn1.status.should.have.property('isRunning', false)
         })
-        it('should reset count when finished schedule is updated (when resetCounter is true)', async function () {
+        it('should apply provided count when updating a task', async function () {
             this.timeout(7000)
             // setup add dyn-1
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 1, expression: '* * * * * * *' })) // every 1 seconds
@@ -877,7 +877,7 @@ describe('cron-plus Node', function () {
             await sleep(1100) // wait 1
             testNode.receive({ topic: 'status-inactive', payload: '' }) // check status of inactive schedules before stopping
             // replace dyn-1 with a new one
-            testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 1, expression: '* * * * * * *', resetCounter: true, topic: 'dyn-1-update' })) // every 1 seconds
+            testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 1, expression: '* * * * * * *', count: 0, topic: 'dyn-1-update' })) // every 1 seconds
             testNode.receive({ topic: 'status-all', payload: '' }) // check status of all schedules before stopping
 
             await resultPromise
@@ -894,6 +894,29 @@ describe('cron-plus Node', function () {
             dyn1.should.have.property('status').which.is.an.Object()
             dyn1.status.should.have.property('count', 0)
             dyn1.status.should.have.property('isRunning', true)
+        })
+        it('should apply provided count when creating a task (clamped by limit)', async function () {
+            this.timeout(7000)
+            // setup add dyn-1
+            testNode.receive(createAddScheduleMsg({ name: 'dyn-2', limit: 1, count: 2, expression: '* * * * * * *' })) // every 1 seconds
+
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+
+            testNode.receive({ topic: 'status-all', payload: '' })
+
+            const msg = await resultPromise
+
+            commandChecker(msg, { description: 'check count of schedules should be 4', send: { topic: 'status-all', payload: '' }, expected: { command: 'status-all', scheduleCount: 4 } })
+
+            const dyn1 = msg.payload.result.find(s => s.config.name === 'dyn-2')
+            should.exist(dyn1, 'dyn-2 should be in the result')
+            dyn1.should.have.property('status').which.is.an.Object()
+            dyn1.status.should.have.property('count', 1) // because the limit is 1, but the count is set to 2, it should be 1
+            dyn1.status.should.have.property('isRunning', false)
         })
         // test dynamic capabilities
         it('should add a schedule dynamically', async function () {
