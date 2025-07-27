@@ -1,8 +1,8 @@
+/// <reference types="should" />
 const should = require('should')
 const helper = require('node-red-node-test-helper')
 const cronplusNode = require('../cronplus.js')
-
-/* global describe, it, beforeEach, afterEach */
+const { describe, it, beforeEach, afterEach } = require('mocha')
 
 helper.init(require.resolve('node-red'))
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -870,6 +870,17 @@ describe('cron-plus Node', function () {
             result.should.have.property('topic', 'trigger')
             result.should.have.property('error').which.is.an.Object()
             result.error.should.have.property('message', 'Error: Manual Trigger failed. Cannot find schedule named \'schedule-non-existing\'')
+        })
+        it('should trigger complete node when triggering existing schedule', async function () {
+            const resultPromise = new Promise(resolve => {
+                completeHelper.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive({ topic: 'trigger', payload: 'schedule1' }) // fire input of testNode
+            const result = await resultPromise
+            result.should.have.property('payload', 'schedule1')
+            result.should.have.property('topic', 'trigger')
         })
     })
 })
