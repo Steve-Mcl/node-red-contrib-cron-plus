@@ -342,7 +342,7 @@ copies or substantial portions of the Software.
     // Plugin definition
     $.fn.cronBuilder = function (options) {
         return this.each(function () {
-            // eslint-disable-next-line no-new
+            // eslint-disable-next-line no-new, new-cap
             (new $.cronBuilder(this, options))
         })
     }
@@ -353,9 +353,9 @@ copies or substantial portions of the Software.
     let map, mapPopup, selectedLocation, selectedLocationInput
     const filesAdded = [] // list of files already added
 
-    function toggleFullscreen(selector, callback) {
+    function toggleFullscreen (selector, callback) {
         callback = callback || function () {}
-        const el = document.querySelector(selector || "#node-cronplus-tab-static-schedules");
+        const el = document.querySelector(selector || '#node-cronplus-tab-static-schedules')
         const $el = $(el)
         if (!document.fullscreenElement) {
             el.requestFullscreen().then(() => {
@@ -365,13 +365,13 @@ copies or substantial portions of the Software.
                 if (callback) {
                     callback(err)
                 } else {
-                    alert( `Unable to get fullscreen mode: ${err.message}`, );
+                    alert(`Unable to get fullscreen mode: ${err.message}`)
                 }
-            });
+            })
         } else {
             $el.removeClass('cron-plus-fullscreen-element').removeClass('cron-plus-expanded-element')
             try {
-                document.exitFullscreen();
+                document.exitFullscreen()
             } finally {
                 callback()
             }
@@ -524,7 +524,7 @@ copies or substantial portions of the Software.
             },
             // eslint-disable-next-line no-unused-vars
             close: function (event, ui) {
-                if (RED._cron_plus_debug) console.log('destroying map')
+                if (RED._cron_plus_debug) console.debug('destroying map')
                 if (map) map.remove()
             }
         })
@@ -532,7 +532,7 @@ copies or substantial portions of the Software.
 
     function createMap (srcInput) {
         if (RED._cron_plus_debug) {
-            console.log('createMap', srcInput)
+            console.debug('createMap', srcInput)
         }
         $('.cron-plus-map-loading').hide()
         if (!window.L || navigator.onLine === false) {
@@ -560,7 +560,7 @@ copies or substantial portions of the Software.
                 lon = arrLatlon[1]
             }
         }
-        if (RED._cron_plus_debug) console.log('createMap', lat, lon)
+        if (RED._cron_plus_debug) console.debug('createMap', lat, lon)
         let zoom = 3// by default, zoomed out
         let showPopupOnOpen = false
         if (lat && lon) {
@@ -569,9 +569,9 @@ copies or substantial portions of the Software.
         }
         lat = safeFloat(lat, 50.0)
         lon = safeFloat(lon, 0.0)
-        if (RED._cron_plus_debug) console.log('lat/lon', lat, lon)
+        if (RED._cron_plus_debug) console.debug('lat/lon', lat, lon)
         selectedLocation = window.L.latLng(lat, lon)
-        if (RED._cron_plus_debug) console.log('selectedLocation', selectedLocation.lat, selectedLocation.lng)
+        if (RED._cron_plus_debug) console.debug('selectedLocation', selectedLocation.lat, selectedLocation.lng)
 
         // create leaflet map
         map = window.L.map('cron-plus-map', {
@@ -582,7 +582,7 @@ copies or substantial portions of the Software.
         mapPopup = window.L.popup()
 
         map.on('click', function (e) {
-            if (RED._cron_plus_debug) console.log(e)
+            if (RED._cron_plus_debug) console.debug(e)
             const normaliseLat = function (x) {
                 while (x > 90.0 || x < -90.0) {
                     if (x > 90.0) { x = -(90.0 - (x - 90)) }
@@ -643,7 +643,7 @@ copies or substantial portions of the Software.
 
                 // eslint-disable-next-line no-unused-vars
                 layer.on('featureClick', function (e, latlng, pos, data, layer) {
-                    if (RED._cron_plus_debug) console.log('click', latlng, data)
+                    if (RED._cron_plus_debug) console.debug('click', latlng, data)
                 })
                 $('#cron-plus-map-dialog').dialog('option', 'position', { my: 'center', at: 'center', of: window })
             })
@@ -669,9 +669,9 @@ copies or substantial portions of the Software.
     }
 
     function updateEditorLayout () {
-         onSchedulesExpandCompress()
+        onSchedulesExpandCompress()
 
-        if (RED._cron_plus_debug) console.log('cronplus-updateEditorLayout')
+        if (RED._cron_plus_debug) console.debug('cronplus-updateEditorLayout')
         const scheduleList = $('#node-cronplus-tab-static-schedules')
         const scheduleListFullScreen = scheduleList.css('position') === 'fixed' || document.fullscreenElement
         if (scheduleListFullScreen) {
@@ -699,7 +699,7 @@ copies or substantial portions of the Software.
             this.input.addClass('red-ui-typedInput-input')
             this.elementDiv = $(this.input).wrap('<div>').parent().addClass('red-ui-typedInput-input-wrap')
             this.uiSelect = $(this.elementDiv).wrap($('<div>', { style: this.options.style })).parent()
-            
+
             const attrStyle = this.options.style || this.element.attr('style')
             this.uiWidth = this.input.outerWidth()
             this.input.css('paddingLeft', 5)
@@ -744,7 +744,7 @@ copies or substantial portions of the Software.
             this.menu = this._createMenu(this.options.menu)
         },
         _createMenu: function (options) {
-            if (RED._cron_plus_debug) console.log('combobox -> _createMenu  options:', options)
+            if (RED._cron_plus_debug) console.debug('combobox -> _createMenu  options:', options)
             const that = this
             this.disarmClick = false
             options = options || {}
@@ -1009,16 +1009,15 @@ copies or substantial portions of the Software.
         },
 
         oneditprepare: function () {
-            if (RED._cron_plus_debug) { console.log('oneditprepare - cronplus') }
+            if (RED._cron_plus_debug) { console.debug('oneditprepare - cronplus') }
             const node = this
             const dupCheck = {}
-            let selectedLocationInput = null
 
             node.commandResponseMsgOutput = ['output1', 'output2', 'fanOut'].indexOf(node.commandResponseMsgOutput) >= 0 ? node.commandResponseMsgOutput : 'output1'
 
             // eslint-disable-next-line no-undef
             initMap()
-            
+
             // inherit/upgrade deprecated properties from config
             const hasStoreNameProperty = Object.prototype.hasOwnProperty.call(node, 'storeName') && typeof node.storeName === 'string'
             const hasDeprecatedPersistDynamic = Object.prototype.hasOwnProperty.call(node, 'persistDynamic') && typeof node.persistDynamic === 'boolean'
@@ -1032,24 +1031,24 @@ copies or substantial portions of the Software.
             // populate store names
             const currentStore = node.storeName || ''
             $('#node-input-storeName').empty()
-            $('#node-input-storeName').append(`<option value="">None: Don't persist state</option>`)
-            $('#node-input-storeName').append(`<option value="file">File: local file system</option>`)
-            RED.settings.context.stores.forEach(function(item){
-                const defaultStore = RED.settings.hasOwnProperty('context') ? RED.settings.context.default : ''
+            $('#node-input-storeName').append('<option value="">None: Don\'t persist state</option>')
+            $('#node-input-storeName').append('<option value="file">File: local file system</option>')
+            RED.settings.context.stores.forEach(function (item) {
+                const defaultStore = Object.hasOwnProperty.call(RED.settings, 'context') ? RED.settings.context.default : ''
                 if (!item) {
                     return // skip empty store names
                 }
-                let name = item 
+                let name = item
                 if (item === defaultStore) {
                     name += ' (default)'
                 }
-                const opt = $(`<option value="${item}">${"Node Context: " + name}</option>`)
+                const opt = $(`<option value="${item}">${'Node Context: ' + name}</option>`)
                 $('#node-input-storeName').append(opt)
             })
 
             // if the store does not exist, add it to the dropdown and select it (appended with the text "NOT AVAILABLE!")
             if (currentStore && currentStore !== 'file' && RED.settings.context.stores.indexOf(currentStore) === -1) {
-                const opt = $(`<option selected disabled style="color: var(--red-ui-text-color-error) !important;" value="${currentStore}">${"Node Context: " + currentStore + " (INVALID)"}</option>`)
+                const opt = $(`<option selected disabled style="color: var(--red-ui-text-color-error) !important;" value="${currentStore}">${'Node Context: ' + currentStore + ' (INVALID)'}</option>`)
                 $('#node-input-storeName').append(opt)
             } else {
                 // select the current option
@@ -1057,7 +1056,7 @@ copies or substantial portions of the Software.
             }
 
             // // hook up the persistDynamic change event - enable/disable storeName select
-            // $("#node-input-persistDynamic").on("change", function(e) { 
+            // $("#node-input-persistDynamic").on("change", function(e) {
             //     // $("#node-input-storeName").prop("disabled", !$(this).prop("checked"))
             //     $('#node-input-storeName').toggle($(this).prop("checked"))
             // });
@@ -1168,7 +1167,7 @@ copies or substantial portions of the Software.
             }
 
             function drawDynamicSchedulesTable (nodeId, table, spinner, options, callback) {
-                if (RED._cron_plus_debug) console.log('drawDynamicSchedulesTable...')
+                if (RED._cron_plus_debug) console.debug('drawDynamicSchedulesTable...')
                 const $table = $(table)
                 const $spinner = $(spinner)
                 $table.hide()
@@ -1178,14 +1177,14 @@ copies or substantial portions of the Software.
                     type: 'POST',
                     url: 'cronplus/' + nodeId + '/getDynamic',
                     headers: {
-                        'Accept': 'application/json',
+                        Accept: 'application/json',
                         'Content-Type': 'application/json'
                     },
                     dataType: 'json',
                     data: '{}' // dummy data
                 })
                     .done(function (response) {
-                        if (RED._cron_plus_debug) console.log('cronplus/' + nodeId + '/getDynamic => response:', response)
+                        if (RED._cron_plus_debug) console.debug('cronplus/' + nodeId + '/getDynamic => response:', response)
 
                         options = options || {}
                         if (options.width) $table.width(options.width)
@@ -1195,7 +1194,7 @@ copies or substantial portions of the Software.
                         if (!response || !response.length) {
                             $spinner.hide()
                             $table.show()
-                            $('<div/>' + (options.emptyMessage || 'no data') + '<div>').css({padding: '12px', 'font-size': '24px'}).appendTo($table)
+                            $('<div/>' + (options.emptyMessage || 'no data') + '<div>').css({ padding: '12px', 'font-size': '24px' }).appendTo($table)
                             return
                         }
 
@@ -1375,7 +1374,7 @@ copies or substantial portions of the Software.
 
             const dnRepositionResize = function () {
                 const w = ($(document).width() < 1025) ? '95%' : '60%'
-                if (RED._cron_plus_debug) console.log('dialog-open-drawDynamicSchedulesTable done - should now center and resize width', w)
+                if (RED._cron_plus_debug) console.debug('dialog-open-drawDynamicSchedulesTable done - should now center and resize width', w)
                 $('#cron-plus-dynamic-nodes-dialog').dialog('option', 'width', w)
                 $('#cron-plus-dynamic-nodes-dialog').dialog('option', 'position', { my: 'center', at: 'center', of: window })
             }
@@ -1421,7 +1420,7 @@ copies or substantial portions of the Software.
                 type: 'POST',
                 url: 'cronplus/0/tz',
                 headers: {
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'Content-Type': 'application/json'
                 },
                 dataType: 'json',
@@ -1572,7 +1571,7 @@ copies or substantial portions of the Software.
              * @param {object} option The option object to present
             */
             function generateOption (optionIndex, option) {
-                if (RED._cron_plus_debug) { console.log('generating option', optionIndex, option) }
+                if (RED._cron_plus_debug) { console.debug('generating option', optionIndex, option) }
                 applyOptionDefaults(optionIndex, option)
                 function buildExpressionTip (title, desc, text, type) {
                     const helpFunc = type === 'solar' ? 'showSolarHelp();' : 'showCronHelp();'
@@ -1590,7 +1589,7 @@ copies or substantial portions of the Software.
                         selector = selector.typedInput('instance').input
                     }
                     const $selector = $(selector)
-                    //clear any title attr to prevent default tooltip & permit the jquery tooltip plugin to work
+                    // clear any title attr to prevent default tooltip & permit the jquery tooltip plugin to work
                     $selector.attr('title', ' ')
                     $selector.off('mouseenter').tooltip({
                         show: { effect: 'fade' },
@@ -1601,25 +1600,25 @@ copies or substantial portions of the Software.
                         },
                         disabled: true
                     }).off('focusout').off('mouseleave').mouseleave(function (e) {
-                        if (RED._cron_plus_debug) console.log('initTooltip--mouseleave')
+                        if (RED._cron_plus_debug) console.debug('initTooltip--mouseleave')
                         if ($selector.is(':focus')) {
-                            if (RED._cron_plus_debug) console.log("initTooltip--mouseleave selector:is(':focus')")
+                            if (RED._cron_plus_debug) console.debug("initTooltip--mouseleave selector:is(':focus')")
                             e.preventDefault()
                             e.stopImmediatePropagation()
                             // selector.tooltip('open');
                             return false
                         }
                     }).on('blur', function (e) {
-                        if (RED._cron_plus_debug) console.log('initTooltip-->on-blur.  relatedTarget:', e.relatedTarget)
+                        if (RED._cron_plus_debug) console.debug('initTooltip-->on-blur.  relatedTarget:', e.relatedTarget)
                         if (e.relatedTarget && e.relatedTarget.id === 'cron-plus-tt-help-button') {
-                            if (RED._cron_plus_debug) console.log('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-link-button"')
+                            if (RED._cron_plus_debug) console.debug('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-link-button"')
                             if (type === 'cron') { showCronHelp() } else if (type === 'solar') { showSolarHelp() }
                             $(this).focus()
                             return false
                         }
                         $(this).tooltip('close').tooltip('disable')
                     }).on('focusin change keyup', function (e) {
-                        if (RED._cron_plus_debug) console.log('initTooltip--focusin change keyup', e)
+                        if (RED._cron_plus_debug) console.debug('initTooltip--focusin change keyup', e)
                         const $this = $(this)
 
                         const $timeZone = $('#node-input-timeZone')
@@ -1652,7 +1651,7 @@ copies or substantial portions of the Software.
                             disabled: false,
                             show: { effect: 'fade' },
                             content: function (callback) {
-                                if (RED._cron_plus_debug) console.log('initTooltip-->content')
+                                if (RED._cron_plus_debug) console.debug('initTooltip-->content')
 
                                 const solarType = $solarEvents.typedInput('type')
                                 const solarEvents = $solarEvents.typedInput('value')
@@ -1705,19 +1704,19 @@ copies or substantial portions of the Software.
                                     titleHtml = (expr) => 'Description of <span class="cron-plus-expression">' + expr.slice(0, 50) + (expr.length > 50 ? '...' : '') + '</span>'
                                     e.expression = expression
                                 }
-                                if (RED._cron_plus_debug) console.log('initTooltip-->Ajax start, e...', e)
+                                if (RED._cron_plus_debug) console.debug('initTooltip-->Ajax start, e...', e)
                                 $.ajax({
                                     type: 'POST',
                                     url: `cronplus/${node.id}/expressionTip`,
                                     headers: {
-                                        'Accept': 'application/json',
+                                        Accept: 'application/json',
                                         'Content-Type': 'application/json'
                                     },
                                     dataType: 'json',
                                     data: JSON.stringify(e)
                                 })
                                     .done(function (data) {
-                                        if (RED._cron_plus_debug) console.log('initTooltip-->Ajax done, data...', data)
+                                        if (RED._cron_plus_debug) console.debug('initTooltip-->Ajax done, data...', data)
                                         let nextInfo = ''
                                         const desc = data.description
                                         if (data.prettyNext) {
@@ -1740,7 +1739,7 @@ copies or substantial portions of the Software.
                                         }
                                         const okContent = function () {
                                             setTimeout(function () {
-                                                if (RED._cron_plus_debug) console.log('initTooltip-->callback-->setTimeout--> option-->position')
+                                                if (RED._cron_plus_debug) console.debug('initTooltip-->callback-->setTimeout--> option-->position')
                                                 $this.tooltip('option', 'position', pos)
                                                 $this.tooltip('enable').tooltip('open')
                                                 $this.tooltip('option', 'position', pos)
@@ -1760,7 +1759,7 @@ copies or substantial portions of the Software.
                         })
                     })
                 }
-                if (RED._cron_plus_debug) { console.log('setting up schedule fields') }
+                if (RED._cron_plus_debug) { console.debug('setting up schedule fields') }
                 // styles for the option row 1
                 const nameStyle = 'display: flex; flex-grow: 0; flex-basis:128px; margin-right:5px;'
                 const topicStyle = 'display: flex; flex-grow: 1; flex-basis: 140px; margin-right: 5px;'
@@ -1784,10 +1783,10 @@ copies or substantial portions of the Software.
                 const controlsContainer = $('<span/>', { style: controlsContainerStyle }).appendTo(container)
                 const deleteButton = $('<a/>', { href: '#', class: 'editor-button editor-button-small', style: '' }).appendTo(controlsContainer)
                 $('<i/>', { class: 'fa fa-remove' }).appendTo(deleteButton)
-                RED.popover.tooltip(deleteButton, 'Delete');
+                RED.popover.tooltip(deleteButton, 'Delete')
                 const sortHandle = $('<a/>', { href: '#', class: 'editor-button editor-button-small node-input-option-handle', style: 'cursor: grab' }).appendTo(controlsContainer)
                 $('<i/>', { class: 'fa fa-bars' }).appendTo(sortHandle)
-                RED.popover.tooltip(sortHandle, 'Move');
+                RED.popover.tooltip(sortHandle, 'Move')
 
                 // #### ROW 1 ####
                 const row1 = $('<div style="display: flex; margin: 0px 0px 5px 0px"/>').appendTo(container)
@@ -1826,10 +1825,9 @@ copies or substantial portions of the Software.
                 scheduleTypeField.val(scheduleType)
                 scheduleTypeField.prop('title', 'Expression Type')
 
-                // generate cell2 
-                const cell2Cron = $('<div>', { style: row2Col2Style}).appendTo(row2)
-                const cell2Solar = $('<div>', { style: row2Col2Style}).appendTo(row2)
-
+                // generate cell2
+                const cell2Cron = $('<div>', { style: row2Col2Style }).appendTo(row2)
+                const cell2Solar = $('<div>', { style: row2Col2Style }).appendTo(row2)
 
                 // generate a combo for cron expression
                 const expression = option.expression == null ? '0 * * * * * *' : option.expression
@@ -1935,41 +1933,6 @@ copies or substantial portions of the Software.
                 })
                 locationField.typedInput('value', option.location || '')
 
-                // const locationGroup = $('<div class="red-ui-typedInput-container node-input-option-location" style="' + locationStyle + '">' +
-                //     '<button class="red-ui-typedInput-type-select" style="width:25px" title="Show Map..."><i class="fa fa-map-marker "> </i></button>' +
-                //     '<div class="red-ui-typedInput-input red-ui-typedInput-input-wrap" style="left: 25px; right: 0px;">' +
-                //     '<input class="red-ui-typedInput-input node-input-option-location" type="text" value="" placeholder="lat lng"></div> </div>')
-                // const locationField = locationGroup.find('input')
-                // const locationButton = locationGroup.find('button')
-                // locationField.prop('title', 'Location coordinates...')
-                // locationButton.prop('title', 'Show Map...')
-                // if (!option.location) {
-                //     locationGroup.addClass('input-error')
-                // } else {
-                //     locationField.val(option.location)
-                // }
-                // locationGroup.appendTo(cell2)
-
-                // locationButton.on('click', function () {
-                //     $('#cron-plus-map-dialog').dialog('open')
-                //     selectedLocationInput = $(this).closest('li').find('.node-input-option-location')
-                //     if (navigator.onLine === true) {
-                //         $('.cron-plus-map-not-loaded').show()
-                //         $('.cron-plus-map-loading').hide()
-                //         $('#cron-plus-map').hide()
-                //         const proto = location.protocol === 'https:' ? location.protocol : 'http:'
-                //         checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css', 'css', function () {
-                //             checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js', 'js', function () {
-                //             })
-                //             createMap(selectedLocationInput)
-                //         })
-                //     } else {
-                //         $('.cron-plus-map-not-loaded').show()
-                //         $('.cron-plus-map-loading').hide()
-                //         $('#cron-plus-map').hide()
-                //     }
-                // })
-
                 // offset fields
                 const offsetField = $('<input/>', { class: 'node-input-option-offset', type: 'number', min: -1439, max: 1439, style: solarOffsetStyle, value: option.offset || 0, placeholder: 'offset' }).appendTo(cell2Solar)
                 offsetField.prop('title', 'Minutes Offset +/- 1439')
@@ -1979,16 +1942,6 @@ copies or substantial portions of the Software.
                 initTooltip(locationField, 'solar', { my: 'middle top', at: 'middle bottom+5', of: cell2Solar, collision: 'flipfit' })
                 initTooltip(expressionField, 'cron', { my: 'middle top', at: 'middle bottom+5', of: cell2Cron, collision: 'flipfit' })
 
-                // locationField.keyup(function () {
-                //     const f = $(this)
-                //     const fg = locationGroup
-                //     if (f.val() && fg.hasClass('input-error')) {
-                //         fg.removeClass('input-error')
-                //     } else if (!f.val()) {
-                //         fg.addClass('input-error')
-                //     }
-                // })
-
                 nameField.keyup(function () {
                     if ($(this).val() && $(this).hasClass('input-error')) {
                         $(this).removeClass('input-error')
@@ -1996,14 +1949,6 @@ copies or substantial portions of the Software.
                         $(this).addClass('input-error')
                     }
                 })
-
-                // locationField.change(function () {
-                //     if ($(this).val() && locationGroup.hasClass('input-error')) {
-                //         locationGroup.removeClass('input-error')
-                //     } else if (!$(this).val()) {
-                //         locationGroup.removeClass('input-error')
-                //     }
-                // })
 
                 topicField.keyup(function () {
                     if ($(this).val() && $(this).hasClass('input-error')) {
@@ -2028,7 +1973,7 @@ copies or substantial portions of the Software.
                         cell2Cron.hide()
                         cell2Solar.show()
                         break
-                        case 'dates':
+                    case 'dates':
                         cell2Cron.show()
                         cell2Solar.hide()
                         expressionField.combobox('hideMenu')
@@ -2057,8 +2002,8 @@ copies or substantial portions of the Software.
                 $('#cron-plus-dynamic-nodes-dialog').dialog('open')
             })
 
-            removeEventListener("fullscreenchange", onSchedulesExpandCompress);
-            addEventListener("fullscreenchange", onSchedulesExpandCompress)
+            removeEventListener('fullscreenchange', onSchedulesExpandCompress)
+            addEventListener('fullscreenchange', onSchedulesExpandCompress)
 
             $('#cronplus-expand-schedules-button').click(function (evt) {
                 const selector = '#node-cronplus-tab-static-schedules'
@@ -2070,13 +2015,13 @@ copies or substantial portions of the Software.
 
                 // if shift key or middle mouse button or already full screen then toggle full screen
                 if (evt.shiftKey || evt.button === 1 /* middle button */ || document.fullscreenElement) {
-                    toggleFullscreen(selector, function (err) {
+                    toggleFullscreen(selector, function (_err) {
                         updateEditorLayout()
                     })
                 } else {
-                    //CSS expansion/contraction
+                    // CSS expansion/contraction
                     const el = $(selector)
-                    const isSmall = el.css('position') !== 'fixed' && !document.fullscreenElement;
+                    const isSmall = el.css('position') !== 'fixed' && !document.fullscreenElement
                     if (isSmall) {
                         // is small - make it big
                         el.addClass('cron-plus-expanded-element').removeClass('cron-plus-fullscreen-element')
@@ -2103,11 +2048,12 @@ copies or substantial portions of the Software.
                 cursor: 'grabbing',
                 cursorAt: { right: 5 },
                 // placeholder: "ui-corner-all"
-                snap: "#node-input-option-container", snapMode: "inner",
+                snap: '#node-input-option-container',
+                snapMode: 'inner',
                 forceHelperSize: true,
                 forcePlaceholderSize: true,
                 tolerance: 'pointer',
-                appendTo:  $('#node-input-option-container'),
+                appendTo: $('#node-input-option-container')
             })
 
             updateEditorLayout()
@@ -2116,11 +2062,10 @@ copies or substantial portions of the Software.
             setTimeout(function () {
                 $('#node-cronplus-tab-static-schedules').css('max-width', '')
             }, 200)
-
         },
         oneditsave: function () {
-            if (RED._cron_plus_debug) { console.log('oneditsave - cronplus') }
-            removeEventListener("fullscreenchange", onSchedulesExpandCompress);
+            if (RED._cron_plus_debug) { console.debug('oneditsave - cronplus') }
+            removeEventListener('fullscreenchange', onSchedulesExpandCompress)
             const node = this
             const options = $('#node-input-option-container').children()
             delete node.persistDynamic // remove deprecated property
@@ -2162,9 +2107,9 @@ copies or substantial portions of the Software.
             $('#node-input-timeZone').off()
             $('#node-input-crontab').off()
         },
-        oneditcancel: function() {
-            if (RED._cron_plus_debug) { console.log('oneditcancel - cronplus') }
-            removeEventListener("fullscreenchange", onSchedulesExpandCompress);
+        oneditcancel: function () {
+            if (RED._cron_plus_debug) { console.debug('oneditcancel - cronplus') }
+            removeEventListener('fullscreenchange', onSchedulesExpandCompress)
             $('#node-input-timeZone').off()
             $('#node-input-crontab').off()
         },
@@ -2179,7 +2124,7 @@ copies or substantial portions of the Software.
                 return !this.changed
             },
             onclick: function () {
-                if  (RED._cron_plus_debug) { console.log('button.onclick - cronplus') }
+                if (RED._cron_plus_debug) { console.debug('button.onclick - cronplus') }
                 const node = this
                 if (node.changed) {
                     return RED.notify(RED._('notification.warning', { message: RED._('notification.warnings.undeployedChanges') }), 'warning')
@@ -2230,7 +2175,8 @@ copies or substantial portions of the Software.
     })
 })(jQuery)
 
-function _popoutCronPlusHelp(tag) {
+// eslint-disable-next-line no-unused-vars
+function _popoutCronPlusHelp (tag) {
     const startTag = (name) => `<${name}>`
     const endTag = (name) => `</${name}>`
     const winHtml = `
@@ -2249,7 +2195,7 @@ function _popoutCronPlusHelp(tag) {
             ${endTag('head')}
             ${startTag('body')}
                 ${startTag('script')}
-                    const styles = ${JSON.stringify([].map.call(document.querySelectorAll('[rel="stylesheet"]'), e =>  e.href ))}
+                    const styles = ${JSON.stringify([].map.call(document.querySelectorAll('[rel="stylesheet"]'), e => e.href))}
                     const head = document.head || document.getElementsByTagName('head')[0]
                     styles.forEach(href => {
                         const el = document.createElement('link');
@@ -2302,11 +2248,11 @@ function _popoutCronPlusHelp(tag) {
             ${endTag('body')}
         ${endTag('html')}`
 
-    const BOM = new Uint8Array([0xEF,0xBB,0xBF])
+    const BOM = new Uint8Array([0xEF, 0xBB, 0xBF])
     const winUrl = URL.createObjectURL(
-        new Blob([BOM, winHtml], { encoding:"UTF-8",type:"text/html;charset=UTF-8" })
+        new Blob([BOM, winHtml], { encoding: 'UTF-8', type: 'text/html;charset=UTF-8' })
     )
-    const win = window.open(
+    window.open(
         winUrl + (tag ? '#' + tag : ''),
         'win',
         'width=800,height=600'
@@ -2317,7 +2263,7 @@ function onSchedulesExpandCompress () {
     const selector = '#node-cronplus-tab-static-schedules'
     const el = $(selector)
     const $buttonExpandIcon = $('#cronplus-expand-schedules-button').find('i.fa')
-    const isBig = el.css('position') === 'fixed' || document.fullscreenElement;
+    const isBig = el.css('position') === 'fixed' || document.fullscreenElement
     if (isBig) {
         // is big - set the icon to compress & hide certain elements
         $buttonExpandIcon.removeClass('fa-expand').addClass('fa-compress')
@@ -2328,7 +2274,6 @@ function onSchedulesExpandCompress () {
         $('#node-input-show-dynamic').removeClass('cron-plus-vanish-element')
     }
 }
-
 </script>
 
 <script type="text/html" data-template-name="cronplus">

@@ -1657,7 +1657,7 @@ module.exports = function (RED) {
                         fs.writeFileSync(filePath, fileData)
                     } catch (err) {
                         node.error(`An error occurred while writing state to file '${filePath}' - (${err.message})`)
-                        return
+                        // return
                     }
                 } else {
                     const contextKey = 'state'

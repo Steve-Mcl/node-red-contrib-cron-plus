@@ -5,6 +5,8 @@
     "main": "cronplus.js",
     "scripts": {
         "test": "mocha \"test/**/*_spec.js\" --exit",
+        "lint": "eslint -c .eslintrc --ext js,html \"*.js\" \"*.html\"",
+        "lint:fix": "eslint -c .eslintrc --ext js,html \"*.js\"  \"*.html\" --fix",
         "publish": "npm publish"
     },
     "repository": {
