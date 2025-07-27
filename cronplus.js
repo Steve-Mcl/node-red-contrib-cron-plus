@@ -1515,10 +1515,8 @@ module.exports = function (RED) {
                 if (task) {
                     modified = true
                     opCount = (task.node_count || 0)
-                    // if this is an update or add command, then we will observe resetCounter flag
-                    // msg is only present when it is a user command
-                    if (msg && opt.resetCounter === true) {
-                        opCount = 0
+                    if (Object.prototype.hasOwnProperty.call(opt, 'count') && typeof opt.count === 'number' && opt.count >= 0) {
+                        opCount = opt.count
                     }
                     opt.count = opCount
                     deleteTask(node, opt.name)
@@ -1577,7 +1575,6 @@ module.exports = function (RED) {
             task.node_expression = opt.expression
             task.node_payloadType = opt.payloadType
             task.node_payload = opt.payload
-            task.node_count = opt.count || 0
             task.node_locationType = opt.locationType
             task.node_location = opt.location
             task.node_solarType = opt.solarType
@@ -1585,7 +1582,11 @@ module.exports = function (RED) {
             task.node_offset = opt.offset
             task.node_index = index
             task.node_opt = opt
-            task.node_limit = opt.limit || 0
+            task.node_limit = typeof opt.limit === 'number' ? opt.limit : 0
+            task.node_count = typeof opt.count === 'number' ? opt.count : 0
+            if (task.node_limit > 0 && task.node_count > task.node_limit) {
+                task.node_count = task.node_limit
+            }
             task.stop()
             task.on('run', (timestamp) => {
                 node.debug(`running '${task.name}' ~ '${task.node_topic}'\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
