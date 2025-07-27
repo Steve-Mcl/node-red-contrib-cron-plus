@@ -1144,6 +1144,7 @@ module.exports = function (RED) {
                             sendCommandResponse(newMsg)
                         }
                         break
+                    case 'list': // single
                     case 'status': // single
                         {
                             const task = getTask(node, cmd.name)
