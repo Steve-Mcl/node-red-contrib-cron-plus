@@ -1,6 +1,6 @@
 {
     "name": "node-red-contrib-cron-plus",
-    "version": "2.1.0",
+    "version": "2.2.0",
     "description": "A flexible scheduler (cron, solar events, fixed dates) node for Node-RED with full dynamic control and time zone support",
     "main": "cronplus.js",
     "scripts": {
@@ -15,15 +15,21 @@
     },
     "keywords": [
         "node-red",
+        "schedule",
         "scheduler",
         "timer",
+        "timer node",
         "cron",
         "cronplus",
         "cron plus",
         "cron-plus",
         "crontab",
-        "timer",
+        "sun",
+        "solar",
+        "solar event",
+        "solar events",
         "suntime",
+        "sun time",
         "sunrise",
         "sunset"
     ],
