@@ -5,18 +5,17 @@ const cronplusNode = require('../cronplus.js')
 /* global describe, it, beforeEach, afterEach */
 
 helper.init(require.resolve('node-red'))
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 describe('cron-plus Node', function () {
     'use strict'
 
     beforeEach(done => { helper.startServer(done) })
 
-    afterEach(async () => {
-        if (helper) {
-            await helper.clearFlows()
-            await helper.unload()
-            helper.stopServer()
-        }
+    afterEach((done) => {
+        helper.unload().then(() => {
+            helper.stopServer(done)
+        })
     })
 
     it('should inject within 1 sec from cron expression * * * * * * *', function (done) {
@@ -153,455 +152,724 @@ describe('cron-plus Node', function () {
     // ]
     // basicTest('topic7', 'payload', 'default', '', 'default', results3, opts3)
 
-    const getTestFlow = (nodeName = 'testNode') => {
-        return [
-            { id: 'helperNode1', type: 'helper' },
-            { id: 'helperNode2', type: 'helper' },
-            { id: 'helperNode3', type: 'helper' },
-            { id: 'helperNode4', type: 'helper' },
-            { id: 'helperNode5', type: 'helper' },
-            {
-                id: nodeName,
-                type: 'cronplus',
-                name: '',
-                outputField: 'payload',
-                timeZone: '',
-                persistDynamic: false,
-                commandResponseMsgOutput: 'fanOut',
-                outputs: 5,
-                options: [
-                    { name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 * * * * * *', location: '', offset: '0' },
-                    { name: 'schedule2', topic: 'schedule2', payloadType: 'default', payload: '', expressionType: 'dates', expression: [Date.now() + 60000, Date.now() + 120000], location: '', offset: '0' },
-                    { name: 'schedule3', topic: 'schedule3', payloadType: 'default', payload: '', expressionType: 'solar', expression: '0 * * * * * *', location: '55.0 -1.418', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }
-                ],
-                wires: [['helperNode1'], ['helperNode2'], ['helperNode3'], ['helperNode4'], ['helperNode5']]
-            }
-        ]
-    }
-
-    it('should generate various values to 5 outputs (fan out test)', done => {
+    describe('extended tests', function () {
         const cronNodeName = 't3n1'
+
+        const getTestFlow = (nodeName = 'testNode') => {
+            return [
+                { id: 'helperNode1', type: 'helper' },
+                { id: 'helperNode2', type: 'helper' },
+                { id: 'helperNode3', type: 'helper' },
+                { id: 'helperNode4', type: 'helper' },
+                { id: 'helperNode5', type: 'helper' },
+                { id: 'catchHelper', type: 'helper' },
+                { id: 'completeHelper', type: 'helper' },
+                {
+                    id: nodeName,
+                    type: 'cronplus',
+                    name: '',
+                    outputField: 'payload',
+                    timeZone: '',
+                    persistDynamic: false,
+                    commandResponseMsgOutput: 'fanOut',
+                    outputs: 5,
+                    options: [
+                        { name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 * * * * * *', location: '', offset: '0' },
+                        { name: 'schedule2', topic: 'schedule2', payloadType: 'default', payload: '', expressionType: 'dates', expression: [Date.now() + 60000, Date.now() + 120000], location: '', offset: '0' },
+                        { name: 'schedule3', topic: 'schedule3', payloadType: 'default', payload: '', expressionType: 'solar', expression: '0 * * * * * *', location: '55.0 -1.418', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }
+                    ],
+                    wires: [['helperNode1'], ['helperNode2'], ['helperNode3'], ['helperNode4'], ['helperNode5']]
+                },
+                { id: 'catchNode1', type: 'catch', name: '', scope: [nodeName], uncaught: false, wires: [['catchHelper']] },
+                { id: 'completeNode1', type: 'complete', name: '', scope: [nodeName], wires: [['completeHelper']] }
+            ]
+        }
         const flow = getTestFlow(cronNodeName)
-        this.timeout(2000) // timeout with an error if done() isn't called within one second
+        /** @type {nodeRed.Node<{}>} */ let helperNode1 = null
+        /** @type {nodeRed.Node<{}>} */ let helperNode2 = null
+        /** @type {nodeRed.Node<{}>} */ let helperNode3 = null
+        /** @type {nodeRed.Node<{}>} */ let helperNode4 = null
+        /** @type {nodeRed.Node<{}>} */ let helperNode5 = null
+        /** @type {nodeRed.Node<{}>} */ let testNode = null
+        /** @type {nodeRed.Node<{}>} */ let catchNode1 = null
+        /** @type {nodeRed.Node<{}>} */ let catchHelper = null
+        /** @type {nodeRed.Node<{}>} */ let completeNode1 = null
+        /** @type {nodeRed.Node<{}>} */ let completeHelper = null
 
-        helper.load(cronplusNode, flow, function () {
-            try {
-                const helperNode1 = helper.getNode('helperNode1')
-                const helperNode2 = helper.getNode('helperNode2')
-                const helperNode3 = helper.getNode('helperNode3')
-                const helperNode4 = helper.getNode('helperNode4')
-                const helperNode5 = helper.getNode('helperNode5')
-                const testNode = helper.getNode(cronNodeName)
+        beforeEach(async () => {
+            await helper.load(cronplusNode, flow)
 
-                should(helperNode1).not.be.null()
-                should(helperNode2).not.be.null()
-                should(helperNode3).not.be.null()
-                should(helperNode4).not.be.null()
-                should(helperNode5).not.be.null()
-                should(testNode).not.be.null()
-                testNode.should.have.property('id', cronNodeName)
+            helperNode1 = helper.getNode('helperNode1')
+            helperNode2 = helper.getNode('helperNode2')
+            helperNode3 = helper.getNode('helperNode3')
+            helperNode4 = helper.getNode('helperNode4')
+            helperNode5 = helper.getNode('helperNode5')
+            testNode = helper.getNode(cronNodeName)
+            catchNode1 = helper.getNode('catchNode1')
+            catchHelper = helper.getNode('catchHelper')
+            completeNode1 = helper.getNode('completeNode1')
+            completeHelper = helper.getNode('completeHelper')
 
-                const configChecker = function (config) {
-                    // it('should be a valid config object ', function (done) {
-                    //     try {
-                    should(config).not.be.Null()
-                    config.should.have.keys('topic', 'name', 'payload')
-                    config.should.have.property('payloadType', 'default')
-                    config.should.have.property('expressionType')
-                    if (config.expressionType === 'solar') {
-                        config.should.have.property('location')
-                    } else {
-                        config.should.have.property('expression')
-                    }
-                    //        done();
-                    //     } catch (error) {
-                    //         done(error);
-                    //     }
-                    // });
+            should(helperNode1).not.be.null()
+            should(helperNode2).not.be.null()
+            should(helperNode3).not.be.null()
+            should(helperNode4).not.be.null()
+            should(helperNode5).not.be.null()
+            should(testNode).not.be.null()
+            should(catchNode1).not.be.null()
+            should(catchHelper).not.be.null()
+            should(completeNode1).not.be.null()
+            should(completeHelper).not.be.null()
+            testNode.should.have.property('id', cronNodeName)
+        })
+
+        afterEach(async () => {
+            helperNode1 = null
+            helperNode2 = null
+            helperNode3 = null
+            helperNode4 = null
+            helperNode5 = null
+            testNode = null
+            catchNode1 = null
+            catchHelper = null
+            completeNode1 = null
+            completeHelper = null
+        })
+
+        function createAddScheduleMsg ({ name = 'dynCron', topic = 'dynCron', expression = '0 0 * * * * *', expressionType = 'cron', payloadType = 'default', limit = 1 }) {
+            return {
+                payload: {
+                    command: 'add',
+                    name,
+                    topic,
+                    expression,
+                    expressionType,
+                    payloadType,
+                    limit
                 }
-
-                const statusChecker = function (status, expectedType) {
-                    /*
-                        count:1
-                        description:'Every minute'
-                        isRunning:true
-                        limit:0
-                        modified:false
-                        nextDate:Sat Apr 10 2021 14:59:00 GMT+0100 (British Summer Time)
-                        nextDateTZ:'Apr 10, 2021, 14:59:00 GMT+1'
-                        nextDescription:'in 38 seconds'
-                        serverTime:Sat Apr 10 2021 14:58:21 GMT+0100 (British Summer Time)
-                        serverTimeZone:'Europe/London'
-                        timeZone:'Europe/London'
-                        type:'static'
-                    */
-                    // it('should be a valid status object ', function (done) {
-                    //     try {
-                    status.should.have.property('count').which.is.a.Number()
-                    status.should.have.property('description').which.is.a.String()
-                    status.should.have.property('isRunning').which.is.a.Boolean()
-                    status.should.have.property('type').which.is.a.String()
-                    if (expectedType) {
-                        should(status.type).eql(expectedType)
-                    } else {
-                        should(status.type).be.oneOf('static', 'dynamic')
-                    }
-                    //        done();
-                    //     } catch (error) {
-                    //         done(error);
-                    //     }
-                    // });
-                }
-
-                const commandChecker = function (msg, test) {
-                    /*
-                        topic:'schedule1'
-                        timeZone:'Europe/London'
-                        solarType:'all'
-                        solarEvents:'sunrise,sunset'
-                        payloadType:'default'
-                        name:'schedule1'
-                        location:'54.9992500,-1.4170300' - or - expression
-                        expressionType:'solar'
-                        command:'describe'
-                    */
-                    // context("cron-plus command check", function () {
-
-                    it('should ' + test.description, function (done) {
-                        try {
-                            msg.should.have.property('payload').which.is.an.Object()
-                            const payload = msg.payload
-                            payload.should.have.property('command').which.is.an.Object()
-                            payload.should.have.property('result').which.is.an.Object()
-
-                            const command = payload.command
-                            const result = payload.result
-
-                            command.should.have.property('command').which.is.a.String()
-                            should(command.command).eql(test.expected.command)
-
-                            if (test.expected.propertyValues) {
-                                for (const propVal of test.expected.propertyValues) {
-                                    const prop = propVal[0]
-                                    const type = propVal[1]
-                                    const val = propVal[2]
-                                    const o = getObjectProperty(msg, prop)
-                                    should(o).not.be.null()
-                                    o.should.have.be.a.type(type)
-                                    if (typeof val !== 'undefined') o.should.eql(val)
-                                }
-                            }
-                            if (command.command === 'describe') {
-                                // .command
-                                command.should.have.property('expressionType').which.is.a.String()
-                                command.should.have.property('payloadType').which.is.a.String()
-                                if (command.expressionType === 'solar') {
-                                    command.should.have.property('location')
-                                } else {
-                                    command.should.have.property('expression')
-                                }
-
-                                // .result
-                                result.should.have.property('description').which.is.a.String()
-                                result.should.have.property('nextDate')
-                                if (command.expressionType === 'cron') {
-                                    result.should.have.property('prettyNext').which.is.a.String()
-                                }
-                                if (command.expressionType === 'solar') {
-                                    result.should.have.property('nextEventTime')
-                                    result.should.have.property('solarState').which.is.an.Object()
-                                    result.should.have.property('eventTimes').which.is.an.Object()
-                                }
-                            } else if (command.command === 'export') {
-                                configChecker(result)
-                            } else if (command.command === 'status') {
-                                result.should.have.property('config').which.is.an.Object()
-                                result.should.have.property('status').which.is.an.Object()
-                                configChecker(result.config)
-                                statusChecker(result.status)
-                            } else if (command.command.indexOf('status-') === 0) {
-                                should(Array.isArray(result)).be.true('check result should be an array')
-                                if (Object.prototype.hasOwnProperty.call(test.expected, 'scheduleCount')) {
-                                    result.should.have.property('length')
-                                    should(result.length).eql(test.expected.scheduleCount, 'Check number of schedules in response')
-                                }
-                                for (const r of result) {
-                                    r.should.have.property('config').which.is.an.Object()
-                                    r.should.have.property('status').which.is.an.Object()
-                                    configChecker(r.config)
-                                    statusChecker(r.status)
-                                }
-                            }
-                            done()
-                        } catch (error) {
-                            done(error)
-                        }
-                    })
-                    // });
-                }
-                const staticScheduleTest = (msg) => {
-                    msg.should.have.property('payload')
-                    msg.payload.should.have.property('triggerTimestamp')
-                    msg.payload.should.have.property('config')
-                    configChecker(msg.payload.config)
-                    msg.payload.should.have.property('status')
-                    statusChecker(msg.payload.status, 'static')
-                }
-                const dynamicScheduleTest = (msg) => {
-                    msg.should.have.property('payload')
-                    msg.payload.should.have.property('triggerTimestamp')
-                    msg.payload.should.have.property('config')
-                    configChecker(msg.payload.config)
-                    msg.payload.should.have.property('status')
-                    statusChecker(msg.payload.status, 'dynamic')
-                }
-
-                const commandTests = [
-                    {
-                        description: 'describe solar events for a location',
-                        send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'all', timeZone: 'Europe/London' } },
-                        expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', 'All Solar Events']] }
-                    },
-                    {
-                        description: 'describe cron expression 0 * * * * * *',
-                        send: { payload: { command: 'describe', expressionType: 'cron', expression: '0 * * * * * *' } },
-                        expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', 'Every minute']] }
-                    },
-                    {
-                        description: 'describe dates expression now+2s',
-                        send: { payload: { command: 'describe', expressionType: 'dates', expression: [Date.now() + 2000] } },
-                        expected: { command: 'describe', propertyValues: [['payload.result.description', 'string']] }
-                    },
-                    {
-                        description: 'Export schedule1',
-                        send: { topic: 'export', payload: 'schedule1' },
-                        expected: { command: 'export', scheduleCount: 1 }
-                    },
-                    {
-                        description: "test 'status' of one schedule 'dynCron'",
-                        send: { topic: 'status', payload: 'dynCron' },
-                        expected: { command: 'status', scheduleCount: 1 }
-                    },
-                    {
-                        description: "test 'status-all' command",
-                        send: { topic: 'status-all', payload: '' },
-                        expected: { command: 'status-all', scheduleCount: 5 }
-                    },
-                    {
-                        description: "test 'status-all' command",
-                        send: { topic: 'status-all-dynamic', payload: '' },
-                        expected: { command: 'status-all-dynamic', scheduleCount: 2 }
-                    },
-                    {
-                        description: "test 'status-all' command",
-                        send: { topic: 'status-all-static', payload: '' },
-                        expected: { command: 'status-all-static', scheduleCount: 3 }
-                    },
-                    {
-                        description: "test 'status-inactive' command",
-                        send: { topic: 'status-inactive', payload: '' },
-                        expected: { command: 'status-inactive', scheduleCount: 1 }
-                    },
-                    {
-                        description: "test 'stop' command",
-                        send: { topic: 'stop', payload: 'schedule3' },
-                        expected: null
-                    },
-                    {
-                        description: "test 'status-inactive' command",
-                        send: { topic: 'status-inactive', payload: '' },
-                        expected: { command: 'status-inactive', scheduleCount: 2 }
-                    },
-                    {
-                        description: "test 'status-active' command",
-                        send: { topic: 'status-active', payload: '' },
-                        expected: { command: 'status-active', scheduleCount: 3 }
-                    },
-                    {
-                        description: "test 'status-inactive-static' command",
-                        send: { topic: 'status-inactive-static', payload: '' },
-                        expected: { command: 'status-inactive-static', scheduleCount: 1 }
-                    },
-                    {
-                        description: "test 'status-active-static' command",
-                        send: { topic: 'status-active-static', payload: '' },
-                        expected: { command: 'status-active-static', scheduleCount: 2 }
-                    },
-                    {
-                        description: "test 'remove' schedule3",
-                        send: { topic: 'remove', payload: 'schedule3' },
-                        expected: null
-                    },
-                    {
-                        description: "test 'status-all-static' command",
-                        send: { topic: 'status-all-static', payload: '' },
-                        expected: { command: 'status-all-static', scheduleCount: 2 }
-                    },
-                    {
-                        description: "test 'status-active-dynamic' command",
-                        send: { topic: 'status-active-dynamic', payload: '' },
-                        expected: { command: 'status-active-dynamic', scheduleCount: 1 }
-                    },
-                    {
-                        description: "test 'status-inactive-dynamic' command",
-                        send: { topic: 'status-inactive-dynamic', payload: '' },
-                        expected: { command: 'status-inactive-dynamic', scheduleCount: 1 }
-                    },
-                    {
-                        description: "test 'remove-inactive-dynamic' command",
-                        send: { topic: 'remove-inactive-dynamic', payload: '' },
-                        expected: null
-                    },
-                    {
-                        description: "test 'status-all' command",
-                        send: { topic: 'status-all', payload: '' },
-                        expected: { command: 'status-all', scheduleCount: 3 }
-                    },
-                    {
-                        description: "test 'remove-active-dynamic' command",
-                        send: { topic: 'remove-active-dynamic', payload: '' },
-                        expected: null
-                    },
-                    {
-                        description: "test 'status-all' command",
-                        send: { topic: 'status-all', payload: '' },
-                        expected: { command: 'status-all', scheduleCount: 2 }
-                    }
-                ]
-
-                const commandResults = []
-                helperNode1.on('input', function (msg) {
-                    staticScheduleTest(msg)
-                })
-                helperNode2.on('input', function (msg) {
-                    staticScheduleTest(msg)
-                })
-                helperNode3.on('input', function (msg) {
-                    staticScheduleTest(msg)
-                })
-                helperNode4.on('input', function (msg) {
-                    dynamicScheduleTest(msg)
-                })
-                helperNode5.on('input', function (msg) {
-                    commandResults.push(msg)
-                    if (msg._testIndex >= (commandTests.length - 1)) {
-                        describe('cron-plus command checks', function () {
-                            for (const m of commandResults) {
-                                const test = commandTests[m._testIndex]
-                                if (test && test.expected) {
-                                    commandChecker(m, test)
-                                }
-                            }
-                        })
-                        done()
-                    }
-                })
-
-                // fire messages into the cron node
-                testNode.receive({ topic: 'trigger', payload: 'schedule1' }) // fire input of testNode
-                testNode.receive({ topic: 'trigger', payload: 'schedule2' }) // fire input of testNode
-                testNode.receive({ topic: 'trigger', payload: 'schedule3' }) // fire input of testNode
-
-                // add a dynamic cron schedule
-                testNode.receive({
-                    payload: {
-                        command: 'add',
-                        name: 'dynCron',
-                        topic: 'dynCron',
-                        expression: '0 0 * * * * *',
-                        expressionType: 'cron',
-                        payloadType: 'default',
-                        limit: 1
-                    }
-                })
-
-                // add an old inactive dynamic cron schedule
-                testNode.receive({
-                    payload: {
-                        command: 'add',
-                        name: 'dynCron2',
-                        topic: 'dynCron2',
-                        expression: '0 0 2 2 FEB * 2020',
-                        expressionType: 'cron',
-                        payloadType: 'default',
-                        limit: 1
-                    }
-                })
-                testNode.receive({ topic: 'trigger', payload: 'dynCron' }) // fire input of testNode
-
-                for (let index = 0; index < commandTests.length; index++) {
-                    const test = commandTests[index]
-                    testNode.receive({ ...test.send, _testIndex: index })
-                }
-            } catch (error) {
-                done(error)
             }
-        })
-    })
+        }
 
-    // test dynamic capabilities
-    it('should add a schedule dynamically', function (done) {
-        this.timeout(2000) // timeout with an error if done() isn't called in time
-        // flow: tab1, cronplus --> helper
-        const flow = [
-            { id: 'tab1', type: 'tab', label: 'Flow 1', env: [{ name: 'tabpos', value: '51.1, 1.1', type: 'str' }] },
-            { id: 'cron.node', type: 'cronplus', name: 'test1', outputField: 'payload', commandResponseMsgOutput: 'output1', outputs: 1, options: [], wires: [['helper.node']], z: 'tab1' },
-            { id: 'helper.node', type: 'helper', z: 'tab1' }
-        ]
+        const configChecker = function (config) {
+            should(config).not.be.Null()
+            config.should.have.keys('topic', 'name', 'payload')
+            config.should.have.property('payloadType', 'default')
+            config.should.have.property('expressionType')
+            if (config.expressionType === 'solar') {
+                config.should.have.property('location')
+            } else {
+                config.should.have.property('expression')
+            }
+        }
 
-        helper.load(cronplusNode, flow, function () {
-            const cronNode = helper.getNode('cron.node')
-            const helperNode = helper.getNode('helper.node')
+        const statusChecker = function (status, expectedType) {
+            /*
+                count:1
+                description:'Every minute'
+                isRunning:true
+                limit:0
+                modified:false
+                nextDate:Sat Apr 10 2021 14:59:00 GMT+0100 (British Summer Time)
+                nextDateTZ:'Apr 10, 2021, 14:59:00 GMT+1'
+                nextDescription:'in 38 seconds'
+                serverTime:Sat Apr 10 2021 14:58:21 GMT+0100 (British Summer Time)
+                serverTimeZone:'Europe/London'
+                timeZone:'Europe/London'
+                type:'static'
+            */
+            // it('should be a valid status object ', function (done) {
+            //     try {
+            status.should.have.property('count').which.is.a.Number()
+            status.should.have.property('description').which.is.a.String()
+            status.should.have.property('isRunning').which.is.a.Boolean()
+            status.should.have.property('type').which.is.a.String()
+            if (expectedType) {
+                should(status.type).eql(expectedType)
+            } else {
+                should(status.type).be.oneOf('static', 'dynamic')
+            }
+        }
+        const countChecker = (name, msg, limit, expectedCount, isRunning) => {
+            msg.should.have.property('config').which.is.an.Object()
+            msg.should.have.property('status').which.is.an.Object()
+            msg.config.should.have.property('limit', limit)
+            msg.config.should.have.property('name', name)
+            msg.status.should.have.property('limit', limit)
+            msg.status.should.have.property('count', expectedCount)
+            msg.status.should.have.property('isRunning', isRunning)
+        }
+        const commandChecker = function (msg, test) {
+            msg.should.have.property('payload').which.is.an.Object()
+            const payload = msg.payload
+            payload.should.have.property('command').which.is.an.Object()
+            payload.should.have.property('result').which.is.an.Object()
 
-            helperNode.on('input', function (msg) {
-                try {
-                    msg.should.have.property('topic', 'dynamic1')
-                    msg.should.have.property('payload')
-                    done()
-                } catch (err) {
-                    done(err)
+            const command = payload.command
+            const result = payload.result
+
+            command.should.have.property('command').which.is.a.String()
+            should(command.command).eql(test.expected.command)
+
+            if (test.expected.propertyValues) {
+                for (const propVal of test.expected.propertyValues) {
+                    const prop = propVal[0]
+                    const type = propVal[1]
+                    const val = propVal[2]
+                    const o = getObjectProperty(msg, prop)
+                    should(o).not.be.null()
+                    o.should.have.be.a.type(type)
+                    if (typeof val !== 'undefined') o.should.eql(val)
                 }
-            })
-            // inject a cronplus schedule named dynamic1
-            cronNode.receive({ payload: { command: 'add', name: 'dynamic1', topic: 'dynamic1', expressionType: 'cron', expression: '0 * * * * * *', payloadType: 'default', limit: 1 } })
-            cronNode.receive({ topic: 'trigger', payload: 'dynamic1' }) // trigger schedule
-        })
-    })
-    it('should remove a schedule dynamically', function (done) {
-        this.timeout(2000) // timeout with an error if done() isn't called in time
-        // static cron schedules
-        const options = [
-            { name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 * * * * * *', location: '', offset: '0' },
-            { name: 'schedule2', topic: 'schedule2', payloadType: 'default', payload: '', expressionType: 'dates', expression: [Date.now() + 60000, Date.now() + 120000], location: '', offset: '0' },
-            { name: 'schedule3', topic: 'schedule3', payloadType: 'default', payload: '', expressionType: 'solar', expression: '0 * * * * * *', location: '55.0 -1.418', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }
-        ]
-
-        // flow: tab1, cronplus --> helper
-        const flow = [
-            { id: 'tab1', type: 'tab', label: 'Flow 1', env: [{ name: 'tabpos', value: '51.1, 1.1', type: 'str' }] },
-            { id: 'cron.node', type: 'cronplus', name: 'test1', outputField: 'payload', commandResponseMsgOutput: 'output1', outputs: 1, options, wires: [['helper.node']], z: 'tab1' },
-            { id: 'helper.node', type: 'helper', z: 'tab1' }
-        ]
-        helper.load(cronplusNode, flow, function () {
-            const cronNode = helper.getNode('cron.node')
-            const helperNode = helper.getNode('helper.node')
-
-            helperNode.on('input', function (msg) {
-                try {
-                    console.log(msg)
-                    msg.should.have.property('topic', 'schedule2')
-                    msg.should.have.property('payload')
-                    helper.clearFlows().then(function () {
-                        done()
-                    })
-                } catch (err) {
-                    done(err)
+            }
+            if (command.command === 'describe') {
+                // .command
+                command.should.have.property('expressionType').which.is.a.String()
+                command.should.have.property('payloadType').which.is.a.String()
+                if (command.expressionType === 'solar') {
+                    command.should.have.property('location')
+                } else {
+                    command.should.have.property('expression')
                 }
+
+                // .result
+                result.should.have.property('description').which.is.a.String()
+                result.should.have.property('nextDate')
+                if (command.expressionType === 'cron') {
+                    result.should.have.property('prettyNext').which.is.a.String()
+                }
+                if (command.expressionType === 'solar') {
+                    result.should.have.property('nextEventTime')
+                    result.should.have.property('solarState').which.is.an.Object()
+                    result.should.have.property('eventTimes').which.is.an.Object()
+                }
+            } else if (command.command === 'export') {
+                configChecker(result)
+            } else if (command.command === 'status' || command.command === 'list') {
+                result.should.have.property('config').which.is.an.Object()
+                result.should.have.property('status').which.is.an.Object()
+                configChecker(result.config)
+                statusChecker(result.status)
+            } else if (command.command.startsWith('status-') || command.command.startsWith('list-')) {
+                should(Array.isArray(result)).be.true('check result should be an array')
+                if (Object.prototype.hasOwnProperty.call(test.expected, 'scheduleCount')) {
+                    result.should.have.property('length')
+                    should(result.length).eql(test.expected.scheduleCount, 'Check number of schedules in response')
+                }
+                for (const r of result) {
+                    r.should.have.property('config').which.is.an.Object()
+                    r.should.have.property('status').which.is.an.Object()
+                    configChecker(r.config)
+                    statusChecker(r.status)
+                }
+            }
+        }
+
+        const staticScheduleTest = (msg) => {
+            msg.should.have.property('payload')
+            msg.payload.should.have.property('triggerTimestamp')
+            msg.payload.should.have.property('config')
+            configChecker(msg.payload.config)
+            msg.payload.should.have.property('status')
+            statusChecker(msg.payload.status, 'static')
+        }
+
+        const dynamicScheduleTest = (msg) => {
+            msg.should.have.property('payload')
+            msg.payload.should.have.property('triggerTimestamp')
+            msg.payload.should.have.property('config')
+            configChecker(msg.payload.config)
+            msg.payload.should.have.property('status')
+            statusChecker(msg.payload.status, 'dynamic')
+        }
+
+        it('should trigger static cron schedule', async function () {
+            const resultPromise = new Promise(resolve => {
+                helperNode1.on('input', resolve)
             })
-            // inject a cronplus schedule named dynamic1
-            cronNode.receive({ topic: 'remove', payload: 'schedule1' })
-            cronNode.receive({ topic: 'trigger', payload: 'schedule1' }) // trigger schedule 1 - should not fire
-            cronNode.receive({ topic: 'trigger', payload: 'schedule2' }) // trigger schedule 2 - should fire
+            testNode.receive({ topic: 'trigger', payload: 'schedule1' }) // fire input of testNode
+            const result = await resultPromise // wait for the first message to be processed
+            staticScheduleTest(result)
+        })
+        it('should trigger static dates schedule', async function () {
+            const resultPromise = new Promise(resolve => {
+                helperNode2.on('input', resolve)
+            })
+            testNode.receive({ topic: 'trigger', payload: 'schedule2' }) // fire input of testNode
+            const result = await resultPromise // wait for the second message to be processed
+            staticScheduleTest(result)
+        })
+        it('should trigger static solar schedule', async function () {
+            const resultPromise = new Promise(resolve => {
+                helperNode3.on('input', resolve)
+            })
+            testNode.receive({ topic: 'trigger', payload: 'schedule3' }) // fire input of testNode
+            const result = await resultPromise // wait for the third message to be processed
+            staticScheduleTest(result)
+        })
+        it("should 'trigger-all' by topic", async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: 'trigger-all', payload: '' },
+                expected: { command: 'trigger-all', scheduleCount: 5 }
+            }
+            // add 2 dynamic schedules
+            testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 3, expression: '* * * * * * *' })) // every 1 seconds
+            testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
+            await sleep(50) // let it unwind
+            const messages = []
+            const addMessage = (msg, resolver) => {
+                messages.push(msg)
+                if (messages.length >= 5) {
+                    resolver(messages)
+                }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode1.on('input', (msg) => {
+                    addMessage(msg, resolve)
+                })
+                helperNode2.on('input', (msg) => {
+                    addMessage(msg, resolve)
+                })
+                helperNode3.on('input', (msg) => {
+                    addMessage(msg, resolve)
+                })
+                helperNode4.on('input', (msg) => {
+                    addMessage(msg, resolve)
+                })
+                helperNode5.on('input', (msg) => {
+                    addMessage(msg, resolve)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            result.should.have.length(5)
+            statusChecker(result[0].payload.status, 'static')
+            statusChecker(result[1].payload.status, 'static')
+            statusChecker(result[2].payload.status, 'static')
+            statusChecker(result[3].payload.status, 'dynamic')
+            statusChecker(result[4].payload.status, 'dynamic')
+            configChecker(result[0].payload.config)
+            configChecker(result[1].payload.config)
+            configChecker(result[2].payload.config)
+            configChecker(result[3].payload.config)
+            configChecker(result[4].payload.config)
+        })
+        it('should add a dynamic cron schedule', async function () {
+            const resultPromise = new Promise(resolve => {
+                helperNode4.on('input', resolve)
+            })
+            testNode.receive(createAddScheduleMsg({ name: 'dynCron1', topic: 'xxx' })) // add a dynamic cron schedule
+            testNode.receive({ topic: 'trigger', payload: 'dynCron1' }) // fire input of testNode
+            const result = await resultPromise
+            dynamicScheduleTest(result)
+            result.topic.should.eql('xxx')
+        })
+
+        it('describe solar events for a location', async function () {
+            const test = {
+                description: this.test.title,
+                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'all', timeZone: 'Europe/London' } },
+                expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', 'All Solar Events']] }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it('should describe cron expression 0 * * * * * *', async function () {
+            const test = {
+                description: this.test.title,
+                send: { payload: { command: 'describe', expressionType: 'cron', expression: '0 * * * * * *' } },
+                expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', 'Every minute']] }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it('should describe dates expression now+2s', async function () {
+            const test = {
+                description: this.test.title,
+                send: { payload: { command: 'describe', expressionType: 'dates', expression: [Date.now() + 2000] } },
+                expected: { command: 'describe', propertyValues: [['payload.result.description', 'string']] }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it('should export schedule1 by topic', async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: 'export', payload: 'schedule1' },
+                expected: { command: 'export', scheduleCount: 1 }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it('should export static schedule1 by payload', async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: '', payload: { command: 'export', name: 'schedule1' } },
+                expected: { command: 'export', scheduleCount: 1 }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it('should export static schedule1 by topic', async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: 'export', payload: 'schedule1' },
+                expected: { command: 'export', scheduleCount: 1 }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            result.payload.should.have.property('command').which.is.an.Object()
+            result.payload.should.have.property('result').which.is.an.Object()
+            result.payload.should.not.have.property('status')
+            result.payload.result.should.not.have.property('status')
+            commandChecker(result, test)
+        })
+        it('should list static schedule1 by topic', async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: 'list', payload: 'schedule1' },
+                expected: { command: 'list', scheduleCount: 1 }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            result.payload.should.have.property('command').which.is.an.Object()
+            result.payload.should.have.property('result').which.is.an.Object()
+            result.payload.result.should.have.property('config').which.is.an.Object()
+            result.payload.result.should.have.property('status').which.is.an.Object()
+            commandChecker(result, test)
+        })
+        it('should list static schedule1 by payload', async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: '', payload: { command: 'list', name: 'schedule1' } },
+                expected: { command: 'list', scheduleCount: 1 }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it("should get 'status' of one schedule 'dynCron'", async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: 'status', payload: 'dyn-cron' },
+                expected: { command: 'status', scheduleCount: 1 }
+            }
+            testNode.receive(createAddScheduleMsg({ name: 'dyn-cron' })) // add a dynamic cron schedule
+            await sleep(50) // let it unwind
+
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it("should get 'status-all' by topic", async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: 'status-all', payload: '' },
+                expected: { command: 'status-all', scheduleCount: 4 } // 3 + 1 dynamic
+            }
+            testNode.receive(createAddScheduleMsg({ name: 'dyn' }))
+            await sleep(50) // let it unwind
+
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it("should get 'status-all' by command", async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: '', payload: { command: 'status-all' } },
+                expected: { command: 'status-all', scheduleCount: 3 } // 3 static schedules
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it("should get 'status-all-dynamic' by topic (no dynamic schedules)", async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: 'status-all-dynamic', payload: '' },
+                expected: { command: 'status-all-dynamic', scheduleCount: 0 }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it("should get 'status-all-dynamic' by topic (2 dynamic schedules)", async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: 'status-all-dynamic', payload: '' },
+                expected: { command: 'status-all-dynamic', scheduleCount: 2 }
+            }
+            testNode.receive(createAddScheduleMsg({ name: 'dyn-1' }))
+            await sleep(20) // let it unwind
+            testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
+            await sleep(30) // let it unwind
+
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+
+            result.payload.should.have.property('result').which.is.an.Array()
+            result.payload.result.should.have.length(2)
+            result.payload.result[0].config.should.have.property('name').which.is.a.String()
+            result.payload.result[0].config.name.should.eql('dyn-1')
+            result.payload.result[1].config.should.have.property('name').which.is.a.String()
+            result.payload.result[1].config.name.should.eql('dyn-2')
+        })
+        it("should get 'status-all-static' by topic", async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: 'status-all-static', payload: '' },
+                expected: { command: 'status-all-static', scheduleCount: 3 }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it("should get 'status-inactive' by topic", async function () {
+            const test = {
+                description: this.test.title,
+                send: { topic: 'status-inactive', payload: '' },
+                expected: { command: 'status-inactive', scheduleCount: 1 }
+            }
+            // pause schedule3
+            testNode.receive({ topic: 'pause', payload: 'schedule3' })
+            await sleep(50) // let it unwind
+
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+            result.should.have.property('payload').which.is.an.Object()
+            result.payload.should.have.property('result').which.is.an.Array()
+            result.payload.result.should.have.length(1)
+            result.payload.result[0].should.have.keys('config', 'status')
+            result.payload.result[0].config.should.have.property('name', 'schedule3')
+        })
+
+        it("should 'stop' by topic (should reset counter)", async function () {
+            this.timeout(5000)
+            // setup add dyn-1 and dyn-2
+            testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 3, expression: '* * * * * * *' })) // every 1 seconds
+            testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
+            await sleep(2100) // wait 2 seconds - should only 2 should be triggered
+
+            const messages = []
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    messages.push(msg)
+                    if (messages.length >= 11) {
+                        resolve()
+                    }
+                })
+            })
+
+            testNode.receive({ topic: 'status-active', payload: '' }) // check status of active schedules before stopping
+            testNode.receive({ topic: 'status-active-static', payload: '' }) // check status of active schedules before stopping
+            testNode.receive({ topic: 'status-active-dynamic', payload: '' }) // check status of active schedules before stopping
+            await sleep(1100) // wait 1 more second for dyn-1 to be triggered another time
+            testNode.receive({ topic: 'status-inactive', payload: '' }) // now that dyn-1 was triggered 3 times, it should be inactive due to its limit
+            testNode.receive({ topic: 'stop', payload: 'schedule2' }) // stop schedule2 (no output expected)
+            testNode.receive({ topic: 'stop', payload: 'dyn-1' }) // stop dyn-1 (no output expected)
+            testNode.receive({ topic: 'status-inactive', payload: '' }) // check status of inactive schedules
+            testNode.receive({ topic: 'status-inactive-static', payload: '' }) // check status of inactive schedules
+            testNode.receive({ topic: 'status-inactive-dynamic', payload: '' }) // check status of inactive schedules
+            testNode.receive({ topic: 'status-active', payload: '' }) // check status of active schedules
+            testNode.receive({ topic: 'status-active-static', payload: '' }) // check status of active schedules
+            testNode.receive({ topic: 'status-active-dynamic', payload: '' }) // check status of active schedules
+            testNode.receive({ topic: 'start-all', payload: '' }) // start all schedules (no output expected)
+            testNode.receive({ topic: 'status-active', payload: '' })
+            await resultPromise
+            messages.should.have.length(11)
+            // before stopping 2 schedules
+            commandChecker(messages[0], { description: 'check status of active schedules should be 5', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 5 } })
+            countChecker('dyn-1', messages[0].payload.result[3], 3, 2, true) // dyn-1 should have triggered 2 times & still be running
+            commandChecker(messages[1], { description: 'check status of active-static schedules should be 3', send: { topic: 'status-active-static', payload: '' }, expected: { command: 'status-active-static', scheduleCount: 3 } })
+            commandChecker(messages[2], { description: 'check status of active-dynamic schedules should be 2', send: { topic: 'status-active-dynamic', payload: '' }, expected: { command: 'status-active-dynamic', scheduleCount: 2 } })
+            // after waiting another second
+            commandChecker(messages[3], { description: 'check status of active inactive should be 1', send: { topic: 'status-inactive', payload: '' }, expected: { command: 'status-inactive', scheduleCount: 1 } })
+            countChecker('dyn-1', messages[3].payload.result[0], 3, 3, false) // dyn-1 should have triggered 3 times and should NOT be running
+
+            // after stopping 2 schedules
+            commandChecker(messages[4], { description: 'check status of inactive schedules should be 2', send: { topic: 'status-inactive', payload: '' }, expected: { command: 'status-inactive', scheduleCount: 2 } })
+            commandChecker(messages[5], { description: 'check status of inactive-static schedules should be 1', send: { topic: 'status-inactive-static', payload: '' }, expected: { command: 'status-inactive-static', scheduleCount: 1 } })
+            commandChecker(messages[6], { description: 'check status of inactive-dynamic schedules should be 1', send: { topic: 'status-inactive-dynamic', payload: '' }, expected: { command: 'status-inactive-dynamic', scheduleCount: 1 } })
+            commandChecker(messages[7], { description: 'check status of active schedules should be 3', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 3 } })
+            commandChecker(messages[8], { description: 'check status of active-static schedules should be 2', send: { topic: 'status-active-static', payload: '' }, expected: { command: 'status-active-static', scheduleCount: 2 } })
+            commandChecker(messages[9], { description: 'check status of active-dynamic schedules should be 1', send: { topic: 'status-active-dynamic', payload: '' }, expected: { command: 'status-active-dynamic', scheduleCount: 1 } })
+            // after starting all schedules
+            commandChecker(messages[10], { description: 'check status of active schedules should be 5', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 5 } })
+            countChecker('dyn-1', messages[10].payload.result[3], 3, 0, true) // since schedules were stopped, the counter should be reset to 0
+        })
+        it("should 'pause' by topic (should not reset counter)", async function () {
+            this.timeout(7000)
+            // setup add dyn-1 and dyn-2
+            testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 3, expression: '* * * * * * *' })) // every 1 seconds
+            testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
+            await sleep(2100) // wait 2 seconds - should only 2 should be triggered
+
+            const messages = []
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    messages.push(msg)
+                    if (messages.length >= 4) {
+                        resolve()
+                    }
+                })
+            })
+
+            testNode.receive({ topic: 'status-active', payload: '' }) // check status of active schedules before stopping
+            testNode.receive({ topic: 'pause', payload: 'dyn-1' }) // stop dyn-1 (no output expected)
+            await sleep(2100) // wait 2 seconds - for dyn-1 should not increase
+            testNode.receive({ topic: 'status-inactive', payload: '' })
+            testNode.receive({ topic: 'start', payload: 'dyn-1' }) // start dyn-1 (no output expected)
+            testNode.receive({ topic: 'status-active', payload: '' })
+            await sleep(1100) // wait 1 seconds for dyn-1 to trigger again
+            testNode.receive({ topic: 'status-inactive', payload: '' })
+            await resultPromise
+            messages.should.have.length(4)
+            // before pausing, dyn-1 should have triggered 2 times & still be running
+            commandChecker(messages[0], { description: 'check status of active schedules should be 5', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 5 } })
+            countChecker('dyn-1', messages[0].payload.result[3], 3, 2, true) // dyn-1 should have triggered 2 times & still be running
+            // after pausing & waiting 2 seconds, dyn-1 should still be running and count should still be 2
+            commandChecker(messages[1], { description: 'check status of active schedules should be 1', send: { topic: 'status-inactive', payload: '' }, expected: { command: 'status-inactive', scheduleCount: 1 } })
+            countChecker('dyn-1', messages[1].payload.result[0], 3, 2, false) // dyn-1 should still have only triggered 2 times
+            // after starting all, active count should be 5 again
+            commandChecker(messages[2], { description: 'check status of active schedules should be 5', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 5 } })
+            countChecker('dyn-1', messages[2].payload.result[3], 3, 2, true) // dyn-1 should still have triggered 2 times & still be running
+            // after waiting another second, dyn-1 should have triggered 3 times and should have reached its limit & stopped
+            commandChecker(messages[3], { description: 'check status of inactive schedules should be 1', send: { topic: 'status-inactive', payload: '' }, expected: { command: 'status-inactive', scheduleCount: 1 } })
+            countChecker('dyn-1', messages[3].payload.result[0], 3, 3, false) // dyn-1 should have triggered 3 times and should NOT be running
+        })
+        // test dynamic capabilities
+        it('should add a schedule dynamically', async function () {
+            const msg = createAddScheduleMsg({ name: 'dynamic1', topic: 'dynamic1', expression: '0 0 * * * * *', expressionType: 'cron', payloadType: 'default', limit: 1 })
+            testNode.receive(msg)
+            sleep(50) // let it unwind
+            const resultPromise = new Promise(resolve => {
+                helperNode4.on('input', (msg) => {
+                    resolve(msg)
+                })
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            // trigger the dynamic schedule
+            testNode.receive({ topic: 'trigger', payload: 'dynamic1' }) // fire input of testNode
+            const result = await resultPromise
+            dynamicScheduleTest(result)
+            result.should.have.property('scheduledEvent', false) // because it was manually triggered
+            result.topic.should.eql('dynamic1')
+        })
+        it('should remove a static schedule dynamically', async function () {
+            const msg = { topic: 'remove', payload: 'schedule1' }
+            testNode.receive(msg)
+            sleep(50) // let it unwind
+            const resultPromise = new Promise(resolve => {
+                helperNode5.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            const test = {
+                description: this.test.title,
+                send: { topic: 'status-all', payload: '' },
+                expected: { command: 'status-all', scheduleCount: 2 }
+            }
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it('should throw catchable error when triggering non-existing schedule', async function () {
+            const resultPromise = new Promise(resolve => {
+                catchHelper.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive({ topic: 'trigger', payload: 'schedule-non-existing' }) // fire input of testNode
+            const result = await resultPromise
+            result.should.have.property('payload', 'schedule-non-existing')
+            result.should.have.property('topic', 'trigger')
+            result.should.have.property('error').which.is.an.Object()
+            result.error.should.have.property('message', 'Error: Manual Trigger failed. Cannot find schedule named \'schedule-non-existing\'')
         })
     })
 })
