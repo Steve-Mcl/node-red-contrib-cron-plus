@@ -352,6 +352,7 @@ copies or substantial portions of the Software.
     RED._cron_plus_debug = false // set true at runtime to enable debug output
     let map, mapPopup, selectedLocation, selectedLocationInput
     const filesAdded = [] // list of files already added
+    const cronTooltipClass = 'cron-plus-expression-tip form-tips ui-corner-all ui-widget-shadow'
 
     function toggleFullscreen (selector, callback) {
         callback = callback || function () {}
@@ -1579,10 +1580,10 @@ copies or substantial portions of the Software.
                     const helpFuncHtml = '<span style="float: right">' +
                         '<button id="cron-plus-tt-help-button" class="cron-plus-link-button" onclick="' + helpFunc + '">help </button>&nbsp;' +
                         '<button class="cron-plus-link-button" onclick="' + helpFuncPopOut + '"> <i class="fa fa-external-link"></i></button></span>'
-                    return '<div style="min-height:190px"><span style="font-size: 12px; font-weight: bold">' + title + '</span>' +
+                    return '<div class="cron-plus-expression-tip-content"><span class="cron-plus-expression-tip-title">' + title + '</span>' +
                         helpFuncHtml +
                         '<hr><div>' + desc + '</div>' +
-                        '<pre class="cron-plus-form-tip form-tips">' + text + '</pre></div>'
+                        '<pre class="cron-plus-expression-tip-detail form-tips">' + text + '</pre></div>'
                 }
                 function initTooltip (selector, type, pos) {
                     if (selector.typedInput('instance') && selector.typedInput('instance').input) {
@@ -1593,7 +1594,8 @@ copies or substantial portions of the Software.
                     $selector.attr('title', ' ')
                     $selector.off('mouseenter').tooltip({
                         show: { effect: 'fade' },
-                        tooltipClass: 'cron-plus-expression-tip form-tips',
+                        tooltipClass: cronTooltipClass, // legacy (pre jQuery UI 1.12)
+                        classes: { 'ui-tooltip': cronTooltipClass }, // jQuery UI 1.12+
                         position: pos,
                         content: function () {
                             return buildExpressionTip('Expression...', 'Getting description...', '', type)
@@ -1648,6 +1650,8 @@ copies or substantial portions of the Software.
                         $this.tooltip('option', 'position', pos)
                         $this.tooltip({
                             position: pos,
+                            tooltipClass: cronTooltipClass, // legacy (pre jQuery UI 1.12)
+                            classes: { 'ui-tooltip': cronTooltipClass }, // jQuery UI 1.12+
                             disabled: false,
                             show: { effect: 'fade' },
                             content: function (callback) {
@@ -2326,6 +2330,7 @@ function onSchedulesExpandCompress () {
         .cron-plus-form-row > label {
             width: 120px !important;
         }
+
         .cron-plus-expression-tip {
             background: var(--red-ui-primary-background);
             color: var(--red-ui-primary-text-color);
@@ -2335,7 +2340,10 @@ function onSchedulesExpandCompress () {
             overflow: auto;
             font-size: 10px;
         }
-        .cron-plus-form-tip {
+        .cron-plus-expression-tip .ui-tooltip {
+            min-width: unset;
+        }
+        .cron-plus-expression-tip-detail {
             background: var(--red-ui-primary-background);
             color: var(--red-ui-primary-text-color);
             padding: 6px 6px;
@@ -2346,18 +2354,25 @@ function onSchedulesExpandCompress () {
             overflow: auto;
             word-break: keep-all;
         }
-        .cron-plus-form-tip > div {
+        .cron-plus-expression-tip-detail > div {
             white-space: pre-wrap;
         }
-        span .cron-plus-form-tip {
+        span .cron-plus-expression-tip-detail {
             border-radius: 2px;
             border: 1px solid var(--red-ui-secondary-background);
             border-radius: 4px;
             display: inline-block;
         }
-        .cron-plus-form-tip-spacer {
+        .cron-plus-expression-tip-detail-spacer {
             display: inline-block;
             width: 100px
+        }
+        .cron-plus-expression-tip-title {
+            font-size: 12px;
+            font-weight: bold
+        }
+        .cron-plus-expression-tip-content {
+            min-height: 190px;
         }
         .cron-plus-expression {
             font-family: monospace;
@@ -2413,14 +2428,6 @@ function onSchedulesExpandCompress () {
         .cron-plus-map-loading {
             padding: 2px 10px 2px 10px;
         }
-        .cron-plus-coordinates {
-            font-family: monospace;
-            background: var(--red-ui-primary-text-color);
-            color: var(--red-ui-primary-background);
-            padding-left: 5px;
-            padding-right: 5px;
-            border: 1px solid var(--red-ui-secondary-background);
-        }
         .cron-plus-link-button {
             background: none!important;
             border: none!important;
@@ -2469,10 +2476,10 @@ function onSchedulesExpandCompress () {
             </ul>
             <h4>Accepted formats...</h4>
             <ul>
-                <li>Decimal Degrees E.g: <code class="cron-plus-coordinates">54.9992500,-1.4170300</code> or <code class="cron-plus-coordinates">54.9992500° N 1.4170300° W</code></li>
-                <li>Degrees Minutes Seconds E.g: <code class="cron-plus-coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
-                <li>Decimal Minutes E.g: <code class="cron-plus-coordinates">54° 59.955' , -1° 25.0218'</code></li>
-                <li>GPS E.g: <code class="cron-plus-coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="cron-plus-coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="cron-plus-coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="cron-plus-coordinates">54:59:57.3N 1:25:1.308W</code></li>
+                <li>Decimal Degrees E.g: <code>54.9992500,-1.4170300</code> or <code>54.9992500° N 1.4170300° W</code></li>
+                <li>Degrees Minutes Seconds E.g: <code>54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
+                <li>Decimal Minutes E.g: <code>54° 59.955' , -1° 25.0218'</code></li>
+                <li>GPS E.g: <code>N54°59'57.3, W1°25'1.308"</code>, <code>54°59'57.3"N, 1°25'1.308"W</code>, <code>54d 59' 57" N 1d 25' 1" W</code> or <code>54:59:57.3N 1:25:1.308W</code></li>
             </ul>
         </div>
         <div class="cron-plus-map-not-loaded"  style="display:hidden" >
@@ -2489,10 +2496,10 @@ function onSchedulesExpandCompress () {
             </ul>
             <h4>Accepted formats...</h4>
             <ul>
-                <li>Decimal Degrees E.g: <code class="cron-plus-coordinates">54.9992500,-1.4170300</code> or <code class="cron-plus-coordinates">54.9992500° N 1.4170300° W</code></li>
-                <li>Degrees Minutes Seconds E.g: <code class="cron-plus-coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
-                <li>Decimal Minutes E.g: <code class="cron-plus-coordinates">54° 59.955' , -1° 25.0218'</code></li>
-                <li>GPS E.g: <code class="cron-plus-coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="cron-plus-coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="cron-plus-coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="cron-plus-coordinates">54:59:57.3N 1:25:1.308W</code></li>
+                <li>Decimal Degrees E.g: <code>54.9992500,-1.4170300</code> or <code>54.9992500° N 1.4170300° W</code></li>
+                <li>Degrees Minutes Seconds E.g: <code>54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
+                <li>Decimal Minutes E.g: <code>54° 59.955' , -1° 25.0218'</code></li>
+                <li>GPS E.g: <code>N54°59'57.3, W1°25'1.308"</code>, <code>54°59'57.3"N, 1°25'1.308"W</code>, <code>54d 59' 57" N 1d 25' 1" W</code> or <code>54:59:57.3N 1:25:1.308W</code></li>
             </ul>
         </div>
         <div id="cron-plus-map"></div>
@@ -2735,10 +2742,10 @@ function onSchedulesExpandCompress () {
             The location field is expected to contain longitude and latitude coordinates for the calculation of solar events.<br>
             Accepted formats...
             <ul>
-                <li>Decimal Degrees E.g: <code class="cron-plus-coordinates">54.9992500,-1.4170300</code> or <code class="cron-plus-coordinates">54.9992500° N 1.4170300° W</code></li>
-                <li>Degrees Minutes Seconds E.g: <code class="cron-plus-coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
-                <li>Decimal Minutes E.g: <code class="cron-plus-coordinates">54° 59.955' , -1° 25.0218'</code></li>
-                <li>GPS E.g: <code class="cron-plus-coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="cron-plus-coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="cron-plus-coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="cron-plus-coordinates">54:59:57.3N 1:25:1.308W</code></li>
+                <li>Decimal Degrees E.g: <code>54.9992500,-1.4170300</code> or <code>54.9992500° N 1.4170300° W</code></li>
+                <li>Degrees Minutes Seconds E.g: <code>54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
+                <li>Decimal Minutes E.g: <code>54° 59.955' , -1° 25.0218'</code></li>
+                <li>GPS E.g: <code>N54°59'57.3, W1°25'1.308"</code>, <code>54°59'57.3"N, 1°25'1.308"W</code>, <code>54d 59' 57" N 1d 25' 1" W</code> or <code>54:59:57.3N 1:25:1.308W</code></li>
             </ul>
         </div>
         <h4>Schedules - Offset</h4>

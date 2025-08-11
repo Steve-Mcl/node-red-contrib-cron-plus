@@ -786,7 +786,7 @@ describe('cron-plus Node', function () {
             // setup add dyn-1 and dyn-2
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 3, expression: '* * * * * * *' })) // every 1 seconds
             testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
-            await sleep(2100) // wait 2 seconds - should only 2 should be triggered
+            await sleep(2050) // wait 2 seconds - should only 2 should be triggered
 
             const messages = []
             const resultPromise = new Promise(resolve => {
@@ -800,11 +800,12 @@ describe('cron-plus Node', function () {
 
             testNode.receive({ topic: 'status-active', payload: '' }) // check status of active schedules before stopping
             testNode.receive({ topic: 'pause', payload: 'dyn-1' }) // stop dyn-1 (no output expected)
-            await sleep(2100) // wait 2 seconds - for dyn-1 should not increase
+            await sleep(2050) // wait 2 seconds - for dyn-1 should not increase
             testNode.receive({ topic: 'status-inactive', payload: '' })
             testNode.receive({ topic: 'start', payload: 'dyn-1' }) // start dyn-1 (no output expected)
+            await sleep(10)
             testNode.receive({ topic: 'status-active', payload: '' })
-            await sleep(1100) // wait 1 seconds for dyn-1 to trigger again
+            await sleep(1050) // wait 1 seconds for dyn-1 to trigger again
             testNode.receive({ topic: 'status-inactive', payload: '' })
             await resultPromise
             messages.should.have.length(4)
