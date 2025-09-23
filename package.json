@@ -1,6 +1,6 @@
 {
     "name": "node-red-contrib-cron-plus",
-    "version": "2.2.1",
+    "version": "2.2.3",
     "description": "A flexible scheduler (cron, solar events, fixed dates) node for Node-RED with full dynamic control and time zone support",
     "main": "cronplus.js",
     "scripts": {
@@ -62,7 +62,7 @@
         "eslint-config-standard": "^17.1.0",
         "eslint-plugin-html": "^7.1.0",
         "eslint-plugin-n": "^16.6.2",
-        "eslint-plugin-no-only-tests": "^3.1.0",
+        "eslint-plugin-no-only-tests": "^3.2.0",
         "eslint-plugin-standard": "^5.0.0",
         "mocha": "^11.7.1",
         "node-red": "^4.1.0",
@@ -75,5 +75,10 @@
             "name": "Steve-Mcl",
             "email": "44235289+Steve-Mcl@users.noreply.github.com"
         }
-    ]
+    ],
+    "overrides": {
+        "node-red-admin@4.1.1": {
+            "axios": "1.12.2"
+        }
+    }
 }
