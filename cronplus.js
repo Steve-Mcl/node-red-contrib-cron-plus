@@ -1426,7 +1426,7 @@ module.exports = function (RED) {
                     task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
                     task.start()
                     // lets see if this is a solar task that failed to start...
-                    if (!task.isRunning && task.node_opt?.expressionType === 'solar') {
+                    if (!task.isRunning && task.node_opt && task.node_opt.expressionType === 'solar') {
                         // solar tasks that are paused when its _time_ passes miss the call to `update`
                         // which is responsible for generating the next occurrence
                         // lets try updating it now
