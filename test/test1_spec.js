@@ -728,7 +728,7 @@ describe('cron-plus Node', function () {
         })
 
         it("should 'stop' by topic (should reset counter)", async function () {
-            this.timeout(555000)
+            this.timeout(5000)
             // setup add dyn-1 and dyn-2
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 3, expression: '* * * * * * *' })) // every 1 seconds
             testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
