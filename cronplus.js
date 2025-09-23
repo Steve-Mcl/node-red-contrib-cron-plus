@@ -1223,12 +1223,12 @@ module.exports = function (RED) {
                         requestSerialisation()// update persistence
                         break
                     case 'start': // single
-                        startTask(node, cmd.name)
+                        startTaskByName(node, cmd.name)
                         updateNextStatus(node, true)
                         requestSerialisation()// update persistence
                         break
                     case 'start-': // multiple
-                        startAllTasks(node, cmdFilter)
+                        await startAllTasks(node, cmdFilter)
                         updateNextStatus(node, true)
                         requestSerialisation()// update persistence
                         break
@@ -1413,29 +1413,37 @@ module.exports = function (RED) {
                 }
             }
         }
-        function startTask (node, name) {
+        async function startTaskByName (node, name) {
             const task = getTask(node, name)
+            return await startTask(node, task)
+        }
+        async function startTask (node, task) {
             if (task) {
-                if (isTaskFinished(task)) {
-                    task.node_count = 0
-                }
-                task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-                task.start()
+                try {
+                    if (isTaskFinished(task)) {
+                        task.node_count = 0
+                    }
+                    task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
+                    task.start()
+                    // lets see if this is a solar task that failed to start...
+                    if (!task.isRunning && task.node_opt?.expressionType === 'solar') {
+                        // solar tasks that are paused when its _time_ passes miss the call to `update`
+                        // which is responsible for generating the next occurrence
+                        // lets try updating it now
+                        await updateTask(node, task.node_opt, null)
+                    }
+                } catch { /* ignore */ }
             }
             return task
         }
-        function startAllTasks (node, filter) {
+        async function startAllTasks (node, filter) {
             if (node.tasks) {
                 for (let index = 0; index < node.tasks.length; index++) {
                     const task = node.tasks[index]
                     let skip = false
                     if (filter) skip = (taskFilterMatch(task, filter) === false)
                     if (!skip && task) {
-                        if (isTaskFinished(task)) {
-                            task.node_count = 0
-                        }
-                        task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-                        task.start()
+                        await startTask(node, task)
                     }
                 }
             }
@@ -1717,7 +1725,7 @@ module.exports = function (RED) {
                             if (opt.isRunning === false) {
                                 stopTask(node, opt.name)
                             } else if (opt.isRunning === true) {
-                                startTask(node, opt.name)
+                                startTaskByName(node, opt.name)
                             }
                         }
                         updateNodeNextInfo(node)
@@ -1743,7 +1751,7 @@ module.exports = function (RED) {
                                 if (opt.isRunning === false) {
                                     stopTask(node, opt.name)
                                 } else if (opt.isRunning === true) {
-                                    startTask(node, opt.name)
+                                    startTaskByName(node, opt.name)
                                 }
                             }
                         }
