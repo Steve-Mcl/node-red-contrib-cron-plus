@@ -1123,7 +1123,7 @@ module.exports = function (RED) {
                         {
                             const tt = getTask(node, cmd.name)
                             if (!tt) throw new Error(`Manual Trigger failed. Cannot find schedule named '${cmd.name}'`)
-                            sendMsg(node, tt, Date.now(), true)
+                            await sendMsg(node, tt, Date.now(), true)
                         }
                         break
                     case 'trigger-': // multiple
@@ -1131,7 +1131,7 @@ module.exports = function (RED) {
                             for (let index = 0; index < node.tasks.length; index++) {
                                 const task = node.tasks[index]
                                 if (task && (cmdAll || taskFilterMatch(task, cmdFilter))) {
-                                    sendMsg(node, task, Date.now(), true)
+                                    await sendMsg(node, task, Date.now(), true)
                                 }
                             }
                         }
@@ -1223,12 +1223,12 @@ module.exports = function (RED) {
                         requestSerialisation()// update persistence
                         break
                     case 'start': // single
-                        startTask(node, cmd.name)
+                        await startTaskByName(node, cmd.name)
                         updateNextStatus(node, true)
                         requestSerialisation()// update persistence
                         break
                     case 'start-': // multiple
-                        startAllTasks(node, cmdFilter)
+                        await startAllTasks(node, cmdFilter)
                         updateNextStatus(node, true)
                         requestSerialisation()// update persistence
                         break
@@ -1324,35 +1324,36 @@ module.exports = function (RED) {
             }
         })
 
+        /**
+         * Get a task by name
+         * @param {Object} node - the cronplus node
+         * @param {*} name - the name of the task
+         * @returns {cronosjs.CronosTask} the found task or null
+         */
         function getTask (node, name) {
             const task = node.tasks.find(function (task) {
                 return task.name === name
             })
             return task
         }
-        async function refreshTasks (node) {
-            const tasks = node.tasks
-            node.debug('Refreshing running schedules')
-            if (tasks) {
+        async function refreshTasks (node, tasks) {
+            const _tasks = tasks || node.tasks
+            if (_tasks && _tasks.length) {
                 try {
-                    // let now = new Date();
-                    if (!tasks || !tasks.length) { return null }
-                    const tasksToRefresh = tasks.filter(function (task) {
+                    const tasksToRefresh = _tasks.filter(function (task) {
                         return task._sequence || (task.isRunning && task._expression && !isTaskFinished(task))
                     })
                     if (!tasksToRefresh || !tasksToRefresh.length) {
                         return null
                     }
-                    for (let index = 0; index < node.tasks.length; index++) {
-                        const task = node.tasks[index]
+                    for (let index = 0; index < _tasks.length; index++) {
+                        const task = _tasks[index]
                         if (task.node_expressionType === 'cron') {
                             task.stop()
                             task.start()
                         } else {
                             await updateTask(node, task.node_opt, null)
                         }
-                        // task.runScheduledTasks();
-                        // index--;
                     }
                 } catch (e) { }
                 updateNextStatus(node)
@@ -1413,32 +1414,51 @@ module.exports = function (RED) {
                 }
             }
         }
-        function startTask (node, name) {
+        async function startTaskByName (node, name) {
             const task = getTask(node, name)
+            return await startTask(node, task)
+        }
+
+        /**
+         * Start a cron task
+         * @param {Object} node - the cronplus node
+         * @param {cronosjs.CronosTask} task - the task to start
+         * @returns {Promise<cronosjs.CronosTask>} the started task
+         */
+        async function startTask (node, task) {
             if (task) {
-                if (isTaskFinished(task)) {
-                    task.node_count = 0
+                try {
+                    if (isTaskFinished(task)) {
+                        task.node_count = 0
+                    }
+                    task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
+                    task.start()
+                    // lets see if this is a solar task that failed to start...
+                    if (!task.isRunning && task.node_opt && task.node_opt.expressionType === 'solar') {
+                        // solar tasks that are paused when its _time_ passes miss the call to `update`
+                        // which is responsible for generating the next occurrence
+                        // lets try updating it now
+                        await updateTask(node, task.node_opt, null)
+                    }
+                } catch (e) {
+                    node.debug(`startTask error: ${e.message}`)
                 }
-                task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-                task.start()
             }
             return task
         }
-        function startAllTasks (node, filter) {
+        async function startAllTasks (node, filter) {
+            const promises = []
             if (node.tasks) {
                 for (let index = 0; index < node.tasks.length; index++) {
                     const task = node.tasks[index]
                     let skip = false
                     if (filter) skip = (taskFilterMatch(task, filter) === false)
                     if (!skip && task) {
-                        if (isTaskFinished(task)) {
-                            task.node_count = 0
-                        }
-                        task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-                        task.start()
+                        promises.push(startTask(node, task))
                     }
                 }
             }
+            return Promise.all(promises)
         }
         function deleteAllTasks (node, filter) {
             if (node.tasks) {
@@ -1468,6 +1488,11 @@ module.exports = function (RED) {
                 task = null
             }
         }
+
+        /**
+         * Delete a task
+         * @param {cronosjs.CronosTask} task - the task to delete
+         */
         function _deleteTask (task) {
             try {
                 task.off('run')
@@ -1502,7 +1527,7 @@ module.exports = function (RED) {
                     validateOpt(opt)
                 } catch (error) {
                     node.warn(error, msg)
-                    return
+                    return null
                 }
             }
 
@@ -1717,7 +1742,7 @@ module.exports = function (RED) {
                             if (opt.isRunning === false) {
                                 stopTask(node, opt.name)
                             } else if (opt.isRunning === true) {
-                                startTask(node, opt.name)
+                                startTaskByName(node, opt.name)
                             }
                         }
                         updateNodeNextInfo(node)
@@ -1743,7 +1768,7 @@ module.exports = function (RED) {
                                 if (opt.isRunning === false) {
                                     stopTask(node, opt.name)
                                 } else if (opt.isRunning === true) {
-                                    startTask(node, opt.name)
+                                    startTaskByName(node, opt.name)
                                 }
                             }
                         }
