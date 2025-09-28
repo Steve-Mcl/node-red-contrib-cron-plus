@@ -1449,12 +1449,13 @@ module.exports = function (RED) {
         async function startAllTasks (node, filter) {
             const promises = []
             if (node.tasks) {
-                for (let index = 0; index < node.tasks.length; index++) {
-                    const task = node.tasks[index]
+                const taskNames = node.tasks.map(t => t.name)
+                for (const name of taskNames) {
+                    const task = getTask(node, name)
                     let skip = false
                     if (filter) skip = (taskFilterMatch(task, filter) === false)
                     if (!skip && task) {
-                        promises.push(startTask(node, task))
+                        promises.push(startTaskByName(node, name))
                     }
                 }
             }
