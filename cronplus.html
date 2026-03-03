@@ -18,6 +18,7 @@ copies or substantial portions of the Software.
 <script type="text/javascript">
 /* global RED, $, jQuery */
 /* global cartodb, L */
+
 (function ($) {
     'use strict'
 
@@ -118,39 +119,39 @@ copies or substantial portions of the Software.
             $selector.siblings('div.cron-start-time').show()
             $selector.siblings('div.cron-start-time').children('select.cron-clock-hour').val('12')
             switch (period) {
-            case 'Minutes':
-                $selector.siblings('div.cron-minutes')
-                    .show()
-                    .find('select.cron-minutes-select').val('1')
-                $selector.siblings('div.cron-start-time').hide()
-                break
-            case 'Hourly':{
-                const $hourlyEl = $selector.siblings('div.cron-hourly')
-                $hourlyEl.show()
-                    .find('input[name=hourlyType][value=every]').prop('checked', true)
-                $hourlyEl.find('select.cron-hourly-hour').val('12')
-                $selector.siblings('div.cron-start-time').hide() }
-                break
-            case 'Daily':{
-                const $dailyEl = $selector.siblings('div.cron-daily')
-                $dailyEl.show()
-                    .find('input[name=dailyType][value=every]').prop('checked', true) }
-                break
-            case 'Weekly':
-                $selector.siblings('div.cron-weekly')
-                    .show()
-                    .find('input[type=checkbox]').prop('checked', false)
-                break
-            case 'Monthly':{
-                const $monthlyEl = $selector.siblings('div.cron-monthly')
-                $monthlyEl.show()
-                    .find('input[name=monthlyType][value=byDay]').prop('checked', true) }
-                break
-            case 'Yearly':{
-                const $yearlyEl = $selector.siblings('div.cron-yearly')
-                $yearlyEl.show()
-                    .find('input[name=yearlyType][value=byDay]').prop('checked', true) }
-                break
+                case 'Minutes':
+                    $selector.siblings('div.cron-minutes')
+                        .show()
+                        .find('select.cron-minutes-select').val('1')
+                    $selector.siblings('div.cron-start-time').hide()
+                    break
+                case 'Hourly':{
+                    const $hourlyEl = $selector.siblings('div.cron-hourly')
+                    $hourlyEl.show()
+                        .find('input[name=hourlyType][value=every]').prop('checked', true)
+                    $hourlyEl.find('select.cron-hourly-hour').val('12')
+                    $selector.siblings('div.cron-start-time').hide() }
+                    break
+                case 'Daily':{
+                    const $dailyEl = $selector.siblings('div.cron-daily')
+                    $dailyEl.show()
+                        .find('input[name=dailyType][value=every]').prop('checked', true) }
+                    break
+                case 'Weekly':
+                    $selector.siblings('div.cron-weekly')
+                        .show()
+                        .find('input[type=checkbox]').prop('checked', false)
+                    break
+                case 'Monthly':{
+                    const $monthlyEl = $selector.siblings('div.cron-monthly')
+                    $monthlyEl.show()
+                        .find('input[name=monthlyType][value=byDay]').prop('checked', true) }
+                    break
+                case 'Yearly':{
+                    const $yearlyEl = $selector.siblings('div.cron-yearly')
+                    $yearlyEl.show()
+                        .find('input[name=yearlyType][value=byDay]').prop('checked', true) }
+                    break
             }
         }
     }
@@ -231,102 +232,102 @@ copies or substantial portions of the Software.
             let hour = base.$el.find('select.cron-clock-hour').val()
             const period = base.$el.find('select.cron-period-select').val()
             switch (period) {
-            case 'Minutes':
-                {
-                    const $selector = base.$el.find('div.cron-minutes')
-                    const nmin = $selector.find('select.cron-minutes-select').val()
-                    if (nmin > 1) min = '0/' + nmin
-                    else min = '*'
-                    hour = '*'
-                }
-                break
-
-            case 'Hourly':
-                {
-                    const $selector = base.$el.find('div.cron-hourly')
-                    if ($selector.find('input[name=hourlyType][value=every]').is(':checked')) {
-                        min = 0
+                case 'Minutes':
+                    {
+                        const $selector = base.$el.find('div.cron-minutes')
+                        const nmin = $selector.find('select.cron-minutes-select').val()
+                        if (nmin > 1) min = '0/' + nmin
+                        else min = '*'
                         hour = '*'
-                        const nhour = $selector.find('select.cron-hourly-select').val()
-                        if (nhour > 1) hour = '0/' + nhour
-                    } else {
-                        min = $selector.find('select.cron-hourly-minute').val()
-                        hour = $selector.find('select.cron-hourly-hour').val()
                     }
-                }
-                break
+                    break
 
-            case 'Daily':
-                {
-                    const $selector = base.$el.find('div.cron-daily')
-                    if ($selector.find('input[name=dailyType][value=every]').is(':checked')) {
-                        const ndom = $selector.find('select.cron-daily-select').val()
-                        if (ndom > 1) dom = '1/' + ndom
-                    } else {
+                case 'Hourly':
+                    {
+                        const $selector = base.$el.find('div.cron-hourly')
+                        if ($selector.find('input[name=hourlyType][value=every]').is(':checked')) {
+                            min = 0
+                            hour = '*'
+                            const nhour = $selector.find('select.cron-hourly-select').val()
+                            if (nhour > 1) hour = '0/' + nhour
+                        } else {
+                            min = $selector.find('select.cron-hourly-minute').val()
+                            hour = $selector.find('select.cron-hourly-hour').val()
+                        }
+                    }
+                    break
+
+                case 'Daily':
+                    {
+                        const $selector = base.$el.find('div.cron-daily')
+                        if ($selector.find('input[name=dailyType][value=every]').is(':checked')) {
+                            const ndom = $selector.find('select.cron-daily-select').val()
+                            if (ndom > 1) dom = '1/' + ndom
+                        } else {
+                            dom = '?'
+                            dow = 'MON-FRI'
+                        }
+                    }
+                    break
+
+                case 'Weekly':
+                    {
+                        const $selector = base.$el.find('div.cron-weekly')
+                        const ndow = []
+                        if ($selector.find('input[name=dayOfWeekMon]').is(':checked')) { ndow.push('MON') }
+                        if ($selector.find('input[name=dayOfWeekTue]').is(':checked')) { ndow.push('TUE') }
+                        if ($selector.find('input[name=dayOfWeekWed]').is(':checked')) { ndow.push('WED') }
+                        if ($selector.find('input[name=dayOfWeekThu]').is(':checked')) { ndow.push('THU') }
+                        if ($selector.find('input[name=dayOfWeekFri]').is(':checked')) { ndow.push('FRI') }
+                        if ($selector.find('input[name=dayOfWeekSat]').is(':checked')) { ndow.push('SAT') }
+                        if ($selector.find('input[name=dayOfWeekSun]').is(':checked')) { ndow.push('SUN') }
+                        dow = '*'
                         dom = '?'
-                        dow = 'MON-FRI'
+                        if (ndow.length < 7 && ndow.length > 0) dow = ndow.join(',')
                     }
-                }
-                break
+                    break
 
-            case 'Weekly':
-                {
-                    const $selector = base.$el.find('div.cron-weekly')
-                    const ndow = []
-                    if ($selector.find('input[name=dayOfWeekMon]').is(':checked')) { ndow.push('MON') }
-                    if ($selector.find('input[name=dayOfWeekTue]').is(':checked')) { ndow.push('TUE') }
-                    if ($selector.find('input[name=dayOfWeekWed]').is(':checked')) { ndow.push('WED') }
-                    if ($selector.find('input[name=dayOfWeekThu]').is(':checked')) { ndow.push('THU') }
-                    if ($selector.find('input[name=dayOfWeekFri]').is(':checked')) { ndow.push('FRI') }
-                    if ($selector.find('input[name=dayOfWeekSat]').is(':checked')) { ndow.push('SAT') }
-                    if ($selector.find('input[name=dayOfWeekSun]').is(':checked')) { ndow.push('SUN') }
-                    dow = '*'
-                    dom = '?'
-                    if (ndow.length < 7 && ndow.length > 0) dow = ndow.join(',')
-                }
-                break
-
-            case 'Monthly':
-                {
-                    const $selector = base.$el.find('div.cron-monthly')
-                    let nmonth
-                    let mnd
-                    if ($selector.find('input[name=monthlyType][value=byDay]').is(':checked')) {
-                        month = '*'
-                        nmonth = $selector.find('select.cron-monthly-month').val()
-                        dom = $selector.find('select.cron-monthly-day').val()
-                        dow = '?'
-                    } else {
-                        mnd = $selector.find('select.cron-monthly-nth-day').val()
-                        dow = $selector.find('select.cron-monthly-day-of-week').val() +
-                                (mnd === 'L' ? 'L' : '#' + mnd)
-                        nmonth = $selector.find('select.cron-monthly-month-by-week').val()
-                        dom = '?'
+                case 'Monthly':
+                    {
+                        const $selector = base.$el.find('div.cron-monthly')
+                        let nmonth
+                        let mnd
+                        if ($selector.find('input[name=monthlyType][value=byDay]').is(':checked')) {
+                            month = '*'
+                            nmonth = $selector.find('select.cron-monthly-month').val()
+                            dom = $selector.find('select.cron-monthly-day').val()
+                            dow = '?'
+                        } else {
+                            mnd = $selector.find('select.cron-monthly-nth-day').val()
+                            dow = $selector.find('select.cron-monthly-day-of-week').val() +
+                                    (mnd === 'L' ? 'L' : '#' + mnd)
+                            nmonth = $selector.find('select.cron-monthly-month-by-week').val()
+                            dom = '?'
+                        }
+                        if (nmonth > 1) month = '1/' + nmonth
                     }
-                    if (nmonth > 1) month = '1/' + nmonth
-                }
-                break
+                    break
 
-            case 'Yearly':
-                {
-                    const $selector = base.$el.find('div.cron-yearly')
-                    let ynd
-                    if ($selector.find('input[name=yearlyType][value=byDay]').is(':checked')) {
-                        dom = $selector.find('select.cron-yearly-day').val()
-                        month = $selector.find('select.cron-yearly-month').val()
-                        dow = '?'
-                    } else {
-                        ynd = $selector.find('select.cron-yearly-nth-day').val()
-                        dow = $selector.find('select.cron-yearly-day-of-week').val() +
-                                (ynd === 'L' ? 'L' : '#' + ynd)
-                        month = $selector.find('select.cron-yearly-month-by-week').val()
-                        dom = '?'
+                case 'Yearly':
+                    {
+                        const $selector = base.$el.find('div.cron-yearly')
+                        let ynd
+                        if ($selector.find('input[name=yearlyType][value=byDay]').is(':checked')) {
+                            dom = $selector.find('select.cron-yearly-day').val()
+                            month = $selector.find('select.cron-yearly-month').val()
+                            dow = '?'
+                        } else {
+                            ynd = $selector.find('select.cron-yearly-nth-day').val()
+                            dow = $selector.find('select.cron-yearly-day-of-week').val() +
+                                    (ynd === 'L' ? 'L' : '#' + ynd)
+                            month = $selector.find('select.cron-yearly-month-by-week').val()
+                            dom = '?'
+                        }
                     }
-                }
-                break
+                    break
 
-            default:
-                break
+                default:
+                    break
             }
             return [sec, min, hour, dom, month, dow, year].join(' ')
         }
@@ -346,10 +347,9 @@ copies or substantial portions of the Software.
             (new $.cronBuilder(this, options))
         })
     }
-}(jQuery));
 
-(function () {
     RED._cron_plus_debug = false // set true at runtime to enable debug output
+    if (RED._cron_plus_debug) console.debug('Initializing cron-plus')
     let map, mapPopup, selectedLocation, selectedLocationInput
     const filesAdded = [] // list of files already added
     const cronTooltipClass = 'cron-plus-expression-tip form-tips ui-corner-all ui-widget-shadow'
@@ -366,7 +366,7 @@ copies or substantial portions of the Software.
                 if (callback) {
                     callback(err)
                 } else {
-                    alert(`Unable to get fullscreen mode: ${err.message}`)
+                    window.alert(`Unable to get fullscreen mode: ${err.message}`)
                 }
             })
         } else {
@@ -415,7 +415,7 @@ copies or substantial portions of the Software.
         }
         try {
             value = parseFloat(value)
-        } catch (e) {
+        } catch (_e) {
             value = def || 0.0
         }
         if (isNaN(value)) {
@@ -448,7 +448,7 @@ copies or substantial portions of the Software.
                 if (!isDate) return false
             }
             return true
-        } catch (error) {
+        } catch (_error) {
             return false
         }
     }
@@ -512,8 +512,7 @@ copies or substantial portions of the Software.
                 effect: 'blind',
                 duration: 500
             },
-            // eslint-disable-next-line no-unused-vars
-            open: function (event) {
+            open: function (_event) {
                 $(this).css('padding', '0px 0px 0px 0px')
                 $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary')
                 $('#cron-plus-map-dialog').dialog('option', 'height', getIdealDialogHeight())
@@ -523,8 +522,7 @@ copies or substantial portions of the Software.
                 effect: 'explode',
                 duration: 500
             },
-            // eslint-disable-next-line no-unused-vars
-            close: function (event, ui) {
+            close: function (_event, _ui) {
                 if (RED._cron_plus_debug) console.debug('destroying map')
                 if (map) map.remove()
             }
@@ -642,8 +640,7 @@ copies or substantial portions of the Software.
                     showMapPopup(content, selectedLocation.lat, selectedLocation.lng, map)
                 }
 
-                // eslint-disable-next-line no-unused-vars
-                layer.on('featureClick', function (e, latlng, pos, data, layer) {
+                layer.on('featureClick', function (e, latlng, pos, data, _layer) {
                     if (RED._cron_plus_debug) console.debug('click', latlng, data)
                 })
                 $('#cron-plus-map-dialog').dialog('option', 'position', { my: 'center', at: 'center', of: window })
@@ -656,9 +653,9 @@ copies or substantial portions of the Software.
             $('.cron-plus-map-not-loaded').show()
             $('.cron-plus-map-loading').hide()
             $('#cron-plus-map').hide()
-            const proto = location.protocol === 'https:' ? location.protocol : 'http:'
-            checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/themes/css/cartodb.css', 'css', function () {
-                checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.11/cartodb.uncompressed.js', 'js', function () {
+            const proto = window.location.protocol === 'https:' ? 'https:' : 'http:'
+            checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.15/themes/css/cartodb.css', 'css', function () {
+                checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.15/cartodb.uncompressed.js', 'js', function () {
                     createMap(srcInput)
                 })
             })
@@ -1016,7 +1013,6 @@ copies or substantial portions of the Software.
 
             node.commandResponseMsgOutput = ['output1', 'output2', 'fanOut'].indexOf(node.commandResponseMsgOutput) >= 0 ? node.commandResponseMsgOutput : 'output1'
 
-            // eslint-disable-next-line no-undef
             initMap()
 
             // inherit/upgrade deprecated properties from config
@@ -1077,10 +1073,9 @@ copies or substantial portions of the Software.
                         label: 'Fixed Location',
                         icon: 'fa fa-map-pin',
                         expand: function () {
-                            // eslint-disable-next-line no-undef
                             showMap($('#node-input-defaultLocation'))
                         },
-                        validate: function (v, opt) { return !!v && v.length >= 3 }
+                        validate: function (v, _opt) { return !!v && v.length >= 3 }
                     },
                     'env'
                 ]
@@ -1118,8 +1113,7 @@ copies or substantial portions of the Software.
                     effect: 'blind',
                     duration: 500
                 },
-                // eslint-disable-next-line no-unused-vars
-                open: function (event) {
+                open: function (_event) {
                     // $(this).css('padding', '0px 0px 0px 0px');
                     $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary')
                     $('#cron-plus-expression-builder .cron-period-select').change()// cause cronBuilder UI to update
@@ -1355,7 +1349,7 @@ copies or substantial portions of the Software.
                             if (e.payload && isObject(e.payload)) {
                                 try {
                                     e.payload = JSON.stringify(e.payload, undefined, 2)
-                                } catch (error) {
+                                } catch (_error) {
                                     e.payload = typeof e.payload
                                 }
                             }
@@ -1483,7 +1477,7 @@ copies or substantial portions of the Software.
                 }
                 try {
                     dateString = new Intl.DateTimeFormat('default', o).format(new Date(date))
-                } catch (error) {
+                } catch (_error) {
                     dateString = 'Error. Check timezone setting'
                 }
                 return dateString
@@ -1668,7 +1662,7 @@ copies or substantial portions of the Software.
                                 if (expressionType === 'solar') {
                                     titleHtml = (expr) => {
                                         const title = '<b>solar events</b> at <span class="cron-plus-expression">' + expr.slice(0, 100) + (expr.length > 100 ? '...' : '') + '</span>'
-                                        // eslint-disable-next-line eqeqeq
+
                                         if (offset != null && offset !== '0' && offset !== 0) {
                                             titleHtml += '<b>'
                                             if (offset > 0) titleHtml += ' +'
@@ -1884,8 +1878,7 @@ copies or substantial portions of the Software.
                 try {
                     expressionField.combobox().button.prop('title', 'Expression examples...')
                     expressionField.combobox('instance').button.prop('title', 'Expression examples...')
-                    // eslint-disable-next-line no-empty
-                } catch (error) { }
+                } catch (_error) { }
                 expressionField.combobox('value', option.expression || '')
 
                 // generate the solar events field
@@ -1928,10 +1921,9 @@ copies or substantial portions of the Software.
                             label: 'Fixed Location',
                             icon: 'fa fa-map-pin',
                             expand: function () {
-                                // eslint-disable-next-line no-undef
                                 showMap(locationField)
                             },
-                            validate: function (v, opt) { return !!v && v.length >= 3 }
+                            validate: function (v, _opt) { return !!v && v.length >= 3 }
                         }
                     ]
                 })
@@ -1973,20 +1965,20 @@ copies or substantial portions of the Software.
                     const showLocationGroup = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
                     locationFieldDiv.toggleClass('cron-plus-hide-per-location', !showLocationGroup)
                     switch (value) {
-                    case 'solar':
-                        cell2Cron.hide()
-                        cell2Solar.show()
-                        break
-                    case 'dates':
-                        cell2Cron.show()
-                        cell2Solar.hide()
-                        expressionField.combobox('hideMenu')
-                        break
-                    default: // cron
-                        cell2Cron.show()
-                        cell2Solar.hide()
-                        expressionField.combobox('showMenu')
-                        break
+                        case 'solar':
+                            cell2Cron.hide()
+                            cell2Solar.show()
+                            break
+                        case 'dates':
+                            cell2Cron.show()
+                            cell2Solar.hide()
+                            expressionField.combobox('hideMenu')
+                            break
+                        default: // cron
+                            cell2Cron.show()
+                            cell2Solar.hide()
+                            expressionField.combobox('showMenu')
+                            break
                     }
                 })
                 scheduleTypeField.triggerHandler('change')
@@ -2006,8 +1998,8 @@ copies or substantial portions of the Software.
                 $('#cron-plus-dynamic-nodes-dialog').dialog('open')
             })
 
-            removeEventListener('fullscreenchange', onSchedulesExpandCompress)
-            addEventListener('fullscreenchange', onSchedulesExpandCompress)
+            window.removeEventListener('fullscreenchange', onSchedulesExpandCompress)
+            window.addEventListener('fullscreenchange', onSchedulesExpandCompress)
 
             $('#cronplus-expand-schedules-button').click(function (evt) {
                 const selector = '#node-cronplus-tab-static-schedules'
@@ -2069,7 +2061,7 @@ copies or substantial portions of the Software.
         },
         oneditsave: function () {
             if (RED._cron_plus_debug) { console.debug('oneditsave - cronplus') }
-            removeEventListener('fullscreenchange', onSchedulesExpandCompress)
+            window.removeEventListener('fullscreenchange', onSchedulesExpandCompress)
             const node = this
             const options = $('#node-input-option-container').children()
             delete node.persistDynamic // remove deprecated property
@@ -2113,7 +2105,7 @@ copies or substantial portions of the Software.
         },
         oneditcancel: function () {
             if (RED._cron_plus_debug) { console.debug('oneditcancel - cronplus') }
-            removeEventListener('fullscreenchange', onSchedulesExpandCompress)
+            window.removeEventListener('fullscreenchange', onSchedulesExpandCompress)
             $('#node-input-timeZone').off()
             $('#node-input-crontab').off()
         },
@@ -2179,7 +2171,6 @@ copies or substantial portions of the Software.
     })
 })(jQuery)
 
-// eslint-disable-next-line no-unused-vars
 function _popoutCronPlusHelp (tag) {
     const startTag = (name) => `<${name}>`
     const endTag = (name) => `</${name}>`
