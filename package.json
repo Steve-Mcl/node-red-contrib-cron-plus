@@ -64,6 +64,7 @@
         "globals": "^17.4.0",
         "mocha": "^11.7.5",
         "neostandard": "^0.13.0",
+        "node-red": "^4.1.6",
         "node-red-node-test-helper": "^0.3.6",
         "should": "^13.2.3",
         "sinon": "^21.0.1"
