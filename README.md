@@ -106,7 +106,3 @@ Development
 * Run `npm run lint` to check code style
 * Run `npm run lint:fix` to fix code style issues
 * Run `npm test` to run tests
-
-**NOTE**
-Tests require Node-RED to be installed locally.
-Run `npm install --no-save node-red` to install Node-RED locally in the project folder then you can run `npm test` to execute the tests.
