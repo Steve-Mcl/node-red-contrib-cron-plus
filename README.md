@@ -97,3 +97,16 @@ Dependencies
 * [suncalc2](https://github.com/andiling/suncalc2)
 * [coord-parser](https://github.com/naturalatlas/coord-parser)
 
+Development
+-----------
+
+* Fork the repo
+* Clone your fork locally and `cd` into the project folder
+* Run `npm install` to install dependencies
+* Run `npm run lint` to check code style
+* Run `npm run lint:fix` to fix code style issues
+* Run `npm test` to run tests
+
+**NOTE**
+Tests require Node-RED to be installed locally.
+Run `npm install --no-save node-red` to install Node-RED locally in the project folder then you can run `npm test` to execute the tests.
