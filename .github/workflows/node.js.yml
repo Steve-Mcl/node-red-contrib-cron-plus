@@ -16,7 +16,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 22.x]
+        node-version: [18.x, 20.x, 22.x, 24.x]
 
     steps:
     - uses: actions/checkout@v4
@@ -28,7 +28,9 @@ jobs:
     - name: Install Node.js dependencies
       run: npm ci
 
+    # only run lint on latest node version
     - name: Run lint
+      if: ${{ startsWith(matrix.node-version, '24') }}
       run: npm run lint
 
     - name: Run tests
