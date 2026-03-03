@@ -16,7 +16,7 @@ copies or substantial portions of the Software.
 
 const cronstrue = require('cronstrue')
 const cronosjs = require('cronosjs')
-const prettyMs = require('pretty-ms')
+const prettyMs = require('./lib/ms.js').prettyMilliseconds
 const coordParser = require('coord-parser')
 const SunCalc = require('suncalc2')
 const path = require('path')
