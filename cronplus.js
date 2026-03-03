@@ -16,7 +16,7 @@ copies or substantial portions of the Software.
 
 const cronstrue = require('cronstrue')
 const cronosjs = require('cronosjs')
-const prettyMs = require('pretty-ms')
+const prettyMs = require('./lib/ms.js').prettyMilliseconds
 const coordParser = require('coord-parser')
 const SunCalc = require('suncalc2')
 const path = require('path')
@@ -102,7 +102,7 @@ const humanizeCron = function (expression, locale) {
         const opt = { use24HourTimeFormat: true }
         if (locale) opt.locale = locale
         return cronstrue.toString(expression, opt)
-    } catch (error) {
+    } catch (_error) {
         return `Cannot parse expression '${expression}'`
     }
 }
@@ -208,8 +208,7 @@ function isDateSequence (data) {
     try {
         const ds = parseDateSequence(data)
         return (ds && ds.isDateSequence)
-    // eslint-disable-next-line no-empty
-    } catch (error) { }
+    } catch (_error) { }
     return false
 }
 
@@ -352,7 +351,7 @@ function formatShortDateTimeWithTZ (date, tz) {
     }
     try {
         dateString = new Intl.DateTimeFormat('default', o).format(new Date(date))
-    } catch (error) {
+    } catch (_error) {
         dateString = 'Error. Check timezone setting'
     }
 
@@ -579,73 +578,73 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
         const event = sorted[index]
         if (event.time < startDate) {
             switch (event.event) {
-            case 'nightEnd':
-                state = 'Astronomical Twilight'// todo: i18n
-                updateSolarState(solarState, state, 'rise', false, false, true, false, false, false, false)
-                break
+                case 'nightEnd':
+                    state = 'Astronomical Twilight'// todo: i18n
+                    updateSolarState(solarState, state, 'rise', false, false, true, false, false, false, false)
+                    break
                 // case "astronomicalDawn":
                 //     state = "Astronomical Twilight";//todo: i18n
                 //     updateSolarState(solarState,state,"rise",false,false,true,false,false,false,false);
                 //     break;
-            case 'nauticalDawn':
-                state = 'Nautical Twilight'
-                updateSolarState(solarState, state, 'rise', false, false, false, true, false, false, false)
-                break
-            case 'civilDawn':
-                state = 'Civil Twilight'
-                updateSolarState(solarState, state, 'rise', false, false, false, false, true, true, false)
-                break
+                case 'nauticalDawn':
+                    state = 'Nautical Twilight'
+                    updateSolarState(solarState, state, 'rise', false, false, false, true, false, false, false)
+                    break
+                case 'civilDawn':
+                    state = 'Civil Twilight'
+                    updateSolarState(solarState, state, 'rise', false, false, false, false, true, true, false)
+                    break
                 // case "morningGoldenHourStart":
                 //     updateSolarState(solarState,null,"rise",false,false,false,false,true,true,false);
                 //     break;
-            case 'sunrise':
-                state = 'Civil Twilight'
-                updateSolarState(solarState, state, 'rise', false, false, false, false, true, true, false)
-                break
-            case 'sunriseEnd':
-                state = 'Day'
-                updateSolarState(solarState, state, 'rise', true, false, false, false, false, true, false)
-                break
-            case 'morningGoldenHourEnd':
-                state = 'Day'
-                updateSolarState(solarState, state, 'rise', true, false, false, false, false, false, false)
-                break
-            case 'solarNoon':
-                updateSolarState(solarState, null, 'fall')
-                break
-            case 'eveningGoldenHourStart':
-                state = 'Day'
-                updateSolarState(solarState, state, 'fall', true, false, false, false, false, false, true)
-                break
-            case 'sunsetStart':
-                state = 'Day'
-                updateSolarState(solarState, state, 'fall', true, false, false, false, false, false, true)
-                break
-            case 'sunset':
-                state = 'Civil Twilight'
-                updateSolarState(solarState, state, 'fall', false, false, false, false, true, false, true)
-                break
+                case 'sunrise':
+                    state = 'Civil Twilight'
+                    updateSolarState(solarState, state, 'rise', false, false, false, false, true, true, false)
+                    break
+                case 'sunriseEnd':
+                    state = 'Day'
+                    updateSolarState(solarState, state, 'rise', true, false, false, false, false, true, false)
+                    break
+                case 'morningGoldenHourEnd':
+                    state = 'Day'
+                    updateSolarState(solarState, state, 'rise', true, false, false, false, false, false, false)
+                    break
+                case 'solarNoon':
+                    updateSolarState(solarState, null, 'fall')
+                    break
+                case 'eveningGoldenHourStart':
+                    state = 'Day'
+                    updateSolarState(solarState, state, 'fall', true, false, false, false, false, false, true)
+                    break
+                case 'sunsetStart':
+                    state = 'Day'
+                    updateSolarState(solarState, state, 'fall', true, false, false, false, false, false, true)
+                    break
+                case 'sunset':
+                    state = 'Civil Twilight'
+                    updateSolarState(solarState, state, 'fall', false, false, false, false, true, false, true)
+                    break
                 // case "eveningGoldenHourEnd":
                 //     state = "Nautical Twilight";
                 //     updateSolarState(solarState,state,"fall",false,false,false,false,true,false,false);
                 //     break;
-            case 'civilDusk':
-                state = 'Nautical Twilight'
-                updateSolarState(solarState, state, 'fall', false, false, false, true, false, false, false)
-                break
-            case 'nauticalDusk':
-                state = 'Astronomical Twilight'
-                updateSolarState(solarState, state, 'fall', false, false, true, false, false, false, false)
-                break
+                case 'civilDusk':
+                    state = 'Nautical Twilight'
+                    updateSolarState(solarState, state, 'fall', false, false, false, true, false, false, false)
+                    break
+                case 'nauticalDusk':
+                    state = 'Astronomical Twilight'
+                    updateSolarState(solarState, state, 'fall', false, false, true, false, false, false, false)
+                    break
                 // case "astronomicalDusk":
-            case 'night':
-            case 'nightStart':
-                state = 'Night'
-                updateSolarState(solarState, state, 'fall', false, true, false, false, false, false, false)
-                break
-            case 'nadir':
-                updateSolarState(solarState, null, 'rise')
-                break
+                case 'night':
+                case 'nightStart':
+                    state = 'Night'
+                    updateSolarState(solarState, state, 'fall', false, true, false, false, false, false, false)
+                    break
+                case 'nadir':
+                    updateSolarState(solarState, null, 'rise')
+                    break
             }
         } else {
             break
@@ -760,8 +759,7 @@ function getTaskStatus (node, task, opts) {
     try {
         localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone
         if (!tz) tz = localTZ
-    // eslint-disable-next-line no-empty
-    } catch (error) { }
+    } catch (_error) { }
 
     const r = {
         type: task.isDynamic ? 'dynamic' : 'static',
@@ -1119,202 +1117,202 @@ module.exports = function (RED) {
                     }
 
                     switch (mainAction) {
-                    case 'trigger': // single
-                        {
-                            const tt = getTask(node, cmd.name)
-                            if (!tt) throw new Error(`Manual Trigger failed. Cannot find schedule named '${cmd.name}'`)
-                            await sendMsg(node, tt, Date.now(), true)
-                        }
-                        break
-                    case 'trigger-': // multiple
-                        if (node.tasks) {
-                            for (let index = 0; index < node.tasks.length; index++) {
-                                const task = node.tasks[index]
-                                if (task && (cmdAll || taskFilterMatch(task, cmdFilter))) {
-                                    await sendMsg(node, task, Date.now(), true)
-                                }
+                        case 'trigger': // single
+                            {
+                                const tt = getTask(node, cmd.name)
+                                if (!tt) throw new Error(`Manual Trigger failed. Cannot find schedule named '${cmd.name}'`)
+                                await sendMsg(node, tt, Date.now(), true)
                             }
-                        }
-                        break
-                    case 'describe': // single
-                        {
-                            const exp = (cmd.expressionType === 'solar') ? cmd.location : cmd.expression
-                            applyOptionDefaults(node, cmd)
-                            newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset: true, locationType: node.node_locationType })
-                            sendCommandResponse(newMsg)
-                        }
-                        break
-                    case 'list': // single
-                    case 'status': // single
-                        {
-                            const task = getTask(node, cmd.name)
-                            if (task) {
-                                newMsg.payload.result.config = exportTask(task, true)
-                                newMsg.payload.result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
-                            } else {
-                                newMsg.error = `${cmd.name} not found`
-                            }
-                            sendCommandResponse(newMsg)
-                        }
-                        updateNextStatus(node, true)
-                        break
-                    case 'export': // single
-                        {
-                            const task = getTask(node, cmd.name)
-                            if (task) {
-                                newMsg.payload.result = exportTask(task, false)
-                            } else {
-                                newMsg.error = `${cmd.name} not found`
-                            }
-                            sendCommandResponse(newMsg)
-                        }
-                        break
-                    case 'list-': // multiple
-                    case 'status-': // multiple
-                        {
-                            const results = []
+                            break
+                        case 'trigger-': // multiple
                             if (node.tasks) {
                                 for (let index = 0; index < node.tasks.length; index++) {
                                     const task = node.tasks[index]
                                     if (task && (cmdAll || taskFilterMatch(task, cmdFilter))) {
-                                        const result = {}
-                                        result.config = exportTask(task, true)
-                                        result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
-                                        results.push(result)
+                                        await sendMsg(node, task, Date.now(), true)
                                     }
                                 }
                             }
-                            newMsg.payload.result = results
+                            break
+                        case 'describe': // single
+                            {
+                                const exp = (cmd.expressionType === 'solar') ? cmd.location : cmd.expression
+                                applyOptionDefaults(node, cmd)
+                                newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset: true, locationType: node.node_locationType })
+                                sendCommandResponse(newMsg)
+                            }
+                            break
+                        case 'list': // single
+                        case 'status': // single
+                            {
+                                const task = getTask(node, cmd.name)
+                                if (task) {
+                                    newMsg.payload.result.config = exportTask(task, true)
+                                    newMsg.payload.result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                                } else {
+                                    newMsg.error = `${cmd.name} not found`
+                                }
+                                sendCommandResponse(newMsg)
+                            }
+                            updateNextStatus(node, true)
+                            break
+                        case 'export': // single
+                            {
+                                const task = getTask(node, cmd.name)
+                                if (task) {
+                                    newMsg.payload.result = exportTask(task, false)
+                                } else {
+                                    newMsg.error = `${cmd.name} not found`
+                                }
+                                sendCommandResponse(newMsg)
+                            }
+                            break
+                        case 'list-': // multiple
+                        case 'status-': // multiple
+                            {
+                                const results = []
+                                if (node.tasks) {
+                                    for (let index = 0; index < node.tasks.length; index++) {
+                                        const task = node.tasks[index]
+                                        if (task && (cmdAll || taskFilterMatch(task, cmdFilter))) {
+                                            const result = {}
+                                            result.config = exportTask(task, true)
+                                            result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                                            results.push(result)
+                                        }
+                                    }
+                                }
+                                newMsg.payload.result = results
+                                sendCommandResponse(newMsg)
+                            }
+                            break
+                        case 'export-': // multiple
+                            {
+                                const results = []
+                                if (node.tasks) {
+                                    for (let index = 0; index < node.tasks.length; index++) {
+                                        const task = node.tasks[index]
+                                        if (cmdAll || taskFilterMatch(task, cmdFilter)) {
+                                            results.push(exportTask(task, false))
+                                        }
+                                    }
+                                }
+                                newMsg.payload.result = results
+                                sendCommandResponse(newMsg)
+                            }
+                            break
+                        case 'add': // single
+                        case 'update': // single
+                            await updateTask(node, cmd, msg)
+                            updateNextStatus(node, true)
+                            requestSerialisation()// update persistence
+                            break
+                        case 'clear':
+                        case 'remove-': // multiple
+                        case 'delete-': // multiple
+                            deleteAllTasks(node, cmdFilter)
+                            updateNextStatus(node, true)
+                            requestSerialisation()// update persistence
+                            break
+                        case 'remove': // single
+                        case 'delete': // single
+                            deleteTask(node, cmd.name)
+                            updateNextStatus(node, true)
+                            requestSerialisation()// update persistence
+                            break
+                        case 'start': // single
+                            await startTaskByName(node, cmd.name)
+                            updateNextStatus(node, true)
+                            requestSerialisation()// update persistence
+                            break
+                        case 'start-': // multiple
+                            await startAllTasks(node, cmdFilter)
+                            updateNextStatus(node, true)
+                            requestSerialisation()// update persistence
+                            break
+                        case 'stop': // single
+                        case 'pause': // single
+                            stopTask(node, cmd.name, cmd.command === 'stop')
+                            updateNextStatus(node, true)
+                            requestSerialisation()// update persistence
+                            break
+                        case 'stop-': // multiple
+                        case 'pause-': {
+                            const resetCounter = cmd.command.startsWith('stop-')
+                            stopAllTasks(node, resetCounter, cmdFilter)
+                            updateNextStatus(node, true)
+                            requestSerialisation()// update persistence
+                        }
+                            break
+                        case 'next':
+                            if (node.tasks && node.tasks.length) {
+                            // gather statuses
+                                const statuses = []
+                                for (let index = 0; index < node.tasks.length; index++) {
+                                    const task = node.tasks[index]
+                                    const result = {}
+                                    result.config = exportTask(task, true)
+                                    result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                                    statuses.push(result)
+                                }
+                                const next = statuses.length && statuses.reduce((a, b) => a.status.nextDate < b.status.nextDate ? a : b)
+                                if (next) {
+                                    newMsg.payload = {
+                                        name: next.config.name,
+                                        topic: next.config.topic,
+                                        next: next.status.nextDate,
+                                        nextLocal: next.status.nextDateTZ,
+                                        timeZone: next.status.serverTimeZone,
+                                        when: next.status.description,
+                                        msUntil: next.status.nextDate.valueOf() - next.status.serverTime.valueOf(),
+                                        description: next.status.nextDescription
+                                    }
+                                } else {
+                                    newMsg.payload = {}
+                                }
+                            } else {
+                                newMsg.payload = {}
+                            }
+                            sendCommandResponse(newMsg)
+                            break
+                        case 'debug': {
+                            const task = getTask(node, cmd.name)
+                            const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                            thisDebug.name = task.name
+                            thisDebug.topic = task.node_topic
+                            thisDebug.expressionType = task.node_expressionType
+                            thisDebug.expression = task.node_expression
+                            thisDebug.location = task.node_location
+                            thisDebug.offset = task.node_offset
+                            thisDebug.solarType = task.node_solarType
+                            thisDebug.solarEvents = task.node_solarEvents
+                            newMsg.payload = thisDebug
                             sendCommandResponse(newMsg)
                         }
-                        break
-                    case 'export-': // multiple
-                        {
+                            break
+                        case 'debug-': { // multiple
                             const results = []
                             if (node.tasks) {
                                 for (let index = 0; index < node.tasks.length; index++) {
                                     const task = node.tasks[index]
                                     if (cmdAll || taskFilterMatch(task, cmdFilter)) {
-                                        results.push(exportTask(task, false))
+                                        const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                                        thisDebug.name = task.name
+                                        thisDebug.topic = task.node_topic
+                                        thisDebug.expressionType = task.node_expressionType
+                                        thisDebug.expression = task.node_expression
+                                        thisDebug.location = task.node_location
+                                        thisDebug.offset = task.node_offset
+                                        thisDebug.solarType = task.node_solarType
+                                        thisDebug.solarEvents = task.node_solarEvents
+                                        results.push(thisDebug)
                                     }
                                 }
                             }
-                            newMsg.payload.result = results
+                            newMsg.payload = results
                             sendCommandResponse(newMsg)
                         }
-                        break
-                    case 'add': // single
-                    case 'update': // single
-                        await updateTask(node, cmd, msg)
-                        updateNextStatus(node, true)
-                        requestSerialisation()// update persistence
-                        break
-                    case 'clear':
-                    case 'remove-': // multiple
-                    case 'delete-': // multiple
-                        deleteAllTasks(node, cmdFilter)
-                        updateNextStatus(node, true)
-                        requestSerialisation()// update persistence
-                        break
-                    case 'remove': // single
-                    case 'delete': // single
-                        deleteTask(node, cmd.name)
-                        updateNextStatus(node, true)
-                        requestSerialisation()// update persistence
-                        break
-                    case 'start': // single
-                        await startTaskByName(node, cmd.name)
-                        updateNextStatus(node, true)
-                        requestSerialisation()// update persistence
-                        break
-                    case 'start-': // multiple
-                        await startAllTasks(node, cmdFilter)
-                        updateNextStatus(node, true)
-                        requestSerialisation()// update persistence
-                        break
-                    case 'stop': // single
-                    case 'pause': // single
-                        stopTask(node, cmd.name, cmd.command === 'stop')
-                        updateNextStatus(node, true)
-                        requestSerialisation()// update persistence
-                        break
-                    case 'stop-': // multiple
-                    case 'pause-': {
-                        const resetCounter = cmd.command.startsWith('stop-')
-                        stopAllTasks(node, resetCounter, cmdFilter)
-                        updateNextStatus(node, true)
-                        requestSerialisation()// update persistence
-                    }
-                        break
-                    case 'next':
-                        if (node.tasks && node.tasks.length) {
-                            // gather statuses
-                            const statuses = []
-                            for (let index = 0; index < node.tasks.length; index++) {
-                                const task = node.tasks[index]
-                                const result = {}
-                                result.config = exportTask(task, true)
-                                result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
-                                statuses.push(result)
-                            }
-                            const next = statuses.length && statuses.reduce((a, b) => a.status.nextDate < b.status.nextDate ? a : b)
-                            if (next) {
-                                newMsg.payload = {
-                                    name: next.config.name,
-                                    topic: next.config.topic,
-                                    next: next.status.nextDate,
-                                    nextLocal: next.status.nextDateTZ,
-                                    timeZone: next.status.serverTimeZone,
-                                    when: next.status.description,
-                                    msUntil: next.status.nextDate.valueOf() - next.status.serverTime.valueOf(),
-                                    description: next.status.nextDescription
-                                }
-                            } else {
-                                newMsg.payload = {}
-                            }
-                        } else {
-                            newMsg.payload = {}
-                        }
-                        sendCommandResponse(newMsg)
-                        break
-                    case 'debug': {
-                        const task = getTask(node, cmd.name)
-                        const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true })
-                        thisDebug.name = task.name
-                        thisDebug.topic = task.node_topic
-                        thisDebug.expressionType = task.node_expressionType
-                        thisDebug.expression = task.node_expression
-                        thisDebug.location = task.node_location
-                        thisDebug.offset = task.node_offset
-                        thisDebug.solarType = task.node_solarType
-                        thisDebug.solarEvents = task.node_solarEvents
-                        newMsg.payload = thisDebug
-                        sendCommandResponse(newMsg)
-                    }
-                        break
-                    case 'debug-': { // multiple
-                        const results = []
-                        if (node.tasks) {
-                            for (let index = 0; index < node.tasks.length; index++) {
-                                const task = node.tasks[index]
-                                if (cmdAll || taskFilterMatch(task, cmdFilter)) {
-                                    const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true })
-                                    thisDebug.name = task.name
-                                    thisDebug.topic = task.node_topic
-                                    thisDebug.expressionType = task.node_expressionType
-                                    thisDebug.expression = task.node_expression
-                                    thisDebug.location = task.node_location
-                                    thisDebug.offset = task.node_offset
-                                    thisDebug.solarType = task.node_solarType
-                                    thisDebug.solarEvents = task.node_solarEvents
-                                    results.push(thisDebug)
-                                }
-                            }
-                        }
-                        newMsg.payload = results
-                        sendCommandResponse(newMsg)
-                    }
-                        break
+                            break
                     }
                 }
                 done()
@@ -1355,7 +1353,7 @@ module.exports = function (RED) {
                             await updateTask(node, task.node_opt, null)
                         }
                     }
-                } catch (e) { }
+                } catch (_e) { }
                 updateNextStatus(node)
             }
         }
@@ -1370,24 +1368,24 @@ module.exports = function (RED) {
             // eslint-disable-next-line eqeqeq
             const isDynamic = function (task) { return (task.isDynamic == true || task.isStatic == false) }
             switch (filter) {
-            case 'all':
-                return true
-            case 'static':
-                return isStatic(task)
-            case 'dynamic':
-                return isDynamic(task)
-            case 'active':
-                return isActive(task)
-            case 'inactive':
-                return isInactive(task)
-            case 'active-dynamic':
-                return isActive(task) && isDynamic(task)
-            case 'active-static':
-                return isActive(task) && isStatic(task)
-            case 'inactive-dynamic':
-                return isInactive(task) && isDynamic(task)
-            case 'inactive-static':
-                return isInactive(task) && isStatic(task)
+                case 'all':
+                    return true
+                case 'static':
+                    return isStatic(task)
+                case 'dynamic':
+                    return isDynamic(task)
+                case 'active':
+                    return isActive(task)
+                case 'inactive':
+                    return isInactive(task)
+                case 'active-dynamic':
+                    return isActive(task) && isDynamic(task)
+                case 'active-static':
+                    return isActive(task) && isStatic(task)
+                case 'inactive-dynamic':
+                    return isInactive(task) && isDynamic(task)
+                case 'inactive-static':
+                    return isInactive(task) && isStatic(task)
             }
             return false
         }
@@ -1476,8 +1474,7 @@ module.exports = function (RED) {
                                 index--
                             }
                         }
-                    // eslint-disable-next-line no-empty
-                    } catch (error) { }
+                    } catch (_error) { }
                 }
             }
         }
@@ -1502,8 +1499,7 @@ module.exports = function (RED) {
                 task.off('stopped')
                 task.stop()
                 task = null
-            // eslint-disable-next-line no-empty
-            } catch (error) {}
+            } catch (_error) {}
         }
         async function updateTask (node, options, msg) {
             if (!options || typeof options !== 'object') {
@@ -1880,15 +1876,15 @@ module.exports = function (RED) {
 
             let idx = 0
             switch (type) {
-            case 'static':
-                idx = staticOutputPinIndex
-                break
-            case 'dynamic':
-                idx = dynOutputPinIndex
-                break
-            case 'command-response':
-                idx = cmdOutputPin
-                break
+                case 'static':
+                    idx = staticOutputPinIndex
+                    break
+                case 'dynamic':
+                    idx = dynOutputPinIndex
+                    break
+                case 'command-response':
+                    idx = cmdOutputPin
+                    break
             }
             const arr = Array(outputCount || (idx + 1))
             arr.fill(null)
@@ -1923,7 +1919,7 @@ module.exports = function (RED) {
 
     function contextSet (context, contextKey, value, storeName) {
         return new Promise(function (resolve, reject) {
-            context.set(contextKey, value, storeName, function (e, r) {
+            context.set(contextKey, value, storeName, function (e, _r) {
                 if (e) {
                     reject(e)
                 } else {

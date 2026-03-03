@@ -5,8 +5,8 @@
     "main": "cronplus.js",
     "scripts": {
         "test": "mocha \"test/**/*_spec.js\" --exit",
-        "lint": "eslint -c .eslintrc --ext js,html \"*.js\" \"*.html\"",
-        "lint:fix": "eslint -c .eslintrc --ext js,html \"*.js\"  \"*.html\" --fix",
+        "lint": "eslint -c eslint.config.mjs",
+        "lint:fix": "eslint -c eslint.config.mjs --fix",
         "publish": "npm publish"
     },
     "repository": {
@@ -53,22 +53,21 @@
     "dependencies": {
         "coord-parser": "^1.0.0",
         "cronosjs": "^1.7.1",
-        "cronstrue": "^3.2.0",
-        "pretty-ms": "^7.0.1",
+        "cronstrue": "^3.13.0",
         "suncalc2": "^1.8.1"
     },
     "devDependencies": {
-        "eslint": "^8.57.0",
-        "eslint-config-standard": "^17.1.0",
-        "eslint-plugin-html": "^7.1.0",
-        "eslint-plugin-n": "^16.6.2",
-        "eslint-plugin-no-only-tests": "^3.2.0",
-        "eslint-plugin-standard": "^5.0.0",
-        "mocha": "^11.7.1",
-        "node-red": "^4.1.0",
-        "node-red-node-test-helper": "^0.3.5",
+        "@eslint/js": "^9.39.3",
+        "eslint": "^9.39.3",
+        "eslint-plugin-html": "^8.1.4",
+        "eslint-plugin-no-only-tests": "^3.3.0",
+        "globals": "^17.4.0",
+        "mocha": "^11.7.5",
+        "neostandard": "^0.13.0",
+        "node-red": "^4.1.6",
+        "node-red-node-test-helper": "^0.3.6",
         "should": "^13.2.3",
-        "sinon": "^21.0.0"
+        "sinon": "^21.0.1"
     },
     "maintainers": [
         {
@@ -77,8 +76,6 @@
         }
     ],
     "overrides": {
-        "node-red-admin@4.1.1": {
-            "axios": "1.12.2"
-        }
+        "minimatch@>=9.0.0 <9.0.7": "9.0.9"
     }
 }
