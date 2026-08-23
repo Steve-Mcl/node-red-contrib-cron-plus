@@ -99,6 +99,28 @@ Run the following command in the root directory of your Node-RED install.
 
   Or simply copy the folder `node-red-contrib-cron-plus` into a folder named `nodes` inside your node-red folder then `cd` into `nodes/node-red-contrib-cron-plus` and execute `npm install`
 
+Troubleshooting
+---------------
+
+### "Invalid store name specified 'xxx' - state will not be persisted for this node"
+
+The node's **Save State** setting names a node context store that the node-red runtime does not recognise. Context stores are defined in the `contextStorage` section of your node-red settings file (typically `~/.node-red/settings.js`) and the store selected in the node may have been removed or renamed there.
+
+To fix, either select a different **Save State** option in the node's settings, or define the store in your settings file and restart node-red, e.g.:
+
+```javascript
+contextStorage: {
+    default: {
+        module: "localfilesystem"
+    },
+},
+```
+
+> [!NOTE]
+> on a default node-red installation (no `contextStorage` configured), the only context store is the built-in `memory` store. State saved there survives re-deploys but **not** node-red restarts - choose the **File** option (or configure a `localfilesystem` context store) if state must survive a restart.
+
+Context storage is pluggable: besides the built-in `memory` and `localfilesystem` modules, installable plugins provide stores backed by other technologies (e.g. [Redis](https://github.com/node-red/node-red-context-redis), SQLite, PostgreSQL, MySQL/MariaDB), and some platforms (e.g. FlowFuse) provide a persistent context store out of the box. Any store configured in `contextStorage` (or provided by your platform) can be selected in the node's **Save State** setting. See the [node-red context documentation](https://nodered.org/docs/user-guide/context) for details.
+
 Acknowledgements
 ---------------
 * Inspired by [node-red-contrib-cron](https://github.com/chameleonbr/node-red-contrib-cron)

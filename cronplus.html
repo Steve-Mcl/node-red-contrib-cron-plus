@@ -2624,13 +2624,21 @@ function onSchedulesExpandCompress () {
                 <li>Fan out: Separate outputs for static, dynamic and command messages</li>
             </ul>
         </div>
-        <h4>Persist dynamic schedules</h4>
+        <h4>Save State</h4>
         <div style="padding-left: 15px">
-            Enabling this option causes dynamic schedules to be saved to file and re-loaded when the cron-plus node is loaded or re-deployed. <br>
+            Determines where (and if) the node saves its state (dynamic schedules and the
+            paused/started/trigger-count state of all schedules) so it can be restored when the
+            node is redeployed or node-red restarts.
+            <ul>
+                <li><b>None</b>: state is not persisted. Dynamic schedules and schedule state are lost on re-deploy or restart</li>
+                <li><b>File</b>: state is saved to a file in a directory called <code>cronplusdata</code> under your node-red folder. Survives re-deploys and restarts</li>
+                <li><b>Node Context: <i>store</i></b>: state is saved in the named node context store. The available stores come from the <code>contextStorage</code> section of your node-red settings file. Context storage is pluggable - besides the built-in <code>memory</code> and <code>localfilesystem</code> modules, installable plugins provide stores backed by e.g. Redis or a database, and some platforms (e.g. FlowFuse) provide a persistent context store out of the box - any configured store appears here</li>
+            </ul>
             NOTES...
             <ul>
-                <li>Any time an update to any dynamic schedule occurs, all dynamic schedules are saved to file</li>
-                <li>The schedules are saved in a directory called <code>cronplusdata</code> under your node-red folder</li>
+                <li>Any time a schedule changes, the state of all schedules is saved to the chosen store</li>
+                <li>On a default node-red installation (no <code>contextStorage</code> configured in the settings file) the only context store is the built-in <code>memory</code> store. State saved there survives re-deploys but <b>not</b> node-red restarts - choose <b>File</b> or configure a persistent (e.g. <code>localfilesystem</code>) context store if state must survive a restart</li>
+                <li>If the selected store is later removed or renamed in the settings file, the node will warn <code>Invalid store name specified ...</code> at start up and state will not be persisted until the setting is corrected</li>
             </ul>
         </div>
         <h4>Schedules</h4>
