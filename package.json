@@ -13,8 +13,7 @@
         "test": "node --test test/test1_spec.js",
         "lint": "eslint -c eslint.config.mjs",
         "lint:fix": "eslint -c eslint.config.mjs --fix",
-        "check-npm-versions": "node scripts/check-npm-versions.js",
-        "publish": "npm publish"
+        "check-npm-versions": "node scripts/check-npm-versions.js"
     },
     "repository": {
         "type": "git",
