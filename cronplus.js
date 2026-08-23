@@ -941,6 +941,11 @@ module.exports = function (RED) {
             }
         }
         const sendMsg = async (node, task, cronTimestamp, manualTrigger) => {
+            if (!task) {
+                node.status({ fill: 'grey', shape: 'dot', text: 'Nothing to trigger' })
+                node.warn('No schedule available to trigger')
+                return
+            }
             const msg = { cronplus: {} }
             msg.topic = task.node_topic
             msg.cronplus.triggerTimestamp = cronTimestamp
@@ -1040,8 +1045,12 @@ module.exports = function (RED) {
             }
             // is this an button press?...
             if (!msg.payload && !msg.topic) { // TODO: better method of differentiating between bad input and button press
-                await sendMsg(node, node.tasks[0], Date.now(), true)
-                done()
+                try {
+                    await sendMsg(node, node.tasks && node.tasks[0], Date.now(), true)
+                    done()
+                } catch (error) {
+                    done(error)
+                }
                 return
             }
 
@@ -1623,7 +1632,7 @@ module.exports = function (RED) {
                     return
                 }
                 task.node_count = task.node_count + 1// ++ stops at 2147483647
-                sendMsg(node, task, timestamp)
+                sendMsg(node, task, timestamp).catch(error => node.error(error))
                 process.nextTick(async function () {
                     if (task.node_expressionType === 'solar') {
                         await updateTask(node, task.node_opt, null)
