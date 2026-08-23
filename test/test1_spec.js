@@ -6,6 +6,11 @@ const { describe, it, beforeEach, afterEach, after } = require('node:test')
 
 helper.init(require.resolve('node-red'))
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+// wait until just after a wall-clock second boundary so every-second cron schedules
+// created after this fire at predictable ~950/1950/2950ms offsets. Without it, a
+// schedule added just before a boundary fires almost immediately and sneaks an extra
+// trigger into sleep(~2050) windows, making count assertions flaky (seen on CI).
+const alignToSecondBoundary = () => sleep(1050 - (Date.now() % 1000))
 
 after(() => {
     // node-red-node-test-helper leaves handles open after stopServer (mocha needed --exit
@@ -472,6 +477,7 @@ describe('cron-plus Node', function () {
                 send: { topic: 'trigger-all', payload: '' },
                 expected: { command: 'trigger-all', scheduleCount: 5 }
             }
+            await alignToSecondBoundary()
             // add 2 dynamic schedules
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 3, expression: '* * * * * * *' })) // every 1 seconds
             testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
@@ -786,7 +792,8 @@ describe('cron-plus Node', function () {
             result.payload.result[0].config.should.have.property('name', 'schedule3')
         })
 
-        it("should 'stop' by topic (should reset counter)", { timeout: 5000 }, async function () {
+        it("should 'stop' by topic (should reset counter)", { timeout: 6000 }, async function () {
+            await alignToSecondBoundary()
             // setup add dyn-1 and dyn-2
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 3, expression: '* * * * * * *' })) // every 1 seconds
             testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
@@ -840,7 +847,8 @@ describe('cron-plus Node', function () {
             commandChecker(messages[10], { description: 'check status of active schedules should be 5', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 5 } })
             countChecker('dyn-1', messages[10].payload.result[3], 3, 0, true) // since schedules were stopped, the counter should be reset to 0
         })
-        it("should 'pause' by topic (should not reset counter)", { timeout: 7000 }, async function () {
+        it("should 'pause' by topic (should not reset counter)", { timeout: 8000 }, async function () {
+            await alignToSecondBoundary()
             // start flow for test has 3 static schedules, below we add 2 dynamic schedules
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 3, expression: '* * * * * * *' })) // every 1 seconds
             testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
@@ -881,6 +889,7 @@ describe('cron-plus Node', function () {
             countChecker('dyn-1', messages[3].payload.result[0], 3, 3, false) // dyn-1 should have triggered 3 times and should NOT be running
         })
         it('should not reset count when finished schedule is updated (default behaviour)', { timeout: 7000 }, async function () {
+            await alignToSecondBoundary()
             // setup add dyn-1
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 1, expression: '* * * * * * *' })) // every 1 seconds
 
@@ -917,6 +926,7 @@ describe('cron-plus Node', function () {
             dyn1.status.should.have.property('isRunning', false)
         })
         it('should apply provided count when updating a task', { timeout: 7000 }, async function () {
+            await alignToSecondBoundary()
             // setup add dyn-1
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 1, expression: '* * * * * * *' })) // every 1 seconds
 
