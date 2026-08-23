@@ -793,8 +793,9 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
     // update final states
     updateSolarState(solarState)// only sending `stateObject` makes updateSolarState() compute dawn/dusk etc
 
-    // now filter to only events of interest
-    const futureEvents = sorted.filter((e) => e && e.timeOffset >= startDate)
+    // now filter to only events of interest (strictly after startDate so an event
+    // firing at this exact instant cannot be included and re-fired)
+    const futureEvents = sorted.filter((e) => e && e.timeOffset > startDate)
     const wantedFutureEvents = []
     for (let index = 0; index < futureEvents.length; index++) {
         const fe = futureEvents[index]
@@ -802,18 +803,18 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
             wantedFutureEvents.push(fe)
         }
     }
-    const nextType = wantedFutureEvents[0].event
-    const nextTime = wantedFutureEvents[0].time
-    const nextTimeOffset = wantedFutureEvents[0].timeOffset
+    // in extreme cases (e.g. a single selected event at polar latitudes) there may
+    // be no future occurrence within the scan window - report "Never", not an error
+    const nextEvent = wantedFutureEvents[0] || null
     // performance.mark('End')
     // performance.measure('SecondScanEnd to End', 'SecondScanEnd', 'End')
     // performance.measure('Start to End', 'Start', 'End')
 
     return {
         solarState,
-        nextEvent: nextType,
-        nextEventTime: nextTime,
-        nextEventTimeOffset: nextTimeOffset,
+        nextEvent: nextEvent ? nextEvent.event : null,
+        nextEventTime: nextEvent ? nextEvent.time : null,
+        nextEventTimeOffset: nextEvent ? nextEvent.timeOffset : null,
         eventTimes: wantedFutureEvents
         // allTimes: sorted,
         // eventTimesByType: resultCategories

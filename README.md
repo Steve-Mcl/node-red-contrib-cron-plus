@@ -80,9 +80,6 @@ A lunar schedule takes the same shape as a solar one, using `expressionType: "lu
 }
 ```
 
-> [!NOTE]
-> Lunar schedules are currently created dynamically (via the `add` command) or by importing flow JSON - the node's editor UI does not offer them yet.
-
 > [!TIP]
 > At high latitudes the moon can stay above or below the horizon for days at a time. During such periods `rise`/`set` events simply do not occur and the schedule waits for the next real occurrence.
 

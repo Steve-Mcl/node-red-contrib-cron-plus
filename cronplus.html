@@ -471,6 +471,11 @@ copies or substantial portions of the Software.
         $('#cron-plus-solar-events-info').get(0).scrollIntoView()
     }
 
+    function showLunarHelp () {
+        showSidebarHelpPanel()
+        $('#cron-plus-lunar-events-info').get(0).scrollIntoView()
+    }
+
     const getIdealDialogHeight = function () {
         return Math.min(800, ($(document).height() < 600) ? $(document).height() - 30 : $(document).height() - 100)
     }
@@ -974,6 +979,15 @@ copies or substantial portions of the Software.
                                 }
                                 if (value[i].solarType === 'selected' && !value[i].solarEvents) {
                                     console.warn('cron-plus: validation error - solarEvents missing')
+                                    return false
+                                }
+                            } else if (value[i].expressionType === 'lunar') {
+                                if (value[i].lunarType !== 'all' && value[i].lunarType !== 'selected') {
+                                    console.warn("cron-plus: validation error - lunarType is not 'all' or 'selected'")
+                                    return false
+                                }
+                                if (value[i].lunarType === 'selected' && !value[i].lunarEvents) {
+                                    console.warn('cron-plus: validation error - lunarEvents missing')
                                     return false
                                 }
                             }
@@ -1512,6 +1526,10 @@ copies or substantial portions of the Software.
                 makeSolarChoice('nightStart', 'astronomical dusk / night start', 'astronomical twilight ends, night starts (-18°)'), // needed? same as astronomicalDusk
                 makeSolarChoice('nadir', 'solar midnight', 'when the sun is closest to nadir and the night is equidistant from dusk and dawn')
             ]
+            const lunarChoices = [
+                makeSolarChoice('rise', 'moon rise', 'the moon rises above the horizon'),
+                makeSolarChoice('set', 'moon set', 'the moon sets below the horizon')
+            ]
 
             function isObject (o) {
                 return (typeof o === 'object' && o !== null)
@@ -1527,7 +1545,7 @@ copies or substantial portions of the Software.
                     return// no point in continuing
                 }
                 optionIndex = optionIndex == null ? 0 : optionIndex
-                if (['cron', 'dates', 'solar'].indexOf(option.expressionType) < 0) {
+                if (['cron', 'dates', 'solar', 'lunar'].indexOf(option.expressionType) < 0) {
                     // if expressionType is not cron or solar - it may be sunrise or sunset
                     if (option.expressionType === 'sunrise') {
                         option.solarEvents = option.solarEvents || 'sunrise'
@@ -1556,6 +1574,8 @@ copies or substantial portions of the Software.
                 if (option.expressionType === 'cron' && !option.expression) option.expression = '0 * * * * * *'
                 if (!option.solarType) option.solarType = option.solarEvents ? 'selected' : 'all'
                 if (!option.solarEvents) option.solarEvents = 'sunrise,sunset'
+                if (!option.lunarType) option.lunarType = option.lunarEvents ? 'selected' : 'all'
+                if (!option.lunarEvents) option.lunarEvents = 'rise,set'
                 if (!option.location) option.location = ''
                 // option.version = 1;
             }
@@ -1569,8 +1589,9 @@ copies or substantial portions of the Software.
                 if (RED._cron_plus_debug) { console.debug('generating option', optionIndex, option) }
                 applyOptionDefaults(optionIndex, option)
                 function buildExpressionTip (title, desc, text, type) {
-                    const helpFunc = type === 'solar' ? 'showSolarHelp();' : 'showCronHelp();'
-                    const helpFuncPopOut = type === 'solar' ? "_popoutCronPlusHelp('cron-plus-solar-events-info');" : "_popoutCronPlusHelp('cron-plus-expression-info');"
+                    const helpFunc = type === 'solar' ? 'showSolarHelp();' : (type === 'lunar' ? 'showLunarHelp();' : 'showCronHelp();')
+                    const helpAnchor = type === 'solar' ? 'cron-plus-solar-events-info' : (type === 'lunar' ? 'cron-plus-lunar-events-info' : 'cron-plus-expression-info')
+                    const helpFuncPopOut = "_popoutCronPlusHelp('" + helpAnchor + "');"
                     const helpFuncHtml = '<span style="float: right">' +
                         '<button id="cron-plus-tt-help-button" class="cron-plus-link-button" onclick="' + helpFunc + '">help </button>&nbsp;' +
                         '<button class="cron-plus-link-button" onclick="' + helpFuncPopOut + '"> <i class="fa fa-external-link"></i></button></span>'
@@ -1608,7 +1629,7 @@ copies or substantial portions of the Software.
                         if (RED._cron_plus_debug) console.debug('initTooltip-->on-blur.  relatedTarget:', e.relatedTarget)
                         if (e.relatedTarget && e.relatedTarget.id === 'cron-plus-tt-help-button') {
                             if (RED._cron_plus_debug) console.debug('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-link-button"')
-                            if (type === 'cron') { showCronHelp() } else if (type === 'solar') { showSolarHelp() }
+                            if (type === 'cron') { showCronHelp() } else if (type === 'solar') { showSolarHelp() } else if (type === 'lunar') { showLunarHelp() }
                             $(this).focus()
                             return false
                         }
@@ -1623,7 +1644,7 @@ copies or substantial portions of the Software.
                         const $location = $this.closest('li').find('.node-input-option-location')
                         const $expression = $this.closest('li').find('.node-input-option-expression')
                         let expression
-                        if (expressionType === 'solar') {
+                        if (expressionType === 'solar' || expressionType === 'lunar') {
                             const defLocation = $('#node-input-defaultLocation').typedInput('value')
                             const defLocationType = $('#node-input-defaultLocation').typedInput('type')
                             if (defLocationType === 'env' || defLocationType === 'fixed') {
@@ -1640,6 +1661,7 @@ copies or substantial portions of the Software.
                         }
                         const $offset = $this.closest('li').find('.node-input-option-offset')
                         const $solarEvents = $this.closest('li').find('.node-input-option-solarEvents')
+                        const $lunarEvents = $this.closest('li').find('.node-input-option-lunarEvents')
                         $this.tooltip('enable').tooltip('open')
                         $this.tooltip('option', 'position', pos)
                         $this.tooltip({
@@ -1659,9 +1681,9 @@ copies or substantial portions of the Software.
                                 let titleHtml
                                 const e = { expressionType }
                                 if (timeZone) e.timeZone = timeZone
-                                if (expressionType === 'solar') {
+                                if (expressionType === 'solar' || expressionType === 'lunar') {
                                     titleHtml = (expr) => {
-                                        const title = '<b>solar events</b> at <span class="cron-plus-expression">' + expr.slice(0, 100) + (expr.length > 100 ? '...' : '') + '</span>'
+                                        const title = '<b>' + expressionType + ' events</b> at <span class="cron-plus-expression">' + expr.slice(0, 100) + (expr.length > 100 ? '...' : '') + '</span>'
 
                                         if (offset != null && offset !== '0' && offset !== 0) {
                                             titleHtml += '<b>'
@@ -1675,8 +1697,13 @@ copies or substantial portions of the Software.
                                     }
                                     e.offset = offset
                                     e.location = expression
-                                    e.solarType = solarType
-                                    e.solarEvents = solarEvents
+                                    if (expressionType === 'solar') {
+                                        e.solarType = solarType
+                                        e.solarEvents = solarEvents
+                                    } else {
+                                        e.lunarType = $lunarEvents.typedInput('type')
+                                        e.lunarEvents = $lunarEvents.typedInput('value')
+                                    }
                                     e.defaultLocationType = $('#node-input-defaultLocation').typedInput('type')
                                     e.defaultLocation = $('#node-input-defaultLocation').typedInput('value')
                                     e.flowId = node.z
@@ -1742,7 +1769,7 @@ copies or substantial portions of the Software.
                                                 $this.tooltip('enable').tooltip('open')
                                                 $this.tooltip('option', 'position', pos)
                                             }, 200)
-                                            const expr = data.expressionType === 'solar' ? data.location : data.expression
+                                            const expr = (data.expressionType === 'solar' || data.expressionType === 'lunar') ? data.location : data.expression
                                             return buildExpressionTip(titleHtml(expr), desc, nextInfo, expressionType)
                                         }
                                         callback(okContent)
@@ -1820,6 +1847,7 @@ copies or substantial portions of the Software.
                 $('<option />', { value: 'cron', text: 'cron' }).appendTo(scheduleTypeField)
                 $('<option />', { value: 'dates', text: 'date sequence' }).appendTo(scheduleTypeField)
                 $('<option />', { value: 'solar', text: 'solar events' }).appendTo(scheduleTypeField)
+                $('<option />', { value: 'lunar', text: 'lunar events' }).appendTo(scheduleTypeField)
                 scheduleTypeField.val(scheduleType)
                 scheduleTypeField.prop('title', 'Expression Type')
 
@@ -1910,6 +1938,35 @@ copies or substantial portions of the Software.
                 solarEventsField.typedInput('type', option.solarType || 'all')
                 solarEventsField.typedInput('value', option.solarEvents || '')// added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
 
+                // generate the lunar events field (occupies the same slot as solar events - visibility is switched by schedule type)
+                const lunarEventsDiv = $('<div/>', { style: solarEventsStyle }).appendTo(cell2Solar)
+                const lunarEventsField = $('<input/>', { class: 'node-input-option-lunarEvents', type: 'text', style: 'width: 100%', placeholder: 'select lunar events', value: option.lunarEvents || '' }).appendTo(lunarEventsDiv)
+                lunarEventsField.typedInput({
+                    default: 'all',
+                    types: [
+                        {
+                            value: 'selected',
+                            label: 'Selected Lunar Events',
+                            title: 'Selected Lunar Events',
+                            icon: 'fa fa-list',
+                            showLabel: false,
+                            multiple: true,
+                            options: lunarChoices,
+                            default: ['rise', 'set']
+                        },
+                        {
+                            value: 'all',
+                            label: 'All Lunar Events',
+                            title: 'All Lunar Events',
+                            icon: 'fa fa-moon-o',
+                            hasValue: false,
+                            showLabel: true
+                        }
+                    ]
+                })
+                lunarEventsField.typedInput('type', option.lunarType || 'all')
+                lunarEventsField.typedInput('value', option.lunarEvents || '')
+
                 // generate location
                 const locationFieldDiv = $('<div/>', { class: 'cron-node-input-option-location-div', style: locationStyle }).appendTo(cell2Solar)
                 const locationField = $('<input/>', { class: 'node-input-option-location', type: 'text', style: 'width: 100%', placeholder: 'lat lng', value: option.location || '' }).appendTo(locationFieldDiv)
@@ -1968,6 +2025,14 @@ copies or substantial portions of the Software.
                         case 'solar':
                             cell2Cron.hide()
                             cell2Solar.show()
+                            solarEventsDiv.show()
+                            lunarEventsDiv.hide()
+                            break
+                        case 'lunar':
+                            cell2Cron.hide()
+                            cell2Solar.show()
+                            solarEventsDiv.hide()
+                            lunarEventsDiv.show()
                             break
                         case 'dates':
                             cell2Cron.show()
@@ -2080,7 +2145,9 @@ copies or substantial portions of the Software.
                     location: option.find('.node-input-option-location').typedInput('value'),
                     offset: option.find('.node-input-option-offset').val(),
                     solarType: option.find('.node-input-option-solarEvents').typedInput('type') || 'all',
-                    solarEvents: option.find('.node-input-option-solarEvents').typedInput('value')
+                    solarEvents: option.find('.node-input-option-solarEvents').typedInput('value'),
+                    lunarType: option.find('.node-input-option-lunarEvents').typedInput('type') || 'all',
+                    lunarEvents: option.find('.node-input-option-lunarEvents').typedInput('value')
                 }
                 if (option.find('.node-input-option-value').typedInput('type') === 'num') {
                     o.payload = Number(o.value)
@@ -2659,7 +2726,7 @@ function onSchedulesExpandCompress () {
         </div>
         <h4>Schedules - Type</h4>
         <div style="padding-left: 15px">
-            The type determines what type of schedule. Options are <code>cron</code>, <code>dates sequence</code>, <code>solar events</code> or <code>lunar events</code> (lunar schedules are currently created dynamically or via flow JSON - see <b>Schedules - Lunar Events</b> below)
+            The type determines what type of schedule. Options are <code>cron</code>, <code>dates sequence</code>, <code>solar events</code> or <code>lunar events</code>
         </div>
         <h4 id="cron-plus-expression-info">Schedules - Expression</h4>
         <div style="padding-left: 15px">
@@ -2737,8 +2804,8 @@ function onSchedulesExpandCompress () {
         </div>
         <h4 id="cron-plus-lunar-events-info">Schedules - Lunar Events</h4>
         <div style="padding-left: 15px">
+            <i>NOTE: Only displayed when the type is set to <b>lunar events</b></i><br>
             Lunar event schedules fire on moon events at the specified location.<br>
-            <i>NOTE: lunar event schedules are currently created dynamically (see the <b>add</b> command below) or by importing flow JSON - the editor UI does not offer them yet</i><br>
             Lunar Events...
             <table class="cron-plus-solar-events-table">
                 <tr><th>Event ID</th><th>Event</th><th>Information</th></tr>
@@ -2749,8 +2816,8 @@ function onSchedulesExpandCompress () {
         </div>
         <h4>Schedules - Location</h4>
         <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
-            The location field is expected to contain longitude and latitude coordinates for the calculation of solar events.<br>
+            <i>NOTE: Only displayed when the type is set to <b>solar events</b> or <b>lunar events</b></i><br>
+            The location field is expected to contain longitude and latitude coordinates for the calculation of solar and lunar events.<br>
             Accepted formats...
             <ul>
                 <li>Decimal Degrees E.g: <code>54.9992500,-1.4170300</code> or <code>54.9992500° N 1.4170300° W</code></li>
