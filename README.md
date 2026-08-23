@@ -65,7 +65,6 @@ Schedules can fire on moon events at a location, alongside the existing solar ev
 |----------|-------|-------------|
 | `rise` | moon rise | the moon rises above the horizon |
 | `set` | moon set | the moon sets below the horizon |
-| `highest` | lunar transit | the moon is at its highest position |
 
 A lunar schedule takes the same shape as a solar one, using `expressionType: "lunar"` with `lunarType` (`"all"` or `"selected"`) and `lunarEvents` (a CSV or array of the event IDs above), plus the usual `location` and optional `offset` (minutes). For example, adding one dynamically:
 
@@ -163,7 +162,7 @@ Dependencies
 * [cronosjs](https://github.com/jaclarke/cronosjs)
 * [cronstrue](https://github.com/bradymholt/cRonstrue) 
 * [pretty-ms](https://github.com/sindresorhus/pretty-ms)
-* [suncalc3](https://github.com/hypnos3/suncalc3)
+* [suncalc](https://github.com/mourner/suncalc)
 * [coord-parser](https://github.com/naturalatlas/coord-parser)
 
 Development

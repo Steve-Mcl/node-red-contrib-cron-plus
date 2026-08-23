@@ -253,8 +253,8 @@ describe('cron-plus Node', function () {
         })
     })
 
-    describe('solar & lunar event calculations (suncalc3)', function () {
-        const SunCalc = require('suncalc3')
+    describe('solar & lunar event calculations (suncalc)', function () {
+        const SunCalc = require('suncalc')
         const iso = d => new Date(d).toISOString()
         const LOC = '55.0,-1.418'
         const LAT = 55.0
@@ -276,27 +276,27 @@ describe('cron-plus Node', function () {
             })
         }
 
-        it("solar 'sunrise' should keep suncalc2 semantics (top edge appears = suncalc3 sunriseStart)", { timeout: 5000 }, async function () {
+        it("solar 'sunrise' should keep suncalc2 semantics (top edge of the sun appears)", { timeout: 5000 }, async function () {
             const ask = await loadDescriber()
             const result = await ask({ expressionType: 'solar', location: LOC, solarType: 'selected', solarEvents: 'sunrise', time: '2026-06-15T12:00:00Z' })
             result.nextEvent.should.eql('sunrise')
-            // the returned time must be the sunriseStart of its own day, NOT sunriseEnd
-            const times = SunCalc.getSunTimes(new Date(result.nextEventTime), LAT, LNG)
-            iso(result.nextEventTime).should.eql(iso(times.sunriseStart.value))
-            iso(result.nextEventTime).should.not.eql(iso(times.sunriseEnd.value))
+            // the returned time must be the sunrise of its own day, NOT sunriseEnd
+            const times = SunCalc.getTimes(new Date(result.nextEventTime), LAT, LNG)
+            iso(result.nextEventTime).should.eql(iso(times.sunrise))
+            iso(result.nextEventTime).should.not.eql(iso(times.sunriseEnd))
         })
-        it("solar 'sunset' should keep suncalc2 semantics (sun disappears = suncalc3 sunsetEnd)", { timeout: 5000 }, async function () {
+        it("solar 'sunset' should keep suncalc2 semantics (sun disappears below the horizon)", { timeout: 5000 }, async function () {
             const ask = await loadDescriber()
             const result = await ask({ expressionType: 'solar', location: LOC, solarType: 'selected', solarEvents: 'sunset', time: '2026-06-15T12:00:00Z' })
             result.nextEvent.should.eql('sunset')
-            const times = SunCalc.getSunTimes(new Date(result.nextEventTime), LAT, LNG)
-            iso(result.nextEventTime).should.eql(iso(times.sunsetEnd.value))
-            iso(result.nextEventTime).should.not.eql(iso(times.sunsetStart.value))
+            const times = SunCalc.getTimes(new Date(result.nextEventTime), LAT, LNG)
+            iso(result.nextEventTime).should.eql(iso(times.sunset))
+            iso(result.nextEventTime).should.not.eql(iso(times.sunsetStart))
         })
         it("solar 'nightEnd' should not fire on days when astronomical dawn does not occur", { timeout: 5000 }, async function () {
-            // at 55N in mid-June the sun never reaches -18 degrees - suncalc3 returns a
-            // real looking Date with valid:false for such days, which must be skipped.
-            // The next true astronomical dawn is several weeks away (late July)
+            // at 55N in mid-June the sun never reaches -18 degrees - suncalc returns
+            // null for such days, which must be skipped. The next true astronomical
+            // dawn is several weeks away (late July)
             const ask = await loadDescriber()
             const result = await ask({ expressionType: 'solar', location: LOC, solarType: 'selected', solarEvents: 'nightEnd', time: '2026-06-15T12:00:00Z' })
             result.nextEvent.should.eql('nightEnd')
@@ -308,22 +308,13 @@ describe('cron-plus Node', function () {
             const result = await ask({ expressionType: 'lunar', location: LOC, lunarType: 'selected', lunarEvents: 'rise', time: t0.toISOString() })
             result.nextEvent.should.eql('rise')
             new Date(result.nextEventTime).getTime().should.be.above(t0.getTime())
-            // the returned time must be the moon rise of its own day per suncalc3
+            // the returned time must be the moon rise of its own day per suncalc
             const moonTimes = SunCalc.getMoonTimes(new Date(result.nextEventTime), LAT, LNG)
             iso(result.nextEventTime).should.eql(iso(moonTimes.rise))
         })
-        it("lunar 'highest' should return the next lunar transit for the location", { timeout: 5000 }, async function () {
-            const t0 = new Date('2026-06-15T12:00:00Z')
-            const ask = await loadDescriber()
-            const result = await ask({ expressionType: 'lunar', location: LOC, lunarType: 'selected', lunarEvents: 'highest', time: t0.toISOString() })
-            result.nextEvent.should.eql('highest')
-            new Date(result.nextEventTime).getTime().should.be.above(t0.getTime())
-            const moonTimes = SunCalc.getMoonTimes(new Date(result.nextEventTime), LAT, LNG)
-            iso(result.nextEventTime).should.eql(iso(moonTimes.highest))
-        })
         it('lunar describe should not crash when there are no recent moon events (polar latitudes)', { timeout: 5000 }, async function () {
             // at 89N the moon is continuously up or down for days at a time - the first
-            // week of Jan 2026 has no rise/set/highest at all, so the backwards scan
+            // week of Jan 2026 has no rise/set events at all, so the backwards scan
             // finds no prior event (this used to throw and no response was ever sent)
             const t0 = new Date('2026-01-04T00:00:00Z')
             const ask = await loadDescriber()

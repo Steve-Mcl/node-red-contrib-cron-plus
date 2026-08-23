@@ -18,40 +18,37 @@ const cronstrue = require('cronstrue')
 const cronosjs = require('cronosjs')
 const prettyMs = require('./lib/ms.js').prettyMilliseconds
 const coordParser = require('coord-parser')
-const SunCalc = require('suncalc3')
+const SunCalc = require('suncalc')
 const path = require('path')
 const fs = require('fs')
 
-// NOTE: suncalc2 compatibility names (sunrise, sunset, nightEnd, nightStart,
-// morningGoldenHourEnd, eveningGoldenHourStart) are mapped onto the suncalc3
-// names in getSunTimes() below. SunCalc.addTime() is NOT used for this - it
-// silently rejects any call where either name collides with a built-in event.
+// NOTE: the event IDs cron-plus exposes are the original suncalc/suncalc2 names.
+// The few that differ in suncalc v2 (civilDawn/civilDusk, morningGoldenHourEnd,
+// eveningGoldenHourStart, nightStart) are mapped in getSunTimes() below.
+// The event angles/semantics are unchanged from suncalc2.
 
 const PERMITTED_SOLAR_EVENTS = [
-    'nightEnd', // renamed astronomicalDawn in suncalc3
-    // "astronomicalDawn",
+    'nightEnd', // astronomical dawn (-18deg)
     'nauticalDawn',
-    'civilDawn',
+    'civilDawn', // named 'dawn' in suncalc
     // "morningGoldenHourStart",
-    'sunrise', // renamed sunriseStart in suncalc3
+    'sunrise',
     'sunriseEnd',
-    'morningGoldenHourEnd',
+    'morningGoldenHourEnd', // named 'goldenHourEnd' in suncalc
     'solarNoon',
-    'eveningGoldenHourStart',
+    'eveningGoldenHourStart', // named 'goldenHour' in suncalc
     'sunsetStart',
-    'sunset', // renamed sunsetEnd in suncalc3
+    'sunset',
     // "eveningGoldenHourEnd",
-    'civilDusk',
+    'civilDusk', // named 'dusk' in suncalc
     'nauticalDusk',
-    // "astronomicalDusk",
-    'nightStart', // renamed astronomicalDusk in suncalc3
+    'nightStart', // astronomical dusk (-18deg), named 'night' in suncalc
     'nadir'
 ]
 
 const PERMITTED_LUNAR_EVENTS = [
     'rise',
-    'set',
-    'highest'
+    'set'
 ]
 
 // accepted commands using topic as the command & (in compatible cases, the payload is the schedule name)
@@ -595,15 +592,28 @@ function parseLunarTimes (opt) {
 }
 
 function getSunTimes (date, lat, lng) {
-    const times = SunCalc.getSunTimes(date, lat, lng)
-    // add suncalc2 compatibility names for events renamed in suncalc3
-    times.sunrise = times.sunriseStart // top edge of the sun appears (-0.833 rising)
-    times.sunset = times.sunsetEnd // sun disappears below the horizon (-0.833 falling)
-    times.nightEnd = times.astronomicalDawn
-    times.nightStart = times.astronomicalDusk
-    times.morningGoldenHourEnd = times.goldenHourDawnEnd
-    times.eveningGoldenHourStart = times.goldenHourDuskStart
+    const times = SunCalc.getTimes(date, lat, lng)
+    // map the original suncalc/suncalc2 event names cron-plus exposes onto the
+    // suncalc v2 names (same events, same angles - only the names differ).
+    // Events that do not occur on the given day are null and are skipped by the scans.
+    times.civilDawn = times.dawn
+    times.civilDusk = times.dusk
+    times.morningGoldenHourEnd = times.goldenHourEnd
+    times.eveningGoldenHourStart = times.goldenHour
+    times.nightStart = times.night
     return times
+}
+
+// replicates suncalc3's getMoonData() (which suncalc v2 does not provide) by
+// composing the moon position and illumination exactly as suncalc3 did.
+// NOTE: suncalc v2 reports angles in degrees with a north-based azimuth
+function getMoonData (dateValue, lat, lng) {
+    const pos = SunCalc.getMoonPosition(dateValue, lat, lng)
+    const illum = SunCalc.getMoonIllumination(dateValue)
+    return Object.assign({
+        illumination: illum,
+        zenithAngle: illum.angle - pos.parallacticAngle
+    }, pos)
 }
 
 function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offset = 0) {
@@ -649,14 +659,12 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
 
         for (let index = 0; index < solarEventsPast.length; index++) {
             const se = solarEventsPast[index]
-            const seObj = timesIteration1[se]
-            // suncalc3 returns a real Date with valid:false for events that do not
-            // occur on that day (e.g. astronomical dawn in mid-summer at high
-            // latitudes) - these must be skipped, not treated as event times
-            if (!seObj || seObj.valid === false || !isValidDateObject(seObj.value)) {
+            // events that do not occur on the scanned day (e.g. astronomical dawn in
+            // mid-summer at high latitudes) are null and must be skipped
+            const seTime = timesIteration1[se]
+            if (!seTime || !isValidDateObject(seTime)) {
                 continue
             }
-            const seTime = seObj.value
             const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
             if (isValidDateObject(seTimeOffset) && seTimeOffset <= startDate) {
                 result.push({ event: se, time: seTime, timeOffset: seTimeOffset })
@@ -677,11 +685,10 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
         // timesIteration2 = new SolarCalc(scanDate,lat,lng);
         for (let index = 0; index < solarEventsFuture.length; index++) {
             const se = solarEventsFuture[index]
-            const seObj = timesIteration2[se]
-            if (!seObj || seObj.valid === false || !isValidDateObject(seObj.value)) {
+            const seTime = timesIteration2[se]
+            if (!seTime || !isValidDateObject(seTime)) {
                 continue
             }
-            const seTime = seObj.value
             const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
             if (isValidDateObject(seTimeOffset) && seTimeOffset > startDate) {
                 result.push({ event: se, time: seTime, timeOffset: seTimeOffset })
@@ -945,7 +952,7 @@ function getLunarTimes (lat, lng, elevation, lunarEvents, startDate = null, offs
     // handled without erroring so the schedule reports "Never" instead of crashing
     const lunarState = {
         ...(event || {}),
-        ...SunCalc.getMoonData((event && event.time) || startDate, lat, lng) // TODO: curate this data to only what is needed
+        ...getMoonData((event && event.time) || startDate, lat, lng) // TODO: curate this data to only what is needed
     }
 
     // now filter to only events of interest

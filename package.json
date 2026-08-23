@@ -55,7 +55,7 @@
         "coord-parser": "^1.0.0",
         "cronosjs": "^1.7.1",
         "cronstrue": "^3.24.0",
-        "suncalc3": "^2.0.5"
+        "suncalc": "^2.0.0"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.3",
