@@ -37,6 +37,62 @@ describe('cron-plus Node', function () {
         })
     })
 
+    it('should warn (not crash) when button pressed and no valid schedules exist', function (done) {
+        this.timeout(2000)
+        // schedule has a blank date-sequence expression so no task will be created,
+        // then an empty msg (button press) must not throw an unhandled rejection
+        const flow = [
+            { id: 't1n3', type: 'cronplus', name: 'no schedules', outputField: 'payload', timeZone: '', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'dates', expression: '', location: '', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }], wires: [[]] }
+        ]
+        helper.load(cronplusNode, flow, function () {
+            const t1n3 = helper.getNode('t1n3')
+            t1n3.receive({}) // simulate button press (no topic, no payload)
+            setTimeout(() => {
+                try {
+                    t1n3.warn.calledWith('No schedule available to trigger').should.be.true('expected "No schedule available to trigger" warning')
+                    done()
+                } catch (err) {
+                    done(err)
+                }
+            }, 200)
+        })
+    })
+
+    it('should catch errors thrown during a scheduled trigger (no unhandled rejection)', function (done) {
+        this.timeout(4000)
+        // a schedule that fires every second - node.status is made to throw part way
+        // through sendMsg (outside its internal try/catch) to prove the scheduled-run
+        // call site routes the rejection to node.error instead of crashing the runtime
+        const flow = [
+            { id: 't1n4', type: 'cronplus', name: 'every1sec', outputField: 'payload', timeZone: '', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '* * * * * * *', location: '', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }], wires: [[]] }
+        ]
+        helper.load(cronplusNode, flow, function () {
+            const t1n4 = helper.getNode('t1n4')
+            const originalStatus = t1n4.status
+            t1n4.status = function (status) {
+                if (status && status.text === 'Schedule Started') {
+                    throw new Error('forced error during sendMsg')
+                }
+                return originalStatus.call(t1n4, status)
+            }
+            let finished = false
+            const finish = (err) => {
+                if (finished) { return }
+                finished = true
+                clearInterval(pollTimer)
+                clearTimeout(failTimer)
+                done(err)
+            }
+            const pollTimer = setInterval(() => {
+                const errCall = t1n4.error.getCalls().find(c => c.args[0] && c.args[0].message === 'forced error during sendMsg')
+                if (errCall) { finish() }
+            }, 100)
+            const failTimer = setTimeout(() => {
+                finish(new Error('node.error was not called - error from scheduled trigger was not caught'))
+            }, 3000)
+        })
+    })
+
     const getObjectProperty = function (object, path, defaultValue) {
         return path
             // eslint-disable-next-line no-useless-escape
