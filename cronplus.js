@@ -908,9 +908,12 @@ module.exports = function (RED) {
             node.storeName = ''
         }
 
+        // context store availability is tracked per node so that one node with a
+        // bad store name cannot disable context persistence for every cronplus node
+        node.contextAvailable = contextAvailable
         if (node.storeName && node.storeName !== 'file' && STORE_NAMES.indexOf(node.storeName) < 0) {
-            node.warn(`Invalid store name specified '${node.storeName}' - state will not be persisted for this node`)
-            contextAvailable = false
+            node.warn(`Invalid store name specified '${node.storeName}' - state will not be persisted for this node. Select a different "Save State" option in the node settings, or add the store to the 'contextStorage' section of the node-red settings file`)
+            node.contextAvailable = false
         }
 
         if (config.commandResponseMsgOutput === 'output2') {
@@ -1746,7 +1749,7 @@ module.exports = function (RED) {
                 } else {
                     const contextKey = 'state'
                     const storeName = node.storeName || 'default'
-                    if (!contextAvailable || STORE_NAMES.indexOf(storeName) === -1) {
+                    if (!node.contextAvailable || STORE_NAMES.indexOf(storeName) === -1) {
                         return
                     }
                     await contextSet(node.context(), contextKey, state, storeName)
@@ -1837,7 +1840,7 @@ module.exports = function (RED) {
                     // use context
                     const storeName = node.storeName || 'default'
                     const contextKey = 'state'
-                    if (!contextAvailable || !STORE_NAMES.indexOf(storeName)) {
+                    if (!node.contextAvailable || STORE_NAMES.indexOf(storeName) === -1) {
                         return
                     }
                     const state = await contextGet(node.context(), contextKey, storeName)
@@ -1983,11 +1986,11 @@ module.exports = function (RED) {
 
     function getStoreNames () {
         const stores = ['', 'file']
-        if (!RED.settings.contextStorage) {
-            return stores
-        }
-        if (typeof RED.settings.contextStorage !== 'object') {
-            return stores
+        if (!RED.settings.contextStorage || typeof RED.settings.contextStorage !== 'object' || Object.keys(RED.settings.contextStorage).length === 0) {
+            // when contextStorage is not configured in the node-red settings file, the
+            // runtime still provides a single built-in in-memory store named 'memory'
+            // (and the editor offers it), so accept it here too (issue #104)
+            return [...stores, 'memory']
         }
         return [...stores, ...Object.keys(RED.settings.contextStorage)]
     }

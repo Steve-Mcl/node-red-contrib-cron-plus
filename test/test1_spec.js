@@ -130,6 +130,40 @@ describe('cron-plus Node', function () {
         })
     })
 
+    describe('save state store validation', function () {
+        // issue #104: the editor offers the built-in 'memory' context store on a
+        // default node-red install (no contextStorage configured in settings), but
+        // the runtime rejected it. It must be accepted, and a genuinely unknown
+        // store must produce an actionable warning that does not affect the
+        // persistence of other cronplus nodes.
+        const makeNode = (id, storeName) => ({
+            id, type: 'cronplus', name: 'store test ' + id, outputField: 'payload', timeZone: '', storeName, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 0 * * * * 2000', location: '', offset: '0' }], wires: [[]]
+        })
+        // the test helper stubs warn at the prototype, so the spy is shared by all
+        // nodes - filter calls by thisValue to get the calls made by *this* node
+        const invalidStoreWarnings = (n) => n.warn.getCalls().filter(c => c.thisValue === n && typeof c.args[0] === 'string' && c.args[0].includes('Invalid store name'))
+
+        it("should accept the built-in 'memory' store, 'file' and none without warning", async function () {
+            const flow = [makeNode('s1', 'memory'), makeNode('s2', 'file'), makeNode('s3', '')]
+            await helper.load(cronplusNode, flow)
+            invalidStoreWarnings(helper.getNode('s1')).should.have.length(0)
+            invalidStoreWarnings(helper.getNode('s2')).should.have.length(0)
+            invalidStoreWarnings(helper.getNode('s3')).should.have.length(0)
+        })
+        it('should warn with guidance for an unknown store, without affecting other nodes', async function () {
+            const flow = [makeNode('s1', 'bogus'), makeNode('s2', 'memory')]
+            await helper.load(cronplusNode, flow)
+            const bad = helper.getNode('s1')
+            const good = helper.getNode('s2')
+            const warnings = invalidStoreWarnings(bad)
+            warnings.should.have.length(1)
+            warnings[0].args[0].should.match(/Invalid store name specified 'bogus'/)
+            warnings[0].args[0].should.match(/contextStorage/) // actionable guidance
+            bad.should.have.property('contextAvailable', false) // per node, not module wide
+            invalidStoreWarnings(good).should.have.length(0)
+        })
+    })
+
     describe('DST transition handling (Debian cron rules)', function () {
         // Jobs whose minute or hour field starts with `*` ("wildcard jobs") keep
         // their real-time interval across a DST change, so they also run during
