@@ -213,6 +213,26 @@ function isDateSequence (data) {
 }
 
 /**
+ * Guards against a cronosjs bug where an expression that can never occur
+ * (e.g. `0 0 30 2 *` - 30th of February) causes `nextDate()` to search year
+ * by year forever, locking up the event loop. An unbounded (`*`) year field
+ * never runs out of candidate years, so the search never terminates.
+ * Cron date/day patterns repeat within the 400 year Gregorian cycle, so if
+ * no occurrence exists within 500 years the expression will never fire -
+ * `nextDate()` then returns `null`, which is already handled as "Never".
+ * @param {cronosjs.CronosExpression} ex a parsed cron expression
+ * @returns {cronosjs.CronosExpression} the same expression, with the year scan bounded
+ */
+function limitExpressionYearScan (ex) {
+    if (ex && ex.years && typeof ex.years.nextYear === 'function') {
+        const maxYear = new Date().getFullYear() + 500
+        const nextYear = ex.years.nextYear.bind(ex.years)
+        ex.years.nextYear = fromYear => (fromYear > maxYear) ? null : nextYear(fromYear)
+    }
+    return ex
+}
+
+/**
  * Returns an object describing the parameters.
  * @param {string} expression The expressions or coordinates to use
  * @param {string} expressionType The expression type ("cron" | "solar" | "dates")
@@ -308,7 +328,7 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
     }
 
     if (exOk) {
-        const ex = cronosjs.CronosExpression.parse(expression, cronOpts)
+        const ex = limitExpressionYearScan(cronosjs.CronosExpression.parse(expression, cronOpts))
         const next = ex.nextDate()
         if (next) {
             const ms = next.valueOf() - now.valueOf()
@@ -1582,7 +1602,7 @@ module.exports = function (RED) {
             const cronOpts = node.timeZone ? { timezone: node.timeZone } : undefined
             let task
             if (opt.expressionType === 'cron') {
-                const expression = cronosjs.CronosExpression.parse(opt.expression, cronOpts)
+                const expression = limitExpressionYearScan(cronosjs.CronosExpression.parse(opt.expression, cronOpts))
                 task = new cronosjs.CronosTask(expression)
             } else if (opt.expressionType === 'solar') {
                 if (node.defaultLocationType === 'env' || node.defaultLocationType === 'fixed') {

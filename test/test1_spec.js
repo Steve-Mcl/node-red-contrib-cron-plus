@@ -102,6 +102,34 @@ describe('cron-plus Node', function () {
         })
     })
 
+    it('should not hang when a schedule can never occur (e.g. 30th of February)', { timeout: 5000 }, function (t, done) {
+        // cronosjs searches year-by-year for the next occurrence; an impossible date
+        // with an unbounded year field made that search spin forever, locking up the
+        // runtime on deploy. The year scan is now bounded and reports "Never".
+        const flow = [
+            { id: 't1n5', type: 'cronplus', name: 'never', outputField: 'payload', timeZone: '', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 0 30 02 *', location: '', offset: '0' }], wires: [['t1n6']] },
+            { id: 't1n6', type: 'helper' }
+        ]
+        helper.load(cronplusNode, flow, function () {
+            // reaching this callback at all proves deploy did not lock the event loop
+            const t1n5 = helper.getNode('t1n5')
+            const t1n6 = helper.getNode('t1n6')
+            t1n6.on('input', function (msg) {
+                try {
+                    msg.should.have.property('payload').which.is.an.Object()
+                    msg.payload.should.have.property('result').which.is.an.Object()
+                    msg.payload.result.should.have.property('description').which.is.a.String()
+                    msg.payload.result.should.have.property('prettyNext', 'Never')
+                    done()
+                } catch (err) {
+                    done(err)
+                }
+            })
+            // also exercise the describe path with the impossible expression
+            t1n5.receive({ payload: { command: 'describe', expressionType: 'cron', expression: '0 0 30 02 *' } })
+        })
+    })
+
     const getObjectProperty = function (object, path, defaultValue) {
         return path
             // eslint-disable-next-line no-useless-escape
