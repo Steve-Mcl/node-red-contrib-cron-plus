@@ -130,6 +130,95 @@ describe('cron-plus Node', function () {
         })
     })
 
+    describe('DST transition handling (Debian cron rules)', function () {
+        // Jobs whose minute or hour field starts with `*` ("wildcard jobs") keep
+        // their real-time interval across a DST change, so they also run during
+        // the repeated hour when clocks go back. Jobs with a fixed hour + minute
+        // ("fixed-time jobs") run only once in a repeated hour, and run as soon
+        // as possible after a missing hour when clocks go forward.
+        // Ref: https://blog.healthchecks.io/2021/10/how-debian-cron-handles-dst-transitions/
+        // MockTimers' 'Date' api landed in Node 20.11.0 - earlier versions throw on enable()
+        const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number)
+        const hasMockDate = nodeMajor > 20 || (nodeMajor === 20 && nodeMinor >= 11)
+        const iso = d => new Date(d).toISOString()
+
+        // loads a cronplus node and returns a function that asks it to describe
+        // a cron expression at a fixed point in time (Europe/London)
+        const loadDescriber = async () => {
+            const flow = [
+                { id: 'dst1', type: 'cronplus', name: 'dst', outputField: 'payload', timeZone: 'Europe/London', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 0 * * * * 2000', location: '', offset: '0' }], wires: [['dst2']] },
+                { id: 'dst2', type: 'helper' }
+            ]
+            await helper.load(cronplusNode, flow)
+            const dst1 = helper.getNode('dst1')
+            const dst2 = helper.getNode('dst2')
+            return (expression, time) => new Promise(resolve => {
+                dst2.once('input', msg => resolve(msg.payload.result))
+                dst1.receive({ payload: { command: 'describe', expressionType: 'cron', expression, timeZone: 'Europe/London', time } })
+            })
+        }
+
+        // UK fall back: Sun 26 Oct 2025, 02:00 BST -> 01:00 GMT (01:00-01:59 local occurs twice)
+        it('wildcard schedule should keep running through the repeated hour (clocks go back)', async function () {
+            const describeExpr = await loadDescriber()
+            const result = await describeExpr('0,15,30,45 * * * * * *', '2025-10-26T00:59:50Z') // 01:59:50 BST
+            iso(result.nextDate).should.eql('2025-10-26T01:00:00.000Z') // 01:00:00 GMT, second pass of the repeated hour
+        })
+        it('minute-wildcard schedule with fixed hour is a wildcard job (clocks go back)', async function () {
+            const describeExpr = await loadDescriber()
+            const result = await describeExpr('0 * 1 * * * *', '2025-10-26T00:59:30Z') // 01:59:30 BST
+            iso(result.nextDate).should.eql('2025-10-26T01:00:00.000Z') // hour 1 repeats - runs again
+        })
+        it('fixed-time schedule should run only once in the repeated hour (clocks go back)', async function () {
+            const describeExpr = await loadDescriber()
+            const first = await describeExpr('0 30 1 * * * *', '2025-10-26T00:29:00Z') // 01:29 BST
+            iso(first.nextDate).should.eql('2025-10-26T00:30:00.000Z') // 01:30 BST, first pass runs
+            const second = await describeExpr('0 30 1 * * * *', '2025-10-26T00:31:00Z') // 01:31 BST, already ran
+            iso(second.nextDate).should.eql('2025-10-27T01:30:00.000Z') // NOT 01:30 GMT (second pass) - next day
+        })
+
+        // UK spring forward: Sun 30 Mar 2025, 01:00 GMT -> 02:00 BST (01:00-01:59 local never occurs)
+        it('wildcard schedule should keep its cadence through the missing hour (clocks go forward)', async function () {
+            const describeExpr = await loadDescriber()
+            const result = await describeExpr('0,15,30,45 * * * * * *', '2025-03-30T00:59:50Z') // 00:59:50 GMT
+            iso(result.nextDate).should.eql('2025-03-30T01:00:00.000Z') // = 02:00:00 BST, 10 real seconds later
+        })
+        it('fixed-time schedule in the missing hour should run as soon as possible (clocks go forward)', async function () {
+            const describeExpr = await loadDescriber()
+            const missed = await describeExpr('0 30 1 * * * *', '2025-03-30T00:29:00Z') // 00:29 GMT - 01:30 local will not occur
+            iso(missed.nextDate).should.eql('2025-03-30T01:00:00.000Z') // runs at the transition (02:00 BST)
+            const after = await describeExpr('0 30 1 * * * *', '2025-03-30T01:01:00Z') // just after the transition
+            iso(after.nextDate).should.eql('2025-03-31T00:30:00.000Z') // 01:30 BST the next day
+        })
+
+        // live scheduler (task creation) path - mock timers travel through the transition
+        it('live wildcard schedule should fire during the repeated hour (clocks go back)', { timeout: 10000 }, async function (t) {
+            if (!hasMockDate) {
+                t.skip('Node 20.11+ required for fake timers (Date) to work through DST transition')
+                return
+            }
+            t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: new Date('2025-10-26T00:59:50Z').getTime() }) // 01:59:50 BST
+            const drain = () => new Promise(resolve => setImmediate(resolve))
+            try {
+                const flow = [
+                    { id: 'dst3', type: 'cronplus', name: 'dst-live', outputField: 'payload', timeZone: 'Europe/London', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'every15', topic: 'every15', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0,15,30,45 * * * * * *', location: '', offset: '0' }], wires: [['dst4']] },
+                    { id: 'dst4', type: 'helper' }
+                ]
+                await helper.load(cronplusNode, flow)
+                const dst4 = helper.getNode('dst4')
+                const fires = []
+                dst4.on('input', msg => fires.push(iso(msg.payload.triggerTimestamp)))
+                // advance 35s of fake time through the transition, in small steps so
+                // each fire sees the clock at its own moment
+                for (let i = 0; i < 700; i++) { t.mock.timers.tick(50); await drain() }
+                fires.should.containEql('2025-10-26T01:00:00.000Z') // 01:00:00 GMT - first slot of the repeated hour
+                fires.should.containEql('2025-10-26T01:00:15.000Z')
+            } finally {
+                t.mock.timers.reset()
+            }
+        })
+    })
+
     const getObjectProperty = function (object, path, defaultValue) {
         return path
             // eslint-disable-next-line no-useless-escape

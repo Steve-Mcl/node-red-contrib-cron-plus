@@ -54,6 +54,22 @@ FEATURES
   * change detection can now be customised by adding an entry in `settings.js` or an environment variable named `CRONPLUS_MAX_CLOCK_DIFF` (as of V2.0.0)
 * Demo flows demonstrating many of the capabilities. Import via node-red menu > import > examples.
 * Optional time zone setting supporting UTC and Region/Area (e.g. Europe/London)
+* Daylight Saving Time transitions are handled following the same conventions as Debian cron (see below)
+
+Daylight Saving Time (DST) handling
+-----------------------------------
+
+When a schedule runs in a time zone that observes DST (either the node's time zone setting or the system time zone), cron-plus follows the same conventions as [Debian cron](https://blog.healthchecks.io/2021/10/how-debian-cron-handles-dst-transitions/):
+
+* A schedule is a **wildcard job** when its minute or hour field starts with `*` (e.g. `0,15,30,45 * * * * * *` "every 15 seconds", or `0 * 1 * * *` "every minute during the 1am hour"). Wildcard jobs maintain their real-time interval across a DST transition:
+  * when clocks go back, they also run during the repeated hour
+  * when clocks go forward, they continue at the next real-time slot
+* A schedule is a **fixed-time job** when both its minute and hour fields are specific (e.g. `0 30 1 * * *` "01:30 every day"). Fixed-time jobs:
+  * run only once when clocks go back and their scheduled time occurs twice
+  * run as soon as possible after the transition when clocks go forward and their scheduled time is skipped
+
+> [!TIP]
+> schedules using the `UTC` time zone (or any time zone without DST) are unaffected by DST transitions.
 
 Install
 -------

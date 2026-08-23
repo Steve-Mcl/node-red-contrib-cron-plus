@@ -233,6 +233,29 @@ function limitExpressionYearScan (ex) {
 }
 
 /**
+ * Classifies a cron expression the same way Debian cron does for DST
+ * handling: a job is a "wildcard job" when its minute or hour field starts
+ * with `*` (e.g. `0 0,15,30,45 * * * *` or `0 * 1 * * *`), otherwise it is a
+ * "fixed-time job" (e.g. `0 30 1 * * *`).
+ * Wildcard jobs maintain their real-time interval across a DST transition,
+ * so when clocks go back they must also run during the repeated hour.
+ * Fixed-time jobs must run only once in the repeated hour.
+ * See https://blog.healthchecks.io/2021/10/how-debian-cron-handles-dst-transitions/
+ * @param {string} expression cron expression (5, 6 or 7 fields, or @macro)
+ * @returns {boolean} true if the minute or hour field is a wildcard
+ */
+function isWildcardCronJob (expression) {
+    const expr = String(expression || '').trim().toLowerCase()
+    if (expr.startsWith('@')) {
+        return expr === '@hourly' // the only supported macro without a fixed hour + minute
+    }
+    const fields = expr.split(/\s+/g)
+    // cronosjs fields: 5 = `min hr dom mon dow`, 6/7 = `sec min hr dom mon dow [year]`
+    const [minute, hour] = fields.length === 5 ? [fields[0], fields[1]] : [fields[1], fields[2]]
+    return (hour || '').startsWith('*') || (minute || '').startsWith('*')
+}
+
+/**
  * Returns an object describing the parameters.
  * @param {string} expression The expressions or coordinates to use
  * @param {string} expressionType The expression type ("cron" | "solar" | "dates")
@@ -328,8 +351,8 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
     }
 
     if (exOk) {
-        const ex = limitExpressionYearScan(cronosjs.CronosExpression.parse(expression, cronOpts))
-        const next = ex.nextDate()
+        const ex = limitExpressionYearScan(cronosjs.CronosExpression.parse(expression, { ...cronOpts, skipRepeatedHour: !isWildcardCronJob(expression) }))
+        const next = ex.nextDate(now)
         if (next) {
             const ms = next.valueOf() - now.valueOf()
             result.prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
@@ -1602,7 +1625,7 @@ module.exports = function (RED) {
             const cronOpts = node.timeZone ? { timezone: node.timeZone } : undefined
             let task
             if (opt.expressionType === 'cron') {
-                const expression = limitExpressionYearScan(cronosjs.CronosExpression.parse(opt.expression, cronOpts))
+                const expression = limitExpressionYearScan(cronosjs.CronosExpression.parse(opt.expression, { ...cronOpts, skipRepeatedHour: !isWildcardCronJob(opt.expression) }))
                 task = new cronosjs.CronosTask(expression)
             } else if (opt.expressionType === 'solar') {
                 if (node.defaultLocationType === 'env' || node.defaultLocationType === 'fixed') {
