@@ -388,7 +388,7 @@ describe('cron-plus Node', function () {
                     timeZone: '',
                     persistDynamic: false,
                     commandResponseMsgOutput: 'fanOut',
-                    outputs: 5,
+                    outputs: 6,
                     options: [
                         { name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 * * * * * *', location: '', offset: '0' },
                         { name: 'schedule2', topic: 'schedule2', payloadType: 'default', payload: '', expressionType: 'dates', expression: [Date.now() + 60000, Date.now() + 120000], location: '', offset: '0' },
@@ -432,6 +432,7 @@ describe('cron-plus Node', function () {
             should(helperNode1StaticSchedule1).not.be.null()
             should(helperNode2StaticSchedule2).not.be.null()
             should(helperNode3StaticSchedule3).not.be.null()
+            should(helperNode4StaticSchedule4).not.be.null()
             should(helperNodeDynamicSchedules).not.be.null()
             should(helperNodeCommandResponses).not.be.null()
             should(testNode).not.be.null()
@@ -446,6 +447,7 @@ describe('cron-plus Node', function () {
             helperNode1StaticSchedule1 = null
             helperNode2StaticSchedule2 = null
             helperNode3StaticSchedule3 = null
+            helperNode4StaticSchedule4 = null
             helperNodeDynamicSchedules = null
             helperNodeCommandResponses = null
             testNode = null
@@ -639,12 +641,11 @@ describe('cron-plus Node', function () {
             const result = await resultPromise // wait for the third message to be processed
             staticScheduleTest(result)
         })
-        it("should 'trigger-all' by topic", async function () {
         it("should 'trigger-all' by topic", async function (t) {
             const test = {
                 description: t.name,
                 send: { topic: 'trigger-all', payload: '' },
-                expected: { command: 'trigger-all', scheduleCount: 5 }
+                expected: { command: 'trigger-all', scheduleCount: 6 } // 4 static + 2 dynamic
             }
             await alignToSecondBoundary()
             // add 2 dynamic schedules
@@ -654,7 +655,7 @@ describe('cron-plus Node', function () {
             const messages = []
             const addMessage = (msg, resolver) => {
                 messages.push(msg)
-                if (messages.length >= 5) {
+                if (messages.length >= 6) {
                     resolver(messages)
                 }
             }
@@ -668,6 +669,9 @@ describe('cron-plus Node', function () {
                 helperNode3StaticSchedule3.on('input', (msg) => {
                     addMessage(msg, resolve)
                 })
+                helperNode4StaticSchedule4.on('input', (msg) => {
+                    addMessage(msg, resolve)
+                })
                 helperNodeDynamicSchedules.on('input', (msg) => {
                     addMessage(msg, resolve)
                 })
@@ -677,17 +681,19 @@ describe('cron-plus Node', function () {
             })
             testNode.receive(test.send)
             const result = await resultPromise
-            result.should.have.length(5)
+            result.should.have.length(6)
             statusChecker(result[0].payload.status, 'static')
             statusChecker(result[1].payload.status, 'static')
             statusChecker(result[2].payload.status, 'static')
-            statusChecker(result[3].payload.status, 'dynamic')
+            statusChecker(result[3].payload.status, 'static')
             statusChecker(result[4].payload.status, 'dynamic')
+            statusChecker(result[5].payload.status, 'dynamic')
             configChecker(result[0].payload.config)
             configChecker(result[1].payload.config)
             configChecker(result[2].payload.config)
             configChecker(result[3].payload.config)
             configChecker(result[4].payload.config)
+            configChecker(result[5].payload.config)
         })
         it('should add a dynamic cron schedule', async function () {
             const resultPromise = new Promise(resolve => {
@@ -707,7 +713,7 @@ describe('cron-plus Node', function () {
                 expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', 'All Solar Events']] }
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
