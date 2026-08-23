@@ -3,6 +3,12 @@
     "version": "2.2.5",
     "description": "A flexible scheduler (cron, solar events, fixed dates) node for Node-RED with full dynamic control and time zone support",
     "main": "cronplus.js",
+    "files": [
+        "cronplus.js",
+        "cronplus.html",
+        "lib/",
+        "examples/"
+    ],
     "scripts": {
         "test": "node --test test/test1_spec.js",
         "lint": "eslint -c eslint.config.mjs",
