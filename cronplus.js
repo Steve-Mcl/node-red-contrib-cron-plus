@@ -239,6 +239,49 @@ function isDateSequence (data) {
 }
 
 /**
+ * Guards against a cronosjs bug where an expression that can never occur
+ * (e.g. `0 0 30 2 *` - 30th of February) causes `nextDate()` to search year
+ * by year forever, locking up the event loop. An unbounded (`*`) year field
+ * never runs out of candidate years, so the search never terminates.
+ * Cron date/day patterns repeat within the 400 year Gregorian cycle, so if
+ * no occurrence exists within 500 years the expression will never fire -
+ * `nextDate()` then returns `null`, which is already handled as "Never".
+ * @param {cronosjs.CronosExpression} ex a parsed cron expression
+ * @returns {cronosjs.CronosExpression} the same expression, with the year scan bounded
+ */
+function limitExpressionYearScan (ex) {
+    if (ex && ex.years && typeof ex.years.nextYear === 'function') {
+        const maxYear = new Date().getFullYear() + 500
+        const nextYear = ex.years.nextYear.bind(ex.years)
+        ex.years.nextYear = fromYear => (fromYear > maxYear) ? null : nextYear(fromYear)
+    }
+    return ex
+}
+
+/**
+ * Classifies a cron expression the same way Debian cron does for DST
+ * handling: a job is a "wildcard job" when its minute or hour field starts
+ * with `*` (e.g. `0 0,15,30,45 * * * *` or `0 * 1 * * *`), otherwise it is a
+ * "fixed-time job" (e.g. `0 30 1 * * *`).
+ * Wildcard jobs maintain their real-time interval across a DST transition,
+ * so when clocks go back they must also run during the repeated hour.
+ * Fixed-time jobs must run only once in the repeated hour.
+ * See https://blog.healthchecks.io/2021/10/how-debian-cron-handles-dst-transitions/
+ * @param {string} expression cron expression (5, 6 or 7 fields, or @macro)
+ * @returns {boolean} true if the minute or hour field is a wildcard
+ */
+function isWildcardCronJob (expression) {
+    const expr = String(expression || '').trim().toLowerCase()
+    if (expr.startsWith('@')) {
+        return expr === '@hourly' // the only supported macro without a fixed hour + minute
+    }
+    const fields = expr.split(/\s+/g)
+    // cronosjs fields: 5 = `min hr dom mon dow`, 6/7 = `sec min hr dom mon dow [year]`
+    const [minute, hour] = fields.length === 5 ? [fields[0], fields[1]] : [fields[1], fields[2]]
+    return (hour || '').startsWith('*') || (minute || '').startsWith('*')
+}
+
+/**
  * Returns an object describing the parameters.
  * @param {string} expression The expressions or coordinates to use
  * @param {string} expressionType The expression type ("cron" | "solar" | "dates")
@@ -358,8 +401,8 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
     }
 
     if (exOk) {
-        const ex = cronosjs.CronosExpression.parse(expression, cronOpts)
-        const next = ex.nextDate()
+        const ex = limitExpressionYearScan(cronosjs.CronosExpression.parse(expression, { ...cronOpts, skipRepeatedHour: !isWildcardCronJob(expression) }))
+        const next = ex.nextDate(now)
         if (next) {
             const ms = next.valueOf() - now.valueOf()
             result.prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
@@ -1095,9 +1138,12 @@ module.exports = function (RED) {
             node.storeName = ''
         }
 
+        // context store availability is tracked per node so that one node with a
+        // bad store name cannot disable context persistence for every cronplus node
+        node.contextAvailable = contextAvailable
         if (node.storeName && node.storeName !== 'file' && STORE_NAMES.indexOf(node.storeName) < 0) {
-            node.warn(`Invalid store name specified '${node.storeName}' - state will not be persisted for this node`)
-            contextAvailable = false
+            node.warn(`Invalid store name specified '${node.storeName}' - state will not be persisted for this node. Select a different "Save State" option in the node settings, or add the store to the 'contextStorage' section of the node-red settings file`)
+            node.contextAvailable = false
         }
 
         if (config.commandResponseMsgOutput === 'output2') {
@@ -1174,6 +1220,11 @@ module.exports = function (RED) {
             }
         }
         const sendMsg = async (node, task, cronTimestamp, manualTrigger) => {
+            if (!task) {
+                node.status({ fill: 'grey', shape: 'dot', text: 'Nothing to trigger' })
+                node.warn('No schedule available to trigger')
+                return
+            }
             const msg = { cronplus: {} }
             msg.topic = task.node_topic
             msg.cronplus.triggerTimestamp = cronTimestamp
@@ -1275,8 +1326,12 @@ module.exports = function (RED) {
             }
             // is this an button press?...
             if (!msg.payload && !msg.topic) { // TODO: better method of differentiating between bad input and button press
-                await sendMsg(node, node.tasks[0], Date.now(), true)
-                done()
+                try {
+                    await sendMsg(node, node.tasks && node.tasks[0], Date.now(), true)
+                    done()
+                } catch (error) {
+                    done(error)
+                }
                 return
             }
 
@@ -1814,7 +1869,7 @@ module.exports = function (RED) {
             const cronOpts = node.timeZone ? { timezone: node.timeZone } : undefined
             let task
             if (opt.expressionType === 'cron') {
-                const expression = cronosjs.CronosExpression.parse(opt.expression, cronOpts)
+                const expression = limitExpressionYearScan(cronosjs.CronosExpression.parse(opt.expression, { ...cronOpts, skipRepeatedHour: !isWildcardCronJob(opt.expression) }))
                 task = new cronosjs.CronosTask(expression)
             } else if (opt.expressionType === 'solar') {
                 if (node.defaultLocationType === 'env' || node.defaultLocationType === 'fixed') {
@@ -1876,7 +1931,7 @@ module.exports = function (RED) {
                     return
                 }
                 task.node_count = task.node_count + 1// ++ stops at 2147483647
-                sendMsg(node, task, timestamp)
+                sendMsg(node, task, timestamp).catch(error => node.error(error))
                 process.nextTick(async function () {
                     if (task.node_expressionType === 'solar' || task.node_expressionType === 'lunar') {
                         await updateTask(node, task.node_opt, null)
@@ -1947,7 +2002,7 @@ module.exports = function (RED) {
                 } else {
                     const contextKey = 'state'
                     const storeName = node.storeName || 'default'
-                    if (!contextAvailable || STORE_NAMES.indexOf(storeName) === -1) {
+                    if (!node.contextAvailable || STORE_NAMES.indexOf(storeName) === -1) {
                         return
                     }
                     await contextSet(node.context(), contextKey, state, storeName)
@@ -2038,7 +2093,7 @@ module.exports = function (RED) {
                     // use context
                     const storeName = node.storeName || 'default'
                     const contextKey = 'state'
-                    if (!contextAvailable || !STORE_NAMES.indexOf(storeName)) {
+                    if (!node.contextAvailable || STORE_NAMES.indexOf(storeName) === -1) {
                         return
                     }
                     const state = await contextGet(node.context(), contextKey, storeName)
@@ -2184,11 +2239,11 @@ module.exports = function (RED) {
 
     function getStoreNames () {
         const stores = ['', 'file']
-        if (!RED.settings.contextStorage) {
-            return stores
-        }
-        if (typeof RED.settings.contextStorage !== 'object') {
-            return stores
+        if (!RED.settings.contextStorage || typeof RED.settings.contextStorage !== 'object' || Object.keys(RED.settings.contextStorage).length === 0) {
+            // when contextStorage is not configured in the node-red settings file, the
+            // runtime still provides a single built-in in-memory store named 'memory'
+            // (and the editor offers it), so accept it here too (issue #104)
+            return [...stores, 'memory']
         }
         return [...stores, ...Object.keys(RED.settings.contextStorage)]
     }

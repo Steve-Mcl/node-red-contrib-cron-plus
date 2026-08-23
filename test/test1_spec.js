@@ -2,24 +2,35 @@
 const should = require('should')
 const helper = require('node-red-node-test-helper')
 const cronplusNode = require('../cronplus.js')
-const { describe, it, beforeEach, afterEach } = require('mocha')
+const { describe, it, beforeEach, afterEach, after } = require('node:test')
 
 helper.init(require.resolve('node-red'))
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+// wait until just after a wall-clock second boundary so every-second cron schedules
+// created after this fire at predictable ~950/1950/2950ms offsets. Without it, a
+// schedule added just before a boundary fires almost immediately and sneaks an extra
+// trigger into sleep(~2050) windows, making count assertions flaky (seen on CI).
+const alignToSecondBoundary = () => sleep(1050 - (Date.now() % 1000))
+
+after(() => {
+    // node-red-node-test-helper leaves handles open after stopServer (mocha needed --exit
+    // for the same reason). Node 18 has no --test-force-exit, so exit once the run has
+    // settled; unref'd so it never delays a clean exit, process.exitCode preserves failures.
+    setTimeout(() => process.exit(process.exitCode ?? 0), 1000).unref()
+})
 
 describe('cron-plus Node', function () {
     'use strict'
 
-    beforeEach(done => { helper.startServer(done) })
+    beforeEach((t, done) => { helper.startServer(done) })
 
-    afterEach((done) => {
+    afterEach((t, done) => {
         helper.unload().then(() => {
             helper.stopServer(done)
         })
     })
 
-    it('should inject within 1 sec from cron expression * * * * * * *', function (done) {
-        this.timeout(1100) // timeout with an error if done() isn't called in time
+    it('should inject within 1 sec from cron expression * * * * * * *', { timeout: 1100 }, function (t, done) {
         const flow = [
             { id: 't1n1', type: 'cronplus', name: 'every1sec', outputField: 'payload', timeZone: '', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'num', payload: '100', expressionType: 'cron', expression: '* * * * * * *', location: '', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }], wires: [['t1n2']] },
             { id: 't1n2', type: 'helper' }
@@ -34,6 +45,211 @@ describe('cron-plus Node', function () {
                     done()
                 })
             })
+        })
+    })
+
+    it('should warn (not crash) when button pressed and no valid schedules exist', { timeout: 2000 }, function (t, done) {
+        // schedule has a blank date-sequence expression so no task will be created,
+        // then an empty msg (button press) must not throw an unhandled rejection
+        const flow = [
+            { id: 't1n3', type: 'cronplus', name: 'no schedules', outputField: 'payload', timeZone: '', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'dates', expression: '', location: '', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }], wires: [[]] }
+        ]
+        helper.load(cronplusNode, flow, function () {
+            const t1n3 = helper.getNode('t1n3')
+            t1n3.receive({}) // simulate button press (no topic, no payload)
+            setTimeout(() => {
+                try {
+                    t1n3.warn.calledWith('No schedule available to trigger').should.be.true('expected "No schedule available to trigger" warning')
+                    done()
+                } catch (err) {
+                    done(err)
+                }
+            }, 200)
+        })
+    })
+
+    it('should catch errors thrown during a scheduled trigger (no unhandled rejection)', { timeout: 4000 }, function (t, done) {
+        // a schedule that fires every second - node.status is made to throw part way
+        // through sendMsg (outside its internal try/catch) to prove the scheduled-run
+        // call site routes the rejection to node.error instead of crashing the runtime
+        const flow = [
+            { id: 't1n4', type: 'cronplus', name: 'every1sec', outputField: 'payload', timeZone: '', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '* * * * * * *', location: '', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }], wires: [[]] }
+        ]
+        helper.load(cronplusNode, flow, function () {
+            const t1n4 = helper.getNode('t1n4')
+            const originalStatus = t1n4.status
+            t1n4.status = function (status) {
+                if (status && status.text === 'Schedule Started') {
+                    throw new Error('forced error during sendMsg')
+                }
+                return originalStatus.call(t1n4, status)
+            }
+            let finished = false
+            const finish = (err) => {
+                if (finished) { return }
+                finished = true
+                clearInterval(pollTimer)
+                clearTimeout(failTimer)
+                done(err)
+            }
+            const pollTimer = setInterval(() => {
+                const errCall = t1n4.error.getCalls().find(c => c.args[0] && c.args[0].message === 'forced error during sendMsg')
+                if (errCall) { finish() }
+            }, 100)
+            const failTimer = setTimeout(() => {
+                finish(new Error('node.error was not called - error from scheduled trigger was not caught'))
+            }, 3000)
+        })
+    })
+
+    it('should not hang when a schedule can never occur (e.g. 30th of February)', { timeout: 5000 }, function (t, done) {
+        // cronosjs searches year-by-year for the next occurrence; an impossible date
+        // with an unbounded year field made that search spin forever, locking up the
+        // runtime on deploy. The year scan is now bounded and reports "Never".
+        const flow = [
+            { id: 't1n5', type: 'cronplus', name: 'never', outputField: 'payload', timeZone: '', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 0 30 02 *', location: '', offset: '0' }], wires: [['t1n6']] },
+            { id: 't1n6', type: 'helper' }
+        ]
+        helper.load(cronplusNode, flow, function () {
+            // reaching this callback at all proves deploy did not lock the event loop
+            const t1n5 = helper.getNode('t1n5')
+            const t1n6 = helper.getNode('t1n6')
+            t1n6.on('input', function (msg) {
+                try {
+                    msg.should.have.property('payload').which.is.an.Object()
+                    msg.payload.should.have.property('result').which.is.an.Object()
+                    msg.payload.result.should.have.property('description').which.is.a.String()
+                    msg.payload.result.should.have.property('prettyNext', 'Never')
+                    done()
+                } catch (err) {
+                    done(err)
+                }
+            })
+            // also exercise the describe path with the impossible expression
+            t1n5.receive({ payload: { command: 'describe', expressionType: 'cron', expression: '0 0 30 02 *' } })
+        })
+    })
+
+    describe('save state store validation', function () {
+        // issue #104: the editor offers the built-in 'memory' context store on a
+        // default node-red install (no contextStorage configured in settings), but
+        // the runtime rejected it. It must be accepted, and a genuinely unknown
+        // store must produce an actionable warning that does not affect the
+        // persistence of other cronplus nodes.
+        const makeNode = (id, storeName) => ({
+            id, type: 'cronplus', name: 'store test ' + id, outputField: 'payload', timeZone: '', storeName, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 0 * * * * 2000', location: '', offset: '0' }], wires: [[]]
+        })
+        // the test helper stubs warn at the prototype, so the spy is shared by all
+        // nodes - filter calls by thisValue to get the calls made by *this* node
+        const invalidStoreWarnings = (n) => n.warn.getCalls().filter(c => c.thisValue === n && typeof c.args[0] === 'string' && c.args[0].includes('Invalid store name'))
+
+        it("should accept the built-in 'memory' store, 'file' and none without warning", async function () {
+            const flow = [makeNode('s1', 'memory'), makeNode('s2', 'file'), makeNode('s3', '')]
+            await helper.load(cronplusNode, flow)
+            invalidStoreWarnings(helper.getNode('s1')).should.have.length(0)
+            invalidStoreWarnings(helper.getNode('s2')).should.have.length(0)
+            invalidStoreWarnings(helper.getNode('s3')).should.have.length(0)
+        })
+        it('should warn with guidance for an unknown store, without affecting other nodes', async function () {
+            const flow = [makeNode('s1', 'bogus'), makeNode('s2', 'memory')]
+            await helper.load(cronplusNode, flow)
+            const bad = helper.getNode('s1')
+            const good = helper.getNode('s2')
+            const warnings = invalidStoreWarnings(bad)
+            warnings.should.have.length(1)
+            warnings[0].args[0].should.match(/Invalid store name specified 'bogus'/)
+            warnings[0].args[0].should.match(/contextStorage/) // actionable guidance
+            bad.should.have.property('contextAvailable', false) // per node, not module wide
+            invalidStoreWarnings(good).should.have.length(0)
+        })
+    })
+
+    describe('DST transition handling (Debian cron rules)', function () {
+        // Jobs whose minute or hour field starts with `*` ("wildcard jobs") keep
+        // their real-time interval across a DST change, so they also run during
+        // the repeated hour when clocks go back. Jobs with a fixed hour + minute
+        // ("fixed-time jobs") run only once in a repeated hour, and run as soon
+        // as possible after a missing hour when clocks go forward.
+        // Ref: https://blog.healthchecks.io/2021/10/how-debian-cron-handles-dst-transitions/
+        // MockTimers' 'Date' api landed in Node 20.11.0 - earlier versions throw on enable()
+        const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number)
+        const hasMockDate = nodeMajor > 20 || (nodeMajor === 20 && nodeMinor >= 11)
+        const iso = d => new Date(d).toISOString()
+
+        // loads a cronplus node and returns a function that asks it to describe
+        // a cron expression at a fixed point in time (Europe/London)
+        const loadDescriber = async () => {
+            const flow = [
+                { id: 'dst1', type: 'cronplus', name: 'dst', outputField: 'payload', timeZone: 'Europe/London', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 0 * * * * 2000', location: '', offset: '0' }], wires: [['dst2']] },
+                { id: 'dst2', type: 'helper' }
+            ]
+            await helper.load(cronplusNode, flow)
+            const dst1 = helper.getNode('dst1')
+            const dst2 = helper.getNode('dst2')
+            return (expression, time) => new Promise(resolve => {
+                dst2.once('input', msg => resolve(msg.payload.result))
+                dst1.receive({ payload: { command: 'describe', expressionType: 'cron', expression, timeZone: 'Europe/London', time } })
+            })
+        }
+
+        // UK fall back: Sun 26 Oct 2025, 02:00 BST -> 01:00 GMT (01:00-01:59 local occurs twice)
+        it('wildcard schedule should keep running through the repeated hour (clocks go back)', async function () {
+            const describeExpr = await loadDescriber()
+            const result = await describeExpr('0,15,30,45 * * * * * *', '2025-10-26T00:59:50Z') // 01:59:50 BST
+            iso(result.nextDate).should.eql('2025-10-26T01:00:00.000Z') // 01:00:00 GMT, second pass of the repeated hour
+        })
+        it('minute-wildcard schedule with fixed hour is a wildcard job (clocks go back)', async function () {
+            const describeExpr = await loadDescriber()
+            const result = await describeExpr('0 * 1 * * * *', '2025-10-26T00:59:30Z') // 01:59:30 BST
+            iso(result.nextDate).should.eql('2025-10-26T01:00:00.000Z') // hour 1 repeats - runs again
+        })
+        it('fixed-time schedule should run only once in the repeated hour (clocks go back)', async function () {
+            const describeExpr = await loadDescriber()
+            const first = await describeExpr('0 30 1 * * * *', '2025-10-26T00:29:00Z') // 01:29 BST
+            iso(first.nextDate).should.eql('2025-10-26T00:30:00.000Z') // 01:30 BST, first pass runs
+            const second = await describeExpr('0 30 1 * * * *', '2025-10-26T00:31:00Z') // 01:31 BST, already ran
+            iso(second.nextDate).should.eql('2025-10-27T01:30:00.000Z') // NOT 01:30 GMT (second pass) - next day
+        })
+
+        // UK spring forward: Sun 30 Mar 2025, 01:00 GMT -> 02:00 BST (01:00-01:59 local never occurs)
+        it('wildcard schedule should keep its cadence through the missing hour (clocks go forward)', async function () {
+            const describeExpr = await loadDescriber()
+            const result = await describeExpr('0,15,30,45 * * * * * *', '2025-03-30T00:59:50Z') // 00:59:50 GMT
+            iso(result.nextDate).should.eql('2025-03-30T01:00:00.000Z') // = 02:00:00 BST, 10 real seconds later
+        })
+        it('fixed-time schedule in the missing hour should run as soon as possible (clocks go forward)', async function () {
+            const describeExpr = await loadDescriber()
+            const missed = await describeExpr('0 30 1 * * * *', '2025-03-30T00:29:00Z') // 00:29 GMT - 01:30 local will not occur
+            iso(missed.nextDate).should.eql('2025-03-30T01:00:00.000Z') // runs at the transition (02:00 BST)
+            const after = await describeExpr('0 30 1 * * * *', '2025-03-30T01:01:00Z') // just after the transition
+            iso(after.nextDate).should.eql('2025-03-31T00:30:00.000Z') // 01:30 BST the next day
+        })
+
+        // live scheduler (task creation) path - mock timers travel through the transition
+        it('live wildcard schedule should fire during the repeated hour (clocks go back)', { timeout: 10000 }, async function (t) {
+            if (!hasMockDate) {
+                t.skip('Node 20.11+ required for fake timers (Date) to work through DST transition')
+                return
+            }
+            t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: new Date('2025-10-26T00:59:50Z').getTime() }) // 01:59:50 BST
+            const drain = () => new Promise(resolve => setImmediate(resolve))
+            try {
+                const flow = [
+                    { id: 'dst3', type: 'cronplus', name: 'dst-live', outputField: 'payload', timeZone: 'Europe/London', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'every15', topic: 'every15', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0,15,30,45 * * * * * *', location: '', offset: '0' }], wires: [['dst4']] },
+                    { id: 'dst4', type: 'helper' }
+                ]
+                await helper.load(cronplusNode, flow)
+                const dst4 = helper.getNode('dst4')
+                const fires = []
+                dst4.on('input', msg => fires.push(iso(msg.payload.triggerTimestamp)))
+                // advance 35s of fake time through the transition, in small steps so
+                // each fire sees the clock at its own moment
+                for (let i = 0; i < 700; i++) { t.mock.timers.tick(50); await drain() }
+                fires.should.containEql('2025-10-26T01:00:00.000Z') // 01:00:00 GMT - first slot of the repeated hour
+                fires.should.containEql('2025-10-26T01:00:15.000Z')
+            } finally {
+                t.mock.timers.reset()
+            }
         })
     })
 
@@ -55,8 +271,7 @@ describe('cron-plus Node', function () {
      * @param {Any} returnVal the expected value
      */
     function basicTest (topic, outputField, payloadType, payloadValue, returnType, returnVal, opts) {
-        it('should inject value of type ' + payloadType + ' in msg.' + outputField, function (done) {
-            this.timeout(2000) // timeout with an error if done() isn't called in time
+        it('should inject value of type ' + payloadType + ' in msg.' + outputField, { timeout: 2000 }, function (t, done) {
             opts = opts || {}
             const cronnode = {
                 id: 't2n1',
@@ -425,11 +640,13 @@ describe('cron-plus Node', function () {
             staticScheduleTest(result)
         })
         it("should 'trigger-all' by topic", async function () {
+        it("should 'trigger-all' by topic", async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: 'trigger-all', payload: '' },
                 expected: { command: 'trigger-all', scheduleCount: 5 }
             }
+            await alignToSecondBoundary()
             // add 2 dynamic schedules
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 3, expression: '* * * * * * *' })) // every 1 seconds
             testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
@@ -483,14 +700,14 @@ describe('cron-plus Node', function () {
             result.topic.should.eql('xxx')
         })
 
-        it('describe solar events for a location', async function () {
+        it('describe solar events for a location', async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'all', timeZone: 'Europe/London' } },
                 expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', 'All Solar Events']] }
             }
             const resultPromise = new Promise(resolve => {
-                helperNodeCommandResponses.on('input', (msg) => {
+                helperNode5CommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -498,9 +715,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it('describe lunar events for a location', async function () {
+        it('describe lunar events for a location', async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { payload: { command: 'describe', expressionType: 'lunar', location: '54.9992500,-1.4170300', lunarType: 'all', timeZone: 'Europe/London' } },
                 expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', 'All Lunar Events']] }
             }
@@ -513,9 +730,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it('should describe cron expression 0 * * * * * *', async function () {
+        it('should describe cron expression 0 * * * * * *', async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { payload: { command: 'describe', expressionType: 'cron', expression: '0 * * * * * *' } },
                 expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', 'Every minute']] }
             }
@@ -528,9 +745,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it('should describe dates expression now+2s', async function () {
+        it('should describe dates expression now+2s', async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { payload: { command: 'describe', expressionType: 'dates', expression: [Date.now() + 2000] } },
                 expected: { command: 'describe', propertyValues: [['payload.result.description', 'string']] }
             }
@@ -543,9 +760,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it('should export schedule1 by topic', async function () {
+        it('should export schedule1 by topic', async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: 'export', payload: 'schedule1' },
                 expected: { command: 'export', scheduleCount: 1 }
             }
@@ -558,9 +775,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it('should export static schedule1 by payload', async function () {
+        it('should export static schedule1 by payload', async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: '', payload: { command: 'export', name: 'schedule1' } },
                 expected: { command: 'export', scheduleCount: 1 }
             }
@@ -573,9 +790,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it('should export static schedule1 by topic', async function () {
+        it('should export static schedule1 by topic', async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: 'export', payload: 'schedule1' },
                 expected: { command: 'export', scheduleCount: 1 }
             }
@@ -592,9 +809,9 @@ describe('cron-plus Node', function () {
             result.payload.result.should.not.have.property('status')
             commandChecker(result, test)
         })
-        it('should list static schedule1 by topic', async function () {
+        it('should list static schedule1 by topic', async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: 'list', payload: 'schedule1' },
                 expected: { command: 'list', scheduleCount: 1 }
             }
@@ -611,9 +828,9 @@ describe('cron-plus Node', function () {
             result.payload.result.should.have.property('status').which.is.an.Object()
             commandChecker(result, test)
         })
-        it('should list static schedule1 by payload', async function () {
+        it('should list static schedule1 by payload', async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: '', payload: { command: 'list', name: 'schedule1' } },
                 expected: { command: 'list', scheduleCount: 1 }
             }
@@ -626,9 +843,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it("should get 'status' of one schedule 'dynCron'", async function () {
+        it("should get 'status' of one schedule 'dynCron'", async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: 'status', payload: 'dyn-cron' },
                 expected: { command: 'status', scheduleCount: 1 }
             }
@@ -644,9 +861,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it("should get 'status-all' by topic", async function () {
+        it("should get 'status-all' by topic", async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: 'status-all', payload: '' },
                 expected: { command: 'status-all', scheduleCount: 5 } // 4 static + 1 dynamic
             }
@@ -662,9 +879,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it("should get 'status-all' by command", async function () {
+        it("should get 'status-all' by command", async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: '', payload: { command: 'status-all' } },
                 expected: { command: 'status-all', scheduleCount: 4 } // 4 static schedules
             }
@@ -677,9 +894,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it("should get 'status-all-dynamic' by topic (no dynamic schedules)", async function () {
+        it("should get 'status-all-dynamic' by topic (no dynamic schedules)", async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: 'status-all-dynamic', payload: '' },
                 expected: { command: 'status-all-dynamic', scheduleCount: 0 }
             }
@@ -692,9 +909,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it("should get 'status-all-dynamic' by topic (2 dynamic schedules)", async function () {
+        it("should get 'status-all-dynamic' by topic (2 dynamic schedules)", async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: 'status-all-dynamic', payload: '' },
                 expected: { command: 'status-all-dynamic', scheduleCount: 2 }
             }
@@ -719,9 +936,9 @@ describe('cron-plus Node', function () {
             result.payload.result[1].config.should.have.property('name').which.is.a.String()
             result.payload.result[1].config.name.should.eql('dyn-2')
         })
-        it("should get 'status-all-static' by topic", async function () {
+        it("should get 'status-all-static' by topic", async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: 'status-all-static', payload: '' },
                 expected: { command: 'status-all-static', scheduleCount: 4 }
             }
@@ -734,9 +951,9 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
-        it("should get 'status-inactive' by topic", async function () {
+        it("should get 'status-inactive' by topic", async function (t) {
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: 'status-inactive', payload: '' },
                 expected: { command: 'status-inactive', scheduleCount: 1 }
             }
@@ -759,8 +976,8 @@ describe('cron-plus Node', function () {
             result.payload.result[0].config.should.have.property('name', 'schedule3')
         })
 
-        it("should 'stop' by topic (should reset counter)", async function () {
-            this.timeout(5000)
+        it("should 'stop' by topic (should reset counter)", { timeout: 6000 }, async function () {
+            await alignToSecondBoundary()
             // setup add dyn-1 and dyn-2
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 3, expression: '* * * * * * *' })) // every 1 seconds
             testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
@@ -814,9 +1031,9 @@ describe('cron-plus Node', function () {
             commandChecker(messages[10], { description: 'check status of active schedules should be 6', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 6 } })
             countChecker('dyn-1', messages[10].payload.result[4], 3, 0, true) // since schedules were stopped, the counter should be reset to 0
         })
-        it("should 'pause' by topic (should not reset counter)", async function () {
-            this.timeout(7000)
-            // start flow for test has 4 static schedules, below we add 2 dynamic schedules
+        it("should 'pause' by topic (should not reset counter)", { timeout: 8000 }, async function () {
+            await alignToSecondBoundary()
+            // start flow for test has 3 static schedules, below we add 2 dynamic schedules
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 3, expression: '* * * * * * *' })) // every 1 seconds
             testNode.receive(createAddScheduleMsg({ name: 'dyn-2' }))
             await sleep(2050) // wait 2 seconds - should only 2 should be triggered
@@ -855,8 +1072,8 @@ describe('cron-plus Node', function () {
             commandChecker(messages[3], { description: 'check status of inactive schedules should be 1', send: { topic: 'status-inactive', payload: '' }, expected: { command: 'status-inactive', scheduleCount: 1 } })
             countChecker('dyn-1', messages[3].payload.result[0], 3, 3, false) // dyn-1 should have triggered 3 times and should NOT be running
         })
-        it('should not reset count when finished schedule is updated (default behaviour)', async function () {
-            this.timeout(7000)
+        it('should not reset count when finished schedule is updated (default behaviour)', { timeout: 7000 }, async function () {
+            await alignToSecondBoundary()
             // setup add dyn-1
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 1, expression: '* * * * * * *' })) // every 1 seconds
 
@@ -892,8 +1109,8 @@ describe('cron-plus Node', function () {
             dyn1.status.should.have.property('count', 1)
             dyn1.status.should.have.property('isRunning', false)
         })
-        it('should apply provided count when updating a task', async function () {
-            this.timeout(7000)
+        it('should apply provided count when updating a task', { timeout: 7000 }, async function () {
+            await alignToSecondBoundary()
             // setup add dyn-1
             testNode.receive(createAddScheduleMsg({ name: 'dyn-1', limit: 1, expression: '* * * * * * *' })) // every 1 seconds
 
@@ -929,8 +1146,7 @@ describe('cron-plus Node', function () {
             dyn1.status.should.have.property('count', 0)
             dyn1.status.should.have.property('isRunning', true)
         })
-        it('should apply provided count when creating a task (clamped by limit)', async function () {
-            this.timeout(7000)
+        it('should apply provided count when creating a task (clamped by limit)', { timeout: 7000 }, async function () {
             // setup add dyn-1
             testNode.receive(createAddScheduleMsg({ name: 'dyn-2', limit: 1, count: 2, expression: '* * * * * * *' })) // every 1 seconds
 
@@ -972,7 +1188,7 @@ describe('cron-plus Node', function () {
             result.should.have.property('scheduledEvent', false) // because it was manually triggered
             result.topic.should.eql('dynamic1')
         })
-        it('should remove a static schedule dynamically', async function () {
+        it('should remove a static schedule dynamically', async function (t) {
             const msg = { topic: 'remove', payload: 'schedule1' }
             testNode.receive(msg)
             sleep(50) // let it unwind
@@ -982,7 +1198,7 @@ describe('cron-plus Node', function () {
                 })
             })
             const test = {
-                description: this.test.title,
+                description: t.name,
                 send: { topic: 'status-all', payload: '' },
                 expected: { command: 'status-all', scheduleCount: 3 }
             }
