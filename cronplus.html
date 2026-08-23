@@ -2659,7 +2659,7 @@ function onSchedulesExpandCompress () {
         </div>
         <h4>Schedules - Type</h4>
         <div style="padding-left: 15px">
-            The type determines what type of schedule. Options are <code>cron</code>, <code>dates sequence</code> or <code>solar events</code>
+            The type determines what type of schedule. Options are <code>cron</code>, <code>dates sequence</code>, <code>solar events</code> or <code>lunar events</code> (lunar schedules are currently created dynamically or via flow JSON - see <b>Schedules - Lunar Events</b> below)
         </div>
         <h4 id="cron-plus-expression-info">Schedules - Expression</h4>
         <div style="padding-left: 15px">
@@ -2734,6 +2734,19 @@ function onSchedulesExpandCompress () {
                 <tr><td>nightStart</td><td>astronomical dusk / night start</td><td>astronomical twilight ends, night starts (-18°)</td></tr>
                 <tr><td>nadir</td><td>solar midnight</td><td>when the sun is closest to nadir and the night is equidistant from dusk and dawn</td></tr>
             </table>
+        </div>
+        <h4 id="cron-plus-lunar-events-info">Schedules - Lunar Events</h4>
+        <div style="padding-left: 15px">
+            Lunar event schedules fire on moon events at the specified location.<br>
+            <i>NOTE: lunar event schedules are currently created dynamically (see the <b>add</b> command below) or by importing flow JSON - the editor UI does not offer them yet</i><br>
+            Lunar Events...
+            <table class="cron-plus-solar-events-table">
+                <tr><th>Event ID</th><th>Event</th><th>Information</th></tr>
+                <tr><td>rise</td><td>moon rise</td><td>the moon rises above the horizon</td></tr>
+                <tr><td>set</td><td>moon set</td><td>the moon sets below the horizon</td></tr>
+                <tr><td>highest</td><td>lunar transit</td><td>the moon is at its highest position</td></tr>
+            </table>
+            <i>NOTE: at high latitudes the moon can stay above or below the horizon for days at a time - during such periods rise/set events do not occur and the schedule simply waits for the next occurrence</i>
         </div>
         <h4>Schedules - Location</h4>
         <div style="padding-left: 15px">
@@ -2853,6 +2866,21 @@ function onSchedulesExpandCompress () {
                         <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected". Accepted values are listed under <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">see above</a> </li>
                         <li>location: (string|required) longitude latitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
                         <li>offset: (number|optional) number of minutes to offset a sunrise or sunset</li>
+                        <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
+                        <li>payload: (any|optional) What to send when schedule triggers</li>
+                        <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
+                    </ul><br>
+                    Adding a lunar event schedule
+                    <ul>
+                        <li>Multiple schedules can be added if the payload is an array of objects</li>
+                        <li>command: (string|required) The operation to perform - in this case "add"</li>
+                        <li>name: (string|required) This will identify schedule</li>
+                        <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
+                        <li>expressionType: (string|required) specify the schedule type. Set to "lunar" for lunar events</li>
+                        <li>lunarType: (string|required) specify the events to fire.  Accepted values are "all" or "selected"</li>
+                        <li>lunarEvents: (string|optional) specify the events to fire. Only required when lunarType == "selected". Accepted values are listed under <b>Schedules - Lunar Events</b> <a href="#cron-plus-lunar-events-info">see above</a> </li>
+                        <li>location: (string|required) longitude latitude, DNS, DMM or GPS coordinates for the moon event calculation</li>
+                        <li>offset: (number|optional) number of minutes to offset a lunar event</li>
                         <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
                         <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>

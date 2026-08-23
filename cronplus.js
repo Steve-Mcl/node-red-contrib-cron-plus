@@ -22,11 +22,10 @@ const SunCalc = require('suncalc3')
 const path = require('path')
 const fs = require('fs')
 
-SunCalc.addTime(-18, 'nightEnd', 'nightStart')
-SunCalc.addTime(-6, 'civilDawn', 'civilDusk')
-SunCalc.addTime(6, 'morningGoldenHourEnd', 'eveningGoldenHourStart')
-// suncalc2 compatibility - these events were renamed in suncalc3
-SunCalc.addTime(-0.833, 'sunrise', 'sunsetEnd')
+// NOTE: suncalc2 compatibility names (sunrise, sunset, nightEnd, nightStart,
+// morningGoldenHourEnd, eveningGoldenHourStart) are mapped onto the suncalc3
+// names in getSunTimes() below. SunCalc.addTime() is NOT used for this - it
+// silently rejects any call where either name collides with a built-in event.
 
 const PERMITTED_SOLAR_EVENTS = [
     'nightEnd', // renamed astronomicalDawn in suncalc3
@@ -597,11 +596,13 @@ function parseLunarTimes (opt) {
 
 function getSunTimes (date, lat, lng) {
     const times = SunCalc.getSunTimes(date, lat, lng)
-    // add suncalc2 compatibility times
-    times.sunrise = times.sunriseEnd
-    times.sunset = times.sunsetStart
+    // add suncalc2 compatibility names for events renamed in suncalc3
+    times.sunrise = times.sunriseStart // top edge of the sun appears (-0.833 rising)
+    times.sunset = times.sunsetEnd // sun disappears below the horizon (-0.833 falling)
     times.nightEnd = times.astronomicalDawn
     times.nightStart = times.astronomicalDusk
+    times.morningGoldenHourEnd = times.goldenHourDawnEnd
+    times.eveningGoldenHourStart = times.goldenHourDuskStart
     return times
 }
 
@@ -649,7 +650,10 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
         for (let index = 0; index < solarEventsPast.length; index++) {
             const se = solarEventsPast[index]
             const seObj = timesIteration1[se]
-            if (!seObj || !isValidDateObject(seObj.value)) {
+            // suncalc3 returns a real Date with valid:false for events that do not
+            // occur on that day (e.g. astronomical dawn in mid-summer at high
+            // latitudes) - these must be skipped, not treated as event times
+            if (!seObj || seObj.valid === false || !isValidDateObject(seObj.value)) {
                 continue
             }
             const seTime = seObj.value
@@ -674,7 +678,7 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
         for (let index = 0; index < solarEventsFuture.length; index++) {
             const se = solarEventsFuture[index]
             const seObj = timesIteration2[se]
-            if (!seObj || !isValidDateObject(seObj.value)) {
+            if (!seObj || seObj.valid === false || !isValidDateObject(seObj.value)) {
                 continue
             }
             const seTime = seObj.value
@@ -935,9 +939,13 @@ function getLunarTimes (lat, lng, elevation, lunarEvents, startDate = null, offs
         }
     }
     // update final states
+    // NOTE: at high latitudes the moon can be continuously up or down for days at
+    // a time, so there may be no event in the (3 day) backwards scan window and,
+    // in extreme cases, none in the forwards scan window either - both must be
+    // handled without erroring so the schedule reports "Never" instead of crashing
     const lunarState = {
-        ...event,
-        ...SunCalc.getMoonData(event.time, lat, lng) // TODO: curate this data to only what is needed
+        ...(event || {}),
+        ...SunCalc.getMoonData((event && event.time) || startDate, lat, lng) // TODO: curate this data to only what is needed
     }
 
     // now filter to only events of interest
@@ -949,18 +957,16 @@ function getLunarTimes (lat, lng, elevation, lunarEvents, startDate = null, offs
             wantedFutureEvents.push(fe)
         }
     }
-    const nextType = wantedFutureEvents[0].event
-    const nextTime = wantedFutureEvents[0].time
-    const nextTimeOffset = wantedFutureEvents[0].timeOffset
+    const nextEvent = wantedFutureEvents[0] || null
     // performance.mark('End')
     // performance.measure('SecondScanEnd to End', 'SecondScanEnd', 'End')
     // performance.measure('Start to End', 'Start', 'End')
 
     return {
         lunarState,
-        nextEvent: nextType,
-        nextEventTime: nextTime,
-        nextEventTimeOffset: nextTimeOffset,
+        nextEvent: nextEvent ? nextEvent.event : null,
+        nextEventTime: nextEvent ? nextEvent.time : null,
+        nextEventTimeOffset: nextEvent ? nextEvent.timeOffset : null,
         eventTimes: wantedFutureEvents
         // allTimes: sorted,
         // eventTimesByType: resultCategories

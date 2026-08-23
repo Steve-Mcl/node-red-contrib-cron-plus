@@ -1,6 +1,6 @@
 node-red-contrib-cron-plus
 ============================
-_A flexible timer/scheduler (cron, solar events, simple dates) node for Node-RED with full dynamic control and time zone support_
+_A flexible timer/scheduler (cron, solar events, lunar events, simple dates) node for Node-RED with full dynamic control and time zone support_
 
 
 QUICK DEMO...
@@ -10,7 +10,7 @@ QUICK DEMO...
 
 FEATURES
 --------
-* Schedule by CRON, date sequences and solar events (with offset) 
+* Schedule by CRON, date sequences, solar events and lunar events (with offset) 
   * A human readable description of your expression is provided as you type.
   * ![cron-tt](https://user-images.githubusercontent.com/44235289/84030877-afe8b300-a98c-11ea-8a77-be84d840bf5d.gif)
   * An Easy Expression Builder to aid cron novices
@@ -55,6 +55,37 @@ FEATURES
 * Demo flows demonstrating many of the capabilities. Import via node-red menu > import > examples.
 * Optional time zone setting supporting UTC and Region/Area (e.g. Europe/London)
 * Daylight Saving Time transitions are handled following the same conventions as Debian cron (see below)
+
+Lunar events
+------------
+
+Schedules can fire on moon events at a location, alongside the existing solar events:
+
+| Event ID | Event | Information |
+|----------|-------|-------------|
+| `rise` | moon rise | the moon rises above the horizon |
+| `set` | moon set | the moon sets below the horizon |
+| `highest` | lunar transit | the moon is at its highest position |
+
+A lunar schedule takes the same shape as a solar one, using `expressionType: "lunar"` with `lunarType` (`"all"` or `"selected"`) and `lunarEvents` (a CSV or array of the event IDs above), plus the usual `location` and optional `offset` (minutes). For example, adding one dynamically:
+
+```json
+{
+    "command": "add",
+    "name": "moonwatch",
+    "topic": "moonwatch",
+    "expressionType": "lunar",
+    "lunarType": "selected",
+    "lunarEvents": "rise,set",
+    "location": "54.9992500,-1.4170300"
+}
+```
+
+> [!NOTE]
+> Lunar schedules are currently created dynamically (via the `add` command) or by importing flow JSON - the node's editor UI does not offer them yet.
+
+> [!TIP]
+> At high latitudes the moon can stay above or below the horizon for days at a time. During such periods `rise`/`set` events simply do not occur and the schedule waits for the next real occurrence.
 
 Daylight Saving Time (DST) handling
 -----------------------------------
@@ -132,7 +163,7 @@ Dependencies
 * [cronosjs](https://github.com/jaclarke/cronosjs)
 * [cronstrue](https://github.com/bradymholt/cRonstrue) 
 * [pretty-ms](https://github.com/sindresorhus/pretty-ms)
-* [suncalc2](https://github.com/andiling/suncalc2)
+* [suncalc3](https://github.com/hypnos3/suncalc3)
 * [coord-parser](https://github.com/naturalatlas/coord-parser)
 
 Development
