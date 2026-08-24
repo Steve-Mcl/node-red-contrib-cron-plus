@@ -18,33 +18,37 @@ const cronstrue = require('cronstrue')
 const cronosjs = require('cronosjs')
 const prettyMs = require('./lib/ms.js').prettyMilliseconds
 const coordParser = require('coord-parser')
-const SunCalc = require('suncalc2')
+const SunCalc = require('suncalc')
 const path = require('path')
 const fs = require('fs')
 
-SunCalc.addTime(-18, 'nightEnd', 'nightStart')
-SunCalc.addTime(-6, 'civilDawn', 'civilDusk')
-SunCalc.addTime(6, 'morningGoldenHourEnd', 'eveningGoldenHourStart')
+// NOTE: the event IDs cron-plus exposes are the original suncalc/suncalc2 names.
+// The few that differ in suncalc v2 (civilDawn/civilDusk, morningGoldenHourEnd,
+// eveningGoldenHourStart, nightStart) are mapped in getSunTimes() below.
+// The event angles/semantics are unchanged from suncalc2.
 
 const PERMITTED_SOLAR_EVENTS = [
-    'nightEnd',
-    // "astronomicalDawn",
+    'nightEnd', // astronomical dawn (-18deg)
     'nauticalDawn',
-    'civilDawn',
+    'civilDawn', // named 'dawn' in suncalc
     // "morningGoldenHourStart",
     'sunrise',
     'sunriseEnd',
-    'morningGoldenHourEnd',
+    'morningGoldenHourEnd', // named 'goldenHourEnd' in suncalc
     'solarNoon',
-    'eveningGoldenHourStart',
+    'eveningGoldenHourStart', // named 'goldenHour' in suncalc
     'sunsetStart',
     'sunset',
     // "eveningGoldenHourEnd",
-    'civilDusk',
+    'civilDusk', // named 'dusk' in suncalc
     'nauticalDusk',
-    // "astronomicalDusk",
-    'nightStart',
+    'nightStart', // astronomical dusk (-18deg), named 'night' in suncalc
     'nadir'
+]
+
+const PERMITTED_LUNAR_EVENTS = [
+    'rise',
+    'set'
 ]
 
 // accepted commands using topic as the command & (in compatible cases, the payload is the schedule name)
@@ -120,7 +124,8 @@ function validateOpt (opt, permitDefaults = true) {
     if (!opt.name) {
         throw new Error('Schedule name property missing')
     }
-    if (!opt.expressionType || opt.expressionType === 'cron' || opt.expressionType === 'dates') { // cron
+
+    const processCronDates = (opt) => {
         if (!opt.expression) {
             throw new Error(`Schedule '${opt.name}' - expression property missing`)
         }
@@ -143,7 +148,11 @@ function validateOpt (opt, permitDefaults = true) {
         if (!valid) {
             throw new Error(`Schedule '${opt.name}' - expression '${opt.expression}' must be either a cron expression, a date, an a array of dates or a CSV of dates`)
         }
-    } else if (opt.expressionType === 'solar') {
+    }
+
+    const processSolarLunar = (opt) => {
+        const isSolar = opt.expressionType === 'solar'
+        const isLunar = opt.expressionType === 'lunar'
         if (!opt.offset) {
             opt.offset = 0
         }
@@ -154,32 +163,45 @@ function validateOpt (opt, permitDefaults = true) {
                 throw new Error(`Schedule '${opt.name}' - location property missing`)
             }
         }
-        if (opt.solarType !== 'selected' && opt.solarType !== 'all') {
-            throw new Error(`Schedule '${opt.name}' - solarType property invalid or mising. Must be either "all" or "selected"`)
+        if (isSolar && opt.solarType !== 'selected' && opt.solarType !== 'all') {
+            throw new Error(`Schedule '${opt.name}' - solarType property invalid or missing. Must be either "all" or "selected"`)
         }
-        if (opt.solarType === 'selected') {
-            if (!opt.solarEvents) {
-                throw new Error(`Schedule '${opt.name}' - solarEvents property missing`)
+        if (isLunar && opt.lunarType !== 'selected' && opt.lunarType !== 'all') {
+            throw new Error(`Schedule '${opt.name}' - lunarType property invalid or missing. Must be either "all" or "selected"`)
+        }
+        const _type = isSolar ? opt.solarType : opt.lunarType
+        const events = isSolar ? opt.solarEvents : opt.lunarEvents
+        const permittedEvents = isSolar ? PERMITTED_SOLAR_EVENTS : PERMITTED_LUNAR_EVENTS
+
+        if (_type === 'selected') {
+            if (!events) {
+                throw new Error(`Schedule '${opt.name}' - ${isSolar ? 'solar' : 'lunar'}Events property missing`)
             }
 
-            let solarEvents
-            if (typeof opt.solarEvents === 'string') {
-                solarEvents = opt.solarEvents.split(',')
-            } else if (Array.isArray(opt.solarEvents)) {
-                solarEvents = opt.solarEvents
+            let selectedEvents
+            if (typeof events === 'string') {
+                selectedEvents = events.split(',')
+            } else if (Array.isArray(events)) {
+                selectedEvents = events
             } else {
-                throw new Error(`Schedule '${opt.name}' - solarEvents property is invalid`)
+                throw new Error(`Schedule '${opt.name}' - ${isSolar ? 'solar' : 'lunar'}Events property is invalid`)
             }
-            if (!solarEvents.length) {
-                throw new Error(`Schedule '${opt.name}' - solarEvents property is empty`)
+            if (!selectedEvents.length) {
+                throw new Error(`Schedule '${opt.name}' - ${isSolar ? 'solar' : 'lunar'}Events property is empty`)
             }
-            for (let index = 0; index < solarEvents.length; index++) {
-                const element = solarEvents[index].trim()
-                if (!PERMITTED_SOLAR_EVENTS.includes(element)) {
-                    throw new Error(`Schedule '${opt.name}' - solarEvents entry '${element}' is invalid`)
+            for (let index = 0; index < selectedEvents.length; index++) {
+                const element = selectedEvents[index].trim()
+                if (!permittedEvents.includes(element)) {
+                    throw new Error(`Schedule '${opt.name}' - ${isSolar ? 'solar' : 'lunar'}Events entry '${element}' is invalid`)
                 }
             }
         }
+    }
+
+    if (!opt.expressionType || opt.expressionType === 'cron' || opt.expressionType === 'dates') { // cron
+        processCronDates(opt)
+    } else if (opt.expressionType === 'solar' || opt.expressionType === 'lunar') {
+        processSolarLunar(opt)
     } else {
         throw new Error(`Schedule '${opt.name}' - invalid schedule type '${opt.expressionType}'. Expected expressionType to be 'cron', 'dates' or 'solar'`)
     }
@@ -263,9 +285,11 @@ function isWildcardCronJob (expression) {
  * @param {number} offset An optional offset to apply
  * @param {string} solarType Specifies either "all" or "selected" - related to solarEvents property
  * @param {string} solarEvents a CSV of solar events to be included
+ * @param {string} lunarType Specifies either "all" or "selected" - related to lunarEvents property
+ * @param {string} lunarEvents a CSV of lunar events to be included
  * @param {date} time Optional time to use (defaults to Date.now() if excluded)
  */
-function _describeExpression (expression, expressionType, timeZone, offset, solarType, solarEvents, time, opts) {
+function _describeExpression (expression, expressionType, timeZone, offset, solarType, solarEvents, lunarType, lunarEvents, time, opts) {
     const now = time ? new Date(time) : new Date()
     opts = opts || {}
     let result = { description: undefined, nextDate: undefined, nextDescription: undefined, prettyNext: 'Never' }
@@ -278,8 +302,13 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
     if (solarType === 'all') {
         solarEvents = PERMITTED_SOLAR_EVENTS.join(',')
     }
+    if (lunarType === 'all') {
+        lunarEvents = PERMITTED_LUNAR_EVENTS.join(',')
+    }
 
-    if (expressionType === 'solar') {
+    if (expressionType === 'solar' || expressionType === 'lunar') {
+        const isSolar = expressionType === 'solar'
+        const isLunar = expressionType === 'lunar'
         const opt = {
             locationType: opts.locationType || opts.defaultLocationType,
             defaultLocationType: opts.defaultLocationType,
@@ -288,8 +317,10 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             location: expression,
             offset: offset || 0,
             name: 'dummy',
-            solarType,
-            solarEvents,
+            solarType: isSolar ? solarType : undefined,
+            lunarType: isLunar ? lunarType : undefined,
+            solarEvents: isSolar ? solarEvents : undefined,
+            lunarEvents: isLunar ? lunarEvents : undefined,
             payloadType: 'default',
             payload: ''
         }
@@ -298,11 +329,20 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             const pos = coordParser(opt.location)
             const offset = isNumber(opt.offset) ? parseInt(opt.offset) : 0
             const nowOffset = new Date(now.getTime() - offset * 60000)
-            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset)
-            // eslint-disable-next-line eqeqeq
-            if (opts.includeSolarStateOffset && offset != 0) {
-                const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0)
-                result.solarStateOffset = ssOffset.solarState
+            if (isSolar) {
+                result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset)
+                // eslint-disable-next-line eqeqeq
+                if (opts.includeSolarStateOffset && offset != 0) {
+                    const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0)
+                    result.solarStateOffset = ssOffset.solarState
+                }
+            } else if (isLunar) {
+                result = getLunarTimes(pos.lat, pos.lon, 0, lunarEvents, now, offset)
+                // eslint-disable-next-line eqeqeq
+                if (opts.includeLunarStateOffset && offset != 0) {
+                    const lsOffset = getLunarTimes(pos.lat, pos.lon, 0, lunarEvents, nowOffset, 0)
+                    result.lunarStateOffset = lsOffset.lunarState
+                }
             }
             result.offset = offset
             result.now = now
@@ -338,6 +378,12 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
                     result.description = 'All Solar Events'
                 } else {
                     result.description = "Solar Events: '" + solarEvents.split(',').join(', ') + "'"
+                }
+            } else if (expressionType === 'lunar') {
+                if (lunarType === 'all') {
+                    result.description = 'All Lunar Events'
+                } else {
+                    result.description = "Lunar Events: '" + lunarEvents.split(',').join(', ') + "'"
                 }
             } else {
                 if (count === 1) {
@@ -459,7 +505,7 @@ function applyOptionDefaults (node, option, optionIndex) {
         } else {
             option.expressionType = 'cron'// if empty, default to cron
         }
-    } else if (['cron', 'dates', 'solar'].indexOf(option.expressionType) < 0) {
+    } else if (['cron', 'dates', 'solar', 'lunar'].indexOf(option.expressionType) < 0) {
         // if expressionType is not cron or solar - it might be sunrise or sunset from an older version
         if (option.expressionType === 'sunrise') {
             option.solarEvents = option.solarEvents || 'sunrise'
@@ -483,6 +529,12 @@ function applyOptionDefaults (node, option, optionIndex) {
     if (option.expressionType === 'solar') {
         if (!option.solarType) option.solarType = option.solarEvents ? 'selected' : 'all'
         if (!option.solarEvents) option.solarEvents = 'sunrise,sunset'
+        if (!option.location) option.location = ''
+        option.locationType = node.defaultLocationType
+    }
+    if (option.expressionType === 'lunar') {
+        if (!option.lunarType) option.lunarType = option.lunarEvents ? 'selected' : 'all'
+        if (!option.lunarEvents) option.lunarEvents = 'rise,set'
         if (!option.location) option.location = ''
         option.locationType = node.defaultLocationType
     }
@@ -527,6 +579,43 @@ function parseSolarTimes (opt) {
     return task
 }
 
+function parseLunarTimes (opt) {
+    // opt.location = location || ''
+    const pos = coordParser(opt.location || '0.0,0.0')
+    const offset = opt.offset ? parseInt(opt.offset) : 0
+    const date = opt.date ? new Date(opt.date) : new Date()
+    const events = opt.lunarType === 'all' ? PERMITTED_LUNAR_EVENTS : opt.lunarEvents
+    const result = getLunarTimes(pos.lat, pos.lon, 0, events, date, offset)
+    const task = parseDateSequence(result.eventTimes.map((o) => o.timeOffset))
+    task.lunarEventTimes = result
+    return task
+}
+
+function getSunTimes (date, lat, lng) {
+    const times = SunCalc.getTimes(date, lat, lng)
+    // map the original suncalc/suncalc2 event names cron-plus exposes onto the
+    // suncalc v2 names (same events, same angles - only the names differ).
+    // Events that do not occur on the given day are null and are skipped by the scans.
+    times.civilDawn = times.dawn
+    times.civilDusk = times.dusk
+    times.morningGoldenHourEnd = times.goldenHourEnd
+    times.eveningGoldenHourStart = times.goldenHour
+    times.nightStart = times.night
+    return times
+}
+
+// replicates suncalc3's getMoonData() (which suncalc v2 does not provide) by
+// composing the moon position and illumination exactly as suncalc3 did.
+// NOTE: suncalc v2 reports angles in degrees with a north-based azimuth
+function getMoonData (dateValue, lat, lng) {
+    const pos = SunCalc.getMoonPosition(dateValue, lat, lng)
+    const illum = SunCalc.getMoonIllumination(dateValue)
+    return Object.assign({
+        illumination: illum,
+        zenithAngle: illum.angle - pos.parallacticAngle
+    }, pos)
+}
+
 function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offset = 0) {
     // performance.mark('Start');
     const solarEventsPast = [...PERMITTED_SOLAR_EVENTS]
@@ -565,12 +654,17 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
     // first scan backwards to get prior solar events
     while (loopMonitor < 3 && solarEventsPast.length) {
         loopMonitor++
-        const timesIteration1 = SunCalc.getTimes(scanDate, lat, lng)
+        const timesIteration1 = getSunTimes(scanDate, lat, lng)
         // timesIteration1 = new SolarCalc(scanDate,lat,lng);
 
         for (let index = 0; index < solarEventsPast.length; index++) {
             const se = solarEventsPast[index]
+            // events that do not occur on the scanned day (e.g. astronomical dawn in
+            // mid-summer at high latitudes) are null and must be skipped
             const seTime = timesIteration1[se]
+            if (!seTime || !isValidDateObject(seTime)) {
+                continue
+            }
             const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
             if (isValidDateObject(seTimeOffset) && seTimeOffset <= startDate) {
                 result.push({ event: se, time: seTime, timeOffset: seTimeOffset })
@@ -587,11 +681,14 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
     // now scan forwards to get future events
     while (loopMonitor < 183 && solarEventsFuture.length) {
         loopMonitor++
-        const timesIteration2 = SunCalc.getTimes(scanDate, lat, lng)
+        const timesIteration2 = getSunTimes(scanDate, lat, lng)
         // timesIteration2 = new SolarCalc(scanDate,lat,lng);
         for (let index = 0; index < solarEventsFuture.length; index++) {
             const se = solarEventsFuture[index]
             const seTime = timesIteration2[se]
+            if (!seTime || !isValidDateObject(seTime)) {
+                continue
+            }
             const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
             if (isValidDateObject(seTimeOffset) && seTimeOffset > startDate) {
                 result.push({ event: se, time: seTime, timeOffset: seTimeOffset })
@@ -696,8 +793,9 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
     // update final states
     updateSolarState(solarState)// only sending `stateObject` makes updateSolarState() compute dawn/dusk etc
 
-    // now filter to only events of interest
-    const futureEvents = sorted.filter((e) => e && e.timeOffset >= startDate)
+    // now filter to only events of interest (strictly after startDate so an event
+    // firing at this exact instant cannot be included and re-fired)
+    const futureEvents = sorted.filter((e) => e && e.timeOffset > startDate)
     const wantedFutureEvents = []
     for (let index = 0; index < futureEvents.length; index++) {
         const fe = futureEvents[index]
@@ -705,18 +803,18 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
             wantedFutureEvents.push(fe)
         }
     }
-    const nextType = wantedFutureEvents[0].event
-    const nextTime = wantedFutureEvents[0].time
-    const nextTimeOffset = wantedFutureEvents[0].timeOffset
+    // in extreme cases (e.g. a single selected event at polar latitudes) there may
+    // be no future occurrence within the scan window - report "Never", not an error
+    const nextEvent = wantedFutureEvents[0] || null
     // performance.mark('End')
     // performance.measure('SecondScanEnd to End', 'SecondScanEnd', 'End')
     // performance.measure('Start to End', 'Start', 'End')
 
     return {
         solarState,
-        nextEvent: nextType,
-        nextEventTime: nextTime,
-        nextEventTimeOffset: nextTimeOffset,
+        nextEvent: nextEvent ? nextEvent.event : null,
+        nextEventTime: nextEvent ? nextEvent.time : null,
+        nextEventTimeOffset: nextEvent ? nextEvent.timeOffset : null,
         eventTimes: wantedFutureEvents
         // allTimes: sorted,
         // eventTimesByType: resultCategories
@@ -748,6 +846,141 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
     }
 }
 
+function getLunarTimes (lat, lng, elevation, lunarEvents, startDate = null, offset = 0) {
+    // performance.mark('Start');
+    const lunarEventsPast = [...PERMITTED_LUNAR_EVENTS]
+    const lunarEventsFuture = [...PERMITTED_LUNAR_EVENTS]
+    const lunarEventsArr = []
+
+    // get list of usable lunar events into lunarEventsArr
+    let lunarEventsArrTemp = []
+    if (typeof lunarEvents === 'string') {
+        lunarEventsArrTemp = lunarEvents.split(',')
+    } else if (Array.isArray(lunarEvents)) {
+        lunarEventsArrTemp = [...lunarEvents]
+    } else {
+        throw new Error('lunarEvents must be a CSV or Array')
+    }
+    for (let index = 0; index < lunarEventsArrTemp.length; index++) {
+        const se = lunarEventsArrTemp[index].trim()
+        if (PERMITTED_LUNAR_EVENTS.includes(se)) {
+            lunarEventsArr.push(se)
+        }
+    }
+
+    offset = isNumber(offset) ? parseInt(offset) : 0
+    elevation = isNumber(elevation) ? parseInt(elevation) : 0// not used for now
+    startDate = startDate ? new Date(startDate) : new Date()
+
+    let scanDate = new Date(startDate.toDateString()) // new Date(startDate); //scanDate = new Date(startDate.toDateString())
+    scanDate.setDate(scanDate.getDate() + 1)// fwd one day to catch times behind of scan day
+    let loopMonitor = 0
+    const result = []
+
+    // performance.mark('initEnd')
+    // performance.measure('Start to Now', 'Start', 'initEnd')
+    // performance.mark('FirstScanStart');
+
+    // first scan backwards to get prior lunar events
+    while (loopMonitor < 3 && lunarEventsPast.length) {
+        loopMonitor++
+        const timesIteration1 = SunCalc.getMoonTimes(scanDate, lat, lng)
+        for (let index = 0; index < lunarEventsPast.length; index++) {
+            const se = lunarEventsPast[index]
+            const seTime = timesIteration1[se]
+            if (!seTime || !isValidDateObject(seTime)) {
+                continue
+            }
+            const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
+            if (isValidDateObject(seTimeOffset) && seTimeOffset <= startDate) {
+                result.push({ event: se, time: seTime, timeOffset: seTimeOffset })
+                lunarEventsPast.splice(index, 1)// remove that item
+                index--
+            }
+        }
+        scanDate.setDate(scanDate.getDate() - 1)
+    }
+
+    scanDate = new Date(startDate.toDateString())
+    scanDate.setDate(scanDate.getDate() - 1)// back one day to catch times ahead of current day
+    loopMonitor = 0
+    // now scan forwards to get future events
+    while (loopMonitor < 16 && lunarEventsFuture.length) {
+        loopMonitor++
+        const timesIteration2 = SunCalc.getMoonTimes(scanDate, lat, lng)
+        for (let index = 0; index < lunarEventsFuture.length; index++) {
+            const se = lunarEventsFuture[index]
+            const seTime = timesIteration2[se]
+            if (!seTime || !isValidDateObject(seTime)) {
+                continue
+            }
+            const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
+            if (isValidDateObject(seTimeOffset) && seTimeOffset > startDate) {
+                result.push({ event: se, time: seTime, timeOffset: seTimeOffset })
+                lunarEventsFuture.splice(index, 1)// remove that item
+                index--
+            }
+        }
+        scanDate.setDate(scanDate.getDate() + 1)
+    }
+    // performance.mark('SecondScanEnd');
+    // performance.measure('FirstScanEnd to SecondScanEnd', 'FirstScanEnd', 'SecondScanEnd');
+
+    // sort the results to get a timeline
+    const sorted = result.sort((a, b) => {
+        if (a.time < b.time) {
+            return -1
+        } else if (a.time > b.time) {
+            return 1
+        } else {
+            return 0
+        }
+    })
+
+    // now scan through sorted lunar events to determine
+    let event
+    for (let index = 0; index < sorted.length; index++) {
+        if (sorted[index].time <= startDate) {
+            event = sorted[index]
+        } else {
+            break
+        }
+    }
+    // update final states
+    // NOTE: at high latitudes the moon can be continuously up or down for days at
+    // a time, so there may be no event in the (3 day) backwards scan window and,
+    // in extreme cases, none in the forwards scan window either - both must be
+    // handled without erroring so the schedule reports "Never" instead of crashing
+    const lunarState = {
+        ...(event || {}),
+        ...getMoonData((event && event.time) || startDate, lat, lng) // TODO: curate this data to only what is needed
+    }
+
+    // now filter to only events of interest
+    const futureEvents = sorted.filter((e) => e && e.timeOffset > startDate)
+    const wantedFutureEvents = []
+    for (let index = 0; index < futureEvents.length; index++) {
+        const fe = futureEvents[index]
+        if (lunarEventsArr.includes(fe.event)) {
+            wantedFutureEvents.push(fe)
+        }
+    }
+    const nextEvent = wantedFutureEvents[0] || null
+    // performance.mark('End')
+    // performance.measure('SecondScanEnd to End', 'SecondScanEnd', 'End')
+    // performance.measure('Start to End', 'Start', 'End')
+
+    return {
+        lunarState,
+        nextEvent: nextEvent ? nextEvent.event : null,
+        nextEventTime: nextEvent ? nextEvent.time : null,
+        nextEventTimeOffset: nextEvent ? nextEvent.timeOffset : null,
+        eventTimes: wantedFutureEvents
+        // allTimes: sorted,
+        // eventTimesByType: resultCategories
+    }
+}
+
 function exportTask (task, includeStatus) {
     const o = {
         topic: task.node_topic || task.name,
@@ -761,6 +994,11 @@ function exportTask (task, includeStatus) {
     if (o.expressionType === 'solar') {
         o.solarType = task.node_solarType
         o.solarEvents = task.node_solarEvents
+        o.location = task.node_location
+        o.offset = task.node_offset
+    } else if (o.expressionType === 'lunar') {
+        o.lunarType = task.node_lunarType
+        o.lunarEvents = task.node_lunarEvents
         o.location = task.node_location
         o.offset = task.node_offset
     } else {
@@ -786,16 +1024,17 @@ function getTaskStatus (node, task, opts) {
     opts.locationType = node.defaultLocationType
     opts.defaultLocation = node.defaultLocation
     opts.defaultLocationType = node.defaultLocationType
-    const sol = task.node_expressionType === 'solar'
-    const exp = sol ? task.node_location : task.node_expression
-    const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts)
+    const isSolar = task.node_expressionType === 'solar'
+    const isLunar = task.node_expressionType === 'lunar'
+    const exp = (isSolar || isLunar) ? task.node_location : task.node_expression
+    const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, task.node_lunarType, task.node_lunarEvents, null, opts)
     let nextDescription = null
     let nextDate = null
     const running = !isTaskFinished(task)
     if (running) {
         // nextDescription = h.nextDescription;
         nextDescription = h.prettyNext
-        nextDate = sol ? h.nextEventTimeOffset : h.nextDate
+        nextDate = isSolar ? h.nextEventTimeOffset : h.nextDate
     }
     let tz = node.timeZone
     let localTZ = ''
@@ -818,11 +1057,16 @@ function getTaskStatus (node, task, opts) {
         serverTimeZone: localTZ,
         description: h.description
     }
-    if (sol) {
+    if (isSolar) {
         r.solarState = h.solarState
         if (h.offset) r.solarStateOffset = h.solarStateOffset
         r.solarTimes = running ? h.eventTimes : null
-        r.nextDescription = running ? nextDescription : null// r.solarTimes && (r.solarTimes[0].event + " " + r.nextDescription);
+        r.nextDescription = running ? nextDescription : null
+    } else if (isLunar) {
+        r.lunarState = h.lunarState
+        if (h.offset) r.lunarStateOffset = h.lunarStateOffset
+        r.lunarTimes = running ? h.eventTimes : null
+        r.nextDescription = running ? nextDescription : null
     }
     return r
 }
@@ -961,6 +1205,9 @@ module.exports = function (RED) {
                 if (t.node_solarEventTimes && t.node_solarEventTimes.nextEvent) {
                     node.nextEvent = t.node_solarEventTimes.nextEvent
                 }
+                if (t.node_lunarEventTimes && t.node_lunarEventTimes.nextEvent) {
+                    node.nextEvent = t.node_lunarEventTimes.nextEvent
+                }
             } else {
                 node.nextDate = null
                 node.nextEvent = ''
@@ -995,8 +1242,10 @@ module.exports = function (RED) {
             const msg = { cronplus: {} }
             msg.topic = task.node_topic
             msg.cronplus.triggerTimestamp = cronTimestamp
-            const se = task.node_expressionType === 'solar' ? node.nextEvent : ''
-            msg.cronplus.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+            const isSolar = task.node_expressionType === 'solar'
+            const isLunar = task.node_expressionType === 'lunar'
+            const se = (isSolar || isLunar) ? node.nextEvent : ''
+            msg.cronplus.status = getTaskStatus(node, task, { includeSolarStateOffset: true, includeLunarStateOffset: true })
             if (se) msg.cronplus.status.solarEvent = se
             msg.cronplus.config = exportTask(task)
             if (manualTrigger) msg.manualTrigger = true
@@ -1191,9 +1440,11 @@ module.exports = function (RED) {
                             break
                         case 'describe': // single
                             {
-                                const exp = (cmd.expressionType === 'solar') ? cmd.location : cmd.expression
+                                const isSolar = cmd.expressionType === 'solar'
+                                const isLunar = cmd.expressionType === 'lunar'
+                                const exp = (isSolar || isLunar) ? cmd.location : cmd.expression
                                 applyOptionDefaults(node, cmd)
-                                newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset: true, locationType: node.node_locationType })
+                                newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.lunarType, cmd.lunarEvents, cmd.time, { includeSolarStateOffset: true, includeLunarStateOffset: true, locationType: node.node_locationType })
                                 sendCommandResponse(newMsg)
                             }
                             break
@@ -1203,7 +1454,7 @@ module.exports = function (RED) {
                                 const task = getTask(node, cmd.name)
                                 if (task) {
                                     newMsg.payload.result.config = exportTask(task, true)
-                                    newMsg.payload.result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                                    newMsg.payload.result.status = getTaskStatus(node, task, { includeSolarStateOffset: true, includeLunarStateOffset: true })
                                 } else {
                                     newMsg.error = `${cmd.name} not found`
                                 }
@@ -1232,7 +1483,7 @@ module.exports = function (RED) {
                                         if (task && (cmdAll || taskFilterMatch(task, cmdFilter))) {
                                             const result = {}
                                             result.config = exportTask(task, true)
-                                            result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                                            result.status = getTaskStatus(node, task, { includeSolarStateOffset: true, includeLunarStateOffset: true })
                                             results.push(result)
                                         }
                                     }
@@ -1307,7 +1558,7 @@ module.exports = function (RED) {
                                     const task = node.tasks[index]
                                     const result = {}
                                     result.config = exportTask(task, true)
-                                    result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                                    result.status = getTaskStatus(node, task, { includeSolarStateOffset: true, includeLunarStateOffset: true })
                                     statuses.push(result)
                                 }
                                 const next = statuses.length && statuses.reduce((a, b) => a.status.nextDate < b.status.nextDate ? a : b)
@@ -1332,15 +1583,17 @@ module.exports = function (RED) {
                             break
                         case 'debug': {
                             const task = getTask(node, cmd.name)
-                            const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                            const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true, includeLunarStateOffset: true })
                             thisDebug.name = task.name
                             thisDebug.topic = task.node_topic
                             thisDebug.expressionType = task.node_expressionType
                             thisDebug.expression = task.node_expression
                             thisDebug.location = task.node_location
                             thisDebug.offset = task.node_offset
-                            thisDebug.solarType = task.node_solarType
-                            thisDebug.solarEvents = task.node_solarEvents
+                            thisDebug.solarType = task.node_expressionType === 'solar' ? task.node_solarType : undefined
+                            thisDebug.solarEvents = task.node_expressionType === 'solar' ? task.node_solarEvents : undefined
+                            thisDebug.lunarType = task.node_expressionType === 'lunar' ? task.node_lunarType : undefined
+                            thisDebug.lunarEvents = task.node_expressionType === 'lunar' ? task.node_lunarEvents : undefined
                             newMsg.payload = thisDebug
                             sendCommandResponse(newMsg)
                         }
@@ -1351,15 +1604,17 @@ module.exports = function (RED) {
                                 for (let index = 0; index < node.tasks.length; index++) {
                                     const task = node.tasks[index]
                                     if (cmdAll || taskFilterMatch(task, cmdFilter)) {
-                                        const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                                        const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true, includeLunarStateOffset: true })
                                         thisDebug.name = task.name
                                         thisDebug.topic = task.node_topic
                                         thisDebug.expressionType = task.node_expressionType
                                         thisDebug.expression = task.node_expression
                                         thisDebug.location = task.node_location
                                         thisDebug.offset = task.node_offset
-                                        thisDebug.solarType = task.node_solarType
-                                        thisDebug.solarEvents = task.node_solarEvents
+                                        thisDebug.solarType = task.node_expressionType === 'solar' ? task.node_solarType : undefined
+                                        thisDebug.solarEvents = task.node_expressionType === 'solar' ? task.node_solarEvents : undefined
+                                        thisDebug.lunarType = task.node_expressionType === 'lunar' ? task.node_lunarType : undefined
+                                        thisDebug.lunarEvents = task.node_expressionType === 'lunar' ? task.node_lunarEvents : undefined
                                         results.push(thisDebug)
                                     }
                                 }
@@ -1486,9 +1741,9 @@ module.exports = function (RED) {
                     }
                     task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
                     task.start()
-                    // lets see if this is a solar task that failed to start...
-                    if (!task.isRunning && task.node_opt && task.node_opt.expressionType === 'solar') {
-                        // solar tasks that are paused when its _time_ passes miss the call to `update`
+                    // lets see if this is a solar or lunar task that failed to start...
+                    if (!task.isRunning && task.node_opt && (task.node_opt.expressionType === 'solar' || task.node_opt.expressionType === 'lunar')) {
+                        // solar and lunar tasks that are paused when its _time_ passes miss the call to `update`
                         // which is responsible for generating the next occurrence
                         // lets try updating it now
                         await updateTask(node, task.node_opt, null)
@@ -1640,6 +1895,16 @@ module.exports = function (RED) {
                 const ds = parseSolarTimes(opt)
                 task = ds.task
                 task.node_solarEventTimes = ds.solarEventTimes
+            } else if (opt.expressionType === 'lunar') {
+                if (node.defaultLocationType === 'env' || node.defaultLocationType === 'fixed') {
+                    opt.locationType = node.defaultLocationType
+                    opt.location = await evaluateNodeProperty(node.defaultLocation, node.defaultLocationType, node)
+                } else { // per schedule
+                    opt.location = await evaluateNodeProperty(opt.location, 'str', node)
+                }
+                const ds = parseLunarTimes(opt)
+                task = ds.task
+                task.node_lunarEventTimes = ds.lunarEventTimes
             } else {
                 const ds = parseDateSequence(opt.expression)
                 task = ds.task
@@ -1654,8 +1919,10 @@ module.exports = function (RED) {
             task.node_payload = opt.payload
             task.node_locationType = opt.locationType
             task.node_location = opt.location
-            task.node_solarType = opt.solarType
-            task.node_solarEvents = opt.solarEvents
+            task.node_solarType = opt.expressionType === 'solar' ? opt.solarType : undefined
+            task.node_solarEvents = opt.expressionType === 'solar' ? opt.solarEvents : undefined
+            task.node_lunarType = opt.expressionType === 'lunar' ? opt.lunarType : undefined
+            task.node_lunarEvents = opt.expressionType === 'lunar' ? opt.lunarEvents : undefined
             task.node_offset = opt.offset
             task.node_index = index
             task.node_opt = opt
@@ -1680,7 +1947,7 @@ module.exports = function (RED) {
                 task.node_count = task.node_count + 1// ++ stops at 2147483647
                 sendMsg(node, task, timestamp).catch(error => node.error(error))
                 process.nextTick(async function () {
-                    if (task.node_expressionType === 'solar') {
+                    if (task.node_expressionType === 'solar' || task.node_expressionType === 'lunar') {
                         await updateTask(node, task.node_opt, null)
                     }
                     requestSerialisation()// request persistent state be written
@@ -2022,11 +2289,15 @@ module.exports = function (RED) {
                 const expressionType = req.body.expressionType ? req.body.expressionType : undefined
                 const opts = { expression: req.body.expression }
                 if (timeZone) opts.timezone = timeZone
+                const isSolar = expressionType === 'solar'
+                const isLunar = expressionType === 'lunar'
                 if (expressionType) {
                     opts.expressionType = expressionType
-                    if (opts.expressionType === 'solar') {
-                        opts.solarType = req.body.solarType || ''
-                        opts.solarEvents = req.body.solarEvents || ''
+                    if (isSolar || isLunar) {
+                        opts.solarType = isSolar ? req.body.solarType || '' : undefined
+                        opts.solarEvents = isSolar ? req.body.solarEvents || '' : undefined
+                        opts.lunarType = isLunar ? req.body.lunarType || '' : undefined
+                        opts.lunarEvents = isLunar ? req.body.lunarEvents || '' : undefined
                         let pos = ''
                         const fakeNode = () => {
                             const n = {
@@ -2078,10 +2349,10 @@ module.exports = function (RED) {
                         opts.offset = req.body.offset || 0
                     }
                 }
-                const exp = (opts.expressionType === 'solar') ? opts.location : opts.expression
-                const h = _describeExpression(exp, opts.expressionType, opts.timezone, opts.offset, opts.solarType, opts.solarEvents, null, { locationType: opts.locationType || opts.defaultLocationType, defaultLocationType: opts.defaultLocationType, defaultLocation: opts.defaultLocation })
+                const exp = (isSolar || isLunar) ? opts.location : opts.expression
+                const h = _describeExpression(exp, opts.expressionType, opts.timezone, opts.offset, opts.solarType, opts.solarEvents, opts.lunarType, opts.lunarEvents, null, { locationType: opts.locationType || opts.defaultLocationType, defaultLocationType: opts.defaultLocationType, defaultLocation: opts.defaultLocation })
                 let r = null
-                if (opts.expressionType === 'solar') {
+                if (isSolar || isLunar) {
                     const times = h.eventTimes && h.eventTimes.slice(1)
                     r = {
                         ...opts,
@@ -2122,7 +2393,7 @@ module.exports = function (RED) {
                 const exp = (t) => {
                     return {
                         config: exportTask(t, false),
-                        status: getTaskStatus(node, t, { includeSolarStateOffset: true })
+                        status: getTaskStatus(node, t, { includeSolarStateOffset: true, includeLunarStateOffset: true })
                     }
                 }
                 const dynNodesExp = dynNodes.map(exp)

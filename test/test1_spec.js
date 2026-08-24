@@ -253,6 +253,79 @@ describe('cron-plus Node', function () {
         })
     })
 
+    describe('solar & lunar event calculations (suncalc)', function () {
+        const SunCalc = require('suncalc')
+        const iso = d => new Date(d).toISOString()
+        const LOC = '55.0,-1.418'
+        const LAT = 55.0
+        const LNG = -1.418
+
+        // loads a cronplus node and returns a function that sends a describe
+        // command and resolves with the command response's result object
+        const loadDescriber = async () => {
+            const flow = [
+                { id: 'sl1', type: 'cronplus', name: 'suncalc test', outputField: 'payload', timeZone: '', persistDynamic: false, commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 0 * * * * 2000', location: '', offset: '0' }], wires: [['sl2']] },
+                { id: 'sl2', type: 'helper' }
+            ]
+            await helper.load(cronplusNode, flow)
+            const sl1 = helper.getNode('sl1')
+            const sl2 = helper.getNode('sl2')
+            return (payload) => new Promise(resolve => {
+                sl2.once('input', msg => resolve(msg.payload.result))
+                sl1.receive({ payload: Object.assign({ command: 'describe' }, payload) })
+            })
+        }
+
+        it("solar 'sunrise' should keep suncalc2 semantics (top edge of the sun appears)", { timeout: 5000 }, async function () {
+            const ask = await loadDescriber()
+            const result = await ask({ expressionType: 'solar', location: LOC, solarType: 'selected', solarEvents: 'sunrise', time: '2026-06-15T12:00:00Z' })
+            result.nextEvent.should.eql('sunrise')
+            // the returned time must be the sunrise of its own day, NOT sunriseEnd
+            const times = SunCalc.getTimes(new Date(result.nextEventTime), LAT, LNG)
+            iso(result.nextEventTime).should.eql(iso(times.sunrise))
+            iso(result.nextEventTime).should.not.eql(iso(times.sunriseEnd))
+        })
+        it("solar 'sunset' should keep suncalc2 semantics (sun disappears below the horizon)", { timeout: 5000 }, async function () {
+            const ask = await loadDescriber()
+            const result = await ask({ expressionType: 'solar', location: LOC, solarType: 'selected', solarEvents: 'sunset', time: '2026-06-15T12:00:00Z' })
+            result.nextEvent.should.eql('sunset')
+            const times = SunCalc.getTimes(new Date(result.nextEventTime), LAT, LNG)
+            iso(result.nextEventTime).should.eql(iso(times.sunset))
+            iso(result.nextEventTime).should.not.eql(iso(times.sunsetStart))
+        })
+        it("solar 'nightEnd' should not fire on days when astronomical dawn does not occur", { timeout: 5000 }, async function () {
+            // at 55N in mid-June the sun never reaches -18 degrees - suncalc returns
+            // null for such days, which must be skipped. The next true astronomical
+            // dawn is several weeks away (late July)
+            const ask = await loadDescriber()
+            const result = await ask({ expressionType: 'solar', location: LOC, solarType: 'selected', solarEvents: 'nightEnd', time: '2026-06-15T12:00:00Z' })
+            result.nextEvent.should.eql('nightEnd')
+            new Date(result.nextEventTime).getTime().should.be.above(new Date('2026-07-01T00:00:00Z').getTime())
+        })
+        it("lunar 'rise' should return the next moon rise for the location", { timeout: 5000 }, async function () {
+            const t0 = new Date('2026-06-15T12:00:00Z')
+            const ask = await loadDescriber()
+            const result = await ask({ expressionType: 'lunar', location: LOC, lunarType: 'selected', lunarEvents: 'rise', time: t0.toISOString() })
+            result.nextEvent.should.eql('rise')
+            new Date(result.nextEventTime).getTime().should.be.above(t0.getTime())
+            // the returned time must be the moon rise of its own day per suncalc
+            const moonTimes = SunCalc.getMoonTimes(new Date(result.nextEventTime), LAT, LNG)
+            iso(result.nextEventTime).should.eql(iso(moonTimes.rise))
+        })
+        it('lunar describe should not crash when there are no recent moon events (polar latitudes)', { timeout: 5000 }, async function () {
+            // at 89N the moon is continuously up or down for days at a time - the first
+            // week of Jan 2026 has no rise/set events at all, so the backwards scan
+            // finds no prior event (this used to throw and no response was ever sent)
+            const t0 = new Date('2026-01-04T00:00:00Z')
+            const ask = await loadDescriber()
+            const result = await ask({ expressionType: 'lunar', location: '89.0,0.0', lunarType: 'all', time: t0.toISOString() })
+            should.exist(result)
+            result.should.have.property('lunarState').which.is.an.Object()
+            result.lunarState.should.have.property('illumination') // moon data present even with no prior event
+            new Date(result.nextEventTime).getTime().should.be.above(t0.getTime()) // events resume within the forward scan window
+        })
+    })
+
     const getObjectProperty = function (object, path, defaultValue) {
         return path
             // eslint-disable-next-line no-useless-escape
@@ -376,7 +449,8 @@ describe('cron-plus Node', function () {
                 { id: 'helperNode2', type: 'helper' },
                 { id: 'helperNode3', type: 'helper' },
                 { id: 'helperNode4', type: 'helper' },
-                { id: 'helperNode5', type: 'helper' },
+                { id: 'helperNodeDynSchedules', type: 'helper' },
+                { id: 'helperNodeCmdResponses', type: 'helper' },
                 { id: 'catchHelper', type: 'helper' },
                 { id: 'completeHelper', type: 'helper' },
                 {
@@ -387,13 +461,14 @@ describe('cron-plus Node', function () {
                     timeZone: '',
                     persistDynamic: false,
                     commandResponseMsgOutput: 'fanOut',
-                    outputs: 5,
+                    outputs: 6,
                     options: [
                         { name: 'schedule1', topic: 'schedule1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '0 * * * * * *', location: '', offset: '0' },
                         { name: 'schedule2', topic: 'schedule2', payloadType: 'default', payload: '', expressionType: 'dates', expression: [Date.now() + 60000, Date.now() + 120000], location: '', offset: '0' },
-                        { name: 'schedule3', topic: 'schedule3', payloadType: 'default', payload: '', expressionType: 'solar', expression: '0 * * * * * *', location: '55.0 -1.418', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' }
+                        { name: 'schedule3', topic: 'schedule3', payloadType: 'default', payload: '', expressionType: 'solar', expression: '0 * * * * * *', location: '55.0 -1.418', offset: '0', solarType: 'all', solarEvents: 'sunrise,sunset' },
+                        { name: 'schedule4', topic: 'schedule4', payloadType: 'default', payload: '', expressionType: 'lunar', expression: '0 * * * * * *', location: '55.0 -1.418', offset: '0', lunarType: 'all', lunarEvents: 'rise,set' }
                     ],
-                    wires: [['helperNode1'], ['helperNode2'], ['helperNode3'], ['helperNode4'], ['helperNode5']]
+                    wires: [['helperNode1'], ['helperNode2'], ['helperNode3'], ['helperNode4'], ['helperNodeDynSchedules'], ['helperNodeCmdResponses']]
                 },
                 { id: 'catchNode1', type: 'catch', name: '', scope: [nodeName], uncaught: false, wires: [['catchHelper']] },
                 { id: 'completeNode1', type: 'complete', name: '', scope: [nodeName], wires: [['completeHelper']] }
@@ -403,8 +478,9 @@ describe('cron-plus Node', function () {
         /** @type {nodeRed.Node<{}>} */ let helperNode1StaticSchedule1 = null
         /** @type {nodeRed.Node<{}>} */ let helperNode2StaticSchedule2 = null
         /** @type {nodeRed.Node<{}>} */ let helperNode3StaticSchedule3 = null
-        /** @type {nodeRed.Node<{}>} */ let helperNode4DynamicSchedules = null
-        /** @type {nodeRed.Node<{}>} */ let helperNode5CommandResponses = null
+        /** @type {nodeRed.Node<{}>} */ let helperNode4StaticSchedule4 = null
+        /** @type {nodeRed.Node<{}>} */ let helperNodeDynamicSchedules = null
+        /** @type {nodeRed.Node<{}>} */ let helperNodeCommandResponses = null
         /** @type {nodeRed.Node<{}>} */ let testNode = null
         /** @type {nodeRed.Node<{}>} */ let catchNode1 = null
         /** @type {nodeRed.Node<{}>} */ let catchHelper = null
@@ -417,8 +493,9 @@ describe('cron-plus Node', function () {
             helperNode1StaticSchedule1 = helper.getNode('helperNode1')
             helperNode2StaticSchedule2 = helper.getNode('helperNode2')
             helperNode3StaticSchedule3 = helper.getNode('helperNode3')
-            helperNode4DynamicSchedules = helper.getNode('helperNode4')
-            helperNode5CommandResponses = helper.getNode('helperNode5')
+            helperNode4StaticSchedule4 = helper.getNode('helperNode4')
+            helperNodeDynamicSchedules = helper.getNode('helperNodeDynSchedules')
+            helperNodeCommandResponses = helper.getNode('helperNodeCmdResponses')
             testNode = helper.getNode(cronNodeName)
             catchNode1 = helper.getNode('catchNode1')
             catchHelper = helper.getNode('catchHelper')
@@ -428,8 +505,9 @@ describe('cron-plus Node', function () {
             should(helperNode1StaticSchedule1).not.be.null()
             should(helperNode2StaticSchedule2).not.be.null()
             should(helperNode3StaticSchedule3).not.be.null()
-            should(helperNode4DynamicSchedules).not.be.null()
-            should(helperNode5CommandResponses).not.be.null()
+            should(helperNode4StaticSchedule4).not.be.null()
+            should(helperNodeDynamicSchedules).not.be.null()
+            should(helperNodeCommandResponses).not.be.null()
             should(testNode).not.be.null()
             should(catchNode1).not.be.null()
             should(catchHelper).not.be.null()
@@ -442,8 +520,9 @@ describe('cron-plus Node', function () {
             helperNode1StaticSchedule1 = null
             helperNode2StaticSchedule2 = null
             helperNode3StaticSchedule3 = null
-            helperNode4DynamicSchedules = null
-            helperNode5CommandResponses = null
+            helperNode4StaticSchedule4 = null
+            helperNodeDynamicSchedules = null
+            helperNodeCommandResponses = null
             testNode = null
             catchNode1 = null
             catchHelper = null
@@ -471,7 +550,7 @@ describe('cron-plus Node', function () {
             config.should.have.keys('topic', 'name', 'payload')
             config.should.have.property('payloadType', 'default')
             config.should.have.property('expressionType')
-            if (config.expressionType === 'solar') {
+            if (config.expressionType === 'solar' || config.expressionType === 'lunar') {
                 config.should.have.property('location')
             } else {
                 config.should.have.property('expression')
@@ -541,7 +620,7 @@ describe('cron-plus Node', function () {
                 // .command
                 command.should.have.property('expressionType').which.is.a.String()
                 command.should.have.property('payloadType').which.is.a.String()
-                if (command.expressionType === 'solar') {
+                if (command.expressionType === 'solar' || command.expressionType === 'lunar') {
                     command.should.have.property('location')
                 } else {
                     command.should.have.property('expression')
@@ -556,6 +635,11 @@ describe('cron-plus Node', function () {
                 if (command.expressionType === 'solar') {
                     result.should.have.property('nextEventTime')
                     result.should.have.property('solarState').which.is.an.Object()
+                    result.should.have.property('eventTimes').which.is.an.Object()
+                }
+                if (command.expressionType === 'lunar') {
+                    result.should.have.property('nextEventTime')
+                    result.should.have.property('lunarState').which.is.an.Object()
                     result.should.have.property('eventTimes').which.is.an.Object()
                 }
             } else if (command.command === 'export') {
@@ -622,11 +706,19 @@ describe('cron-plus Node', function () {
             const result = await resultPromise // wait for the third message to be processed
             staticScheduleTest(result)
         })
+        it('should trigger static lunar schedule', async function () {
+            const resultPromise = new Promise(resolve => {
+                helperNode4StaticSchedule4.on('input', resolve)
+            })
+            testNode.receive({ topic: 'trigger', payload: 'schedule4' }) // fire input of testNode
+            const result = await resultPromise // wait for the third message to be processed
+            staticScheduleTest(result)
+        })
         it("should 'trigger-all' by topic", async function (t) {
             const test = {
                 description: t.name,
                 send: { topic: 'trigger-all', payload: '' },
-                expected: { command: 'trigger-all', scheduleCount: 5 }
+                expected: { command: 'trigger-all', scheduleCount: 6 } // 4 static + 2 dynamic
             }
             await alignToSecondBoundary()
             // add 2 dynamic schedules
@@ -636,7 +728,7 @@ describe('cron-plus Node', function () {
             const messages = []
             const addMessage = (msg, resolver) => {
                 messages.push(msg)
-                if (messages.length >= 5) {
+                if (messages.length >= 6) {
                     resolver(messages)
                 }
             }
@@ -650,30 +742,35 @@ describe('cron-plus Node', function () {
                 helperNode3StaticSchedule3.on('input', (msg) => {
                     addMessage(msg, resolve)
                 })
-                helperNode4DynamicSchedules.on('input', (msg) => {
+                helperNode4StaticSchedule4.on('input', (msg) => {
                     addMessage(msg, resolve)
                 })
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeDynamicSchedules.on('input', (msg) => {
+                    addMessage(msg, resolve)
+                })
+                helperNodeCommandResponses.on('input', (msg) => {
                     addMessage(msg, resolve)
                 })
             })
             testNode.receive(test.send)
             const result = await resultPromise
-            result.should.have.length(5)
+            result.should.have.length(6)
             statusChecker(result[0].payload.status, 'static')
             statusChecker(result[1].payload.status, 'static')
             statusChecker(result[2].payload.status, 'static')
-            statusChecker(result[3].payload.status, 'dynamic')
+            statusChecker(result[3].payload.status, 'static')
             statusChecker(result[4].payload.status, 'dynamic')
+            statusChecker(result[5].payload.status, 'dynamic')
             configChecker(result[0].payload.config)
             configChecker(result[1].payload.config)
             configChecker(result[2].payload.config)
             configChecker(result[3].payload.config)
             configChecker(result[4].payload.config)
+            configChecker(result[5].payload.config)
         })
         it('should add a dynamic cron schedule', async function () {
             const resultPromise = new Promise(resolve => {
-                helperNode4DynamicSchedules.on('input', resolve)
+                helperNodeDynamicSchedules.on('input', resolve)
             })
             testNode.receive(createAddScheduleMsg({ name: 'dynCron1', topic: 'xxx' })) // add a dynamic cron schedule
             testNode.receive({ topic: 'trigger', payload: 'dynCron1' }) // fire input of testNode
@@ -689,7 +786,22 @@ describe('cron-plus Node', function () {
                 expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', 'All Solar Events']] }
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+        })
+        it('describe lunar events for a location', async function (t) {
+            const test = {
+                description: t.name,
+                send: { payload: { command: 'describe', expressionType: 'lunar', location: '54.9992500,-1.4170300', lunarType: 'all', timeZone: 'Europe/London' } },
+                expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', 'All Lunar Events']] }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -704,7 +816,7 @@ describe('cron-plus Node', function () {
                 expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', 'Every minute']] }
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -719,7 +831,7 @@ describe('cron-plus Node', function () {
                 expected: { command: 'describe', propertyValues: [['payload.result.description', 'string']] }
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -734,7 +846,7 @@ describe('cron-plus Node', function () {
                 expected: { command: 'export', scheduleCount: 1 }
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -749,7 +861,7 @@ describe('cron-plus Node', function () {
                 expected: { command: 'export', scheduleCount: 1 }
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -764,7 +876,7 @@ describe('cron-plus Node', function () {
                 expected: { command: 'export', scheduleCount: 1 }
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -783,7 +895,7 @@ describe('cron-plus Node', function () {
                 expected: { command: 'list', scheduleCount: 1 }
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -802,7 +914,7 @@ describe('cron-plus Node', function () {
                 expected: { command: 'list', scheduleCount: 1 }
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -820,7 +932,7 @@ describe('cron-plus Node', function () {
             await sleep(50) // let it unwind
 
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -832,13 +944,13 @@ describe('cron-plus Node', function () {
             const test = {
                 description: t.name,
                 send: { topic: 'status-all', payload: '' },
-                expected: { command: 'status-all', scheduleCount: 4 } // 3 + 1 dynamic
+                expected: { command: 'status-all', scheduleCount: 5 } // 4 static + 1 dynamic
             }
             testNode.receive(createAddScheduleMsg({ name: 'dyn' }))
             await sleep(50) // let it unwind
 
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -850,10 +962,10 @@ describe('cron-plus Node', function () {
             const test = {
                 description: t.name,
                 send: { topic: '', payload: { command: 'status-all' } },
-                expected: { command: 'status-all', scheduleCount: 3 } // 3 static schedules
+                expected: { command: 'status-all', scheduleCount: 4 } // 4 static schedules
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -868,7 +980,7 @@ describe('cron-plus Node', function () {
                 expected: { command: 'status-all-dynamic', scheduleCount: 0 }
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -888,7 +1000,7 @@ describe('cron-plus Node', function () {
             await sleep(30) // let it unwind
 
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -907,10 +1019,10 @@ describe('cron-plus Node', function () {
             const test = {
                 description: t.name,
                 send: { topic: 'status-all-static', payload: '' },
-                expected: { command: 'status-all-static', scheduleCount: 3 }
+                expected: { command: 'status-all-static', scheduleCount: 4 }
             }
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -929,7 +1041,7 @@ describe('cron-plus Node', function () {
             await sleep(50) // let it unwind
 
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -952,7 +1064,7 @@ describe('cron-plus Node', function () {
 
             const messages = []
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     messages.push(msg)
                     if (messages.length >= 11) {
                         resolve()
@@ -978,10 +1090,10 @@ describe('cron-plus Node', function () {
             testNode.receive({ topic: 'status-active', payload: '' })
             await resultPromise
             messages.should.have.length(11)
-            // before stopping 2 schedules
-            commandChecker(messages[0], { description: 'check status of active schedules should be 5', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 5 } })
-            countChecker('dyn-1', messages[0].payload.result[3], 3, 2, true) // dyn-1 should have triggered 2 times & still be running
-            commandChecker(messages[1], { description: 'check status of active-static schedules should be 3', send: { topic: 'status-active-static', payload: '' }, expected: { command: 'status-active-static', scheduleCount: 3 } })
+            // before stopping 2 schedules (1 static and 1 dynamic)
+            commandChecker(messages[0], { description: 'check status of active schedules should be 6', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 6 } })
+            countChecker('dyn-1', messages[0].payload.result[4], 3, 2, true) // dyn-1 should have triggered 2 times & still be running
+            commandChecker(messages[1], { description: 'check status of active-static schedules should be 4', send: { topic: 'status-active-static', payload: '' }, expected: { command: 'status-active-static', scheduleCount: 4 } })
             commandChecker(messages[2], { description: 'check status of active-dynamic schedules should be 2', send: { topic: 'status-active-dynamic', payload: '' }, expected: { command: 'status-active-dynamic', scheduleCount: 2 } })
             // after waiting another second
             commandChecker(messages[3], { description: 'check status of active inactive should be 1', send: { topic: 'status-inactive', payload: '' }, expected: { command: 'status-inactive', scheduleCount: 1 } })
@@ -991,12 +1103,12 @@ describe('cron-plus Node', function () {
             commandChecker(messages[4], { description: 'check status of inactive schedules should be 2', send: { topic: 'status-inactive', payload: '' }, expected: { command: 'status-inactive', scheduleCount: 2 } })
             commandChecker(messages[5], { description: 'check status of inactive-static schedules should be 1', send: { topic: 'status-inactive-static', payload: '' }, expected: { command: 'status-inactive-static', scheduleCount: 1 } })
             commandChecker(messages[6], { description: 'check status of inactive-dynamic schedules should be 1', send: { topic: 'status-inactive-dynamic', payload: '' }, expected: { command: 'status-inactive-dynamic', scheduleCount: 1 } })
-            commandChecker(messages[7], { description: 'check status of active schedules should be 3', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 3 } })
-            commandChecker(messages[8], { description: 'check status of active-static schedules should be 2', send: { topic: 'status-active-static', payload: '' }, expected: { command: 'status-active-static', scheduleCount: 2 } })
+            commandChecker(messages[7], { description: 'check status of active schedules should be 4', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 4 } })
+            commandChecker(messages[8], { description: 'check status of active-static schedules should be 3', send: { topic: 'status-active-static', payload: '' }, expected: { command: 'status-active-static', scheduleCount: 3 } })
             commandChecker(messages[9], { description: 'check status of active-dynamic schedules should be 1', send: { topic: 'status-active-dynamic', payload: '' }, expected: { command: 'status-active-dynamic', scheduleCount: 1 } })
             // after starting all schedules
-            commandChecker(messages[10], { description: 'check status of active schedules should be 5', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 5 } })
-            countChecker('dyn-1', messages[10].payload.result[3], 3, 0, true) // since schedules were stopped, the counter should be reset to 0
+            commandChecker(messages[10], { description: 'check status of active schedules should be 6', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 6 } })
+            countChecker('dyn-1', messages[10].payload.result[4], 3, 0, true) // since schedules were stopped, the counter should be reset to 0
         })
         it("should 'pause' by topic (should not reset counter)", { timeout: 8000 }, async function () {
             await alignToSecondBoundary()
@@ -1007,7 +1119,7 @@ describe('cron-plus Node', function () {
 
             const messages = []
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     messages.push(msg)
                     if (messages.length >= 4) {
                         resolve()
@@ -1027,14 +1139,14 @@ describe('cron-plus Node', function () {
             await resultPromise
             messages.should.have.length(4)
             // status-active, before pausing, dyn-1 should have triggered 2 times & still be running
-            commandChecker(messages[0], { description: 'check status of active schedules should be 5', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 5 } })
-            countChecker('dyn-1', messages[0].payload.result[3], 3, 2, true) // dyn-1 should have triggered 2 times & still be running
+            commandChecker(messages[0], { description: 'check status of active schedules should be 6', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 6 } })
+            countChecker('dyn-1', messages[0].payload.result[4], 3, 2, true) // dyn-1 should have triggered 2 times & still be running
             // after pausing & waiting 2 seconds, dyn-1 should still be running and count should still be 2
             commandChecker(messages[1], { description: 'check status of active schedules should be 1', send: { topic: 'status-inactive', payload: '' }, expected: { command: 'status-inactive', scheduleCount: 1 } })
             countChecker('dyn-1', messages[1].payload.result[0], 3, 2, false) // dyn-1 should still have only triggered 2 times
-            // after starting all, active count should be 5 again
-            commandChecker(messages[2], { description: 'check status of active schedules should be 5', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 5 } })
-            countChecker('dyn-1', messages[2].payload.result[3], 3, 2, true) // dyn-1 should still have triggered 2 times & still be running
+            // after starting all, active count should be 6 again
+            commandChecker(messages[2], { description: 'check status of active schedules should be 6', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 6 } })
+            countChecker('dyn-1', messages[2].payload.result[4], 3, 2, true) // dyn-1 should still have triggered 2 times & still be running
             // after waiting another second, dyn-1 should have triggered 3 times and should have reached its limit & stopped
             commandChecker(messages[3], { description: 'check status of inactive schedules should be 1', send: { topic: 'status-inactive', payload: '' }, expected: { command: 'status-inactive', scheduleCount: 1 } })
             countChecker('dyn-1', messages[3].payload.result[0], 3, 3, false) // dyn-1 should have triggered 3 times and should NOT be running
@@ -1046,7 +1158,7 @@ describe('cron-plus Node', function () {
 
             const messages = []
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     messages.push(msg)
                     if (messages.length >= 3) {
                         resolve()
@@ -1064,8 +1176,8 @@ describe('cron-plus Node', function () {
             await resultPromise
             messages.should.have.length(3)
             // at first, dyn-1 should be active
-            commandChecker(messages[0], { description: 'check status of active schedules should be 4', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 4 } })
-            countChecker('dyn-1', messages[0].payload.result[3], 1, 0, true) // dyn-1 should have triggered 0 times
+            commandChecker(messages[0], { description: 'check status of active schedules should be 5', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 5 } })
+            countChecker('dyn-1', messages[0].payload.result[4], 1, 0, true) // dyn-1 should have triggered 0 times
             // after waiting 1 second, dyn-1 should have triggered 1 time and should be no longer be running
             commandChecker(messages[1], { description: 'check status of inactive schedules should be 1', send: { topic: 'status-inactive', payload: '' }, expected: { command: 'status-inactive', scheduleCount: 1 } })
             countChecker('dyn-1', messages[1].payload.result[0], 1, 1, false) // dyn-1 should have triggered 1 time and should NOT be running
@@ -1083,7 +1195,7 @@ describe('cron-plus Node', function () {
 
             const messages = []
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     messages.push(msg)
                     if (messages.length >= 3) {
                         resolve()
@@ -1101,8 +1213,8 @@ describe('cron-plus Node', function () {
             await resultPromise
             messages.should.have.length(3)
             // at first, dyn-1 should be active
-            commandChecker(messages[0], { description: 'check status of active schedules should be 4', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 4 } })
-            countChecker('dyn-1', messages[0].payload.result[3], 1, 0, true) // dyn-1 should have triggered 0 times
+            commandChecker(messages[0], { description: 'check status of active schedules should be 5', send: { topic: 'status-active', payload: '' }, expected: { command: 'status-active', scheduleCount: 5 } })
+            countChecker('dyn-1', messages[0].payload.result[4], 1, 0, true) // dyn-1 should have triggered 0 times
             // after waiting 1 second, dyn-1 should have triggered 1 time and should be no longer be running
             commandChecker(messages[1], { description: 'check status of inactive schedules should be 1', send: { topic: 'status-inactive', payload: '' }, expected: { command: 'status-inactive', scheduleCount: 1 } })
             countChecker('dyn-1', messages[1].payload.result[0], 1, 1, false) // dyn-1 should have triggered 1 time and should NOT be running
@@ -1118,7 +1230,7 @@ describe('cron-plus Node', function () {
             testNode.receive(createAddScheduleMsg({ name: 'dyn-2', limit: 1, count: 2, expression: '* * * * * * *' })) // every 1 seconds
 
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -1127,7 +1239,7 @@ describe('cron-plus Node', function () {
 
             const msg = await resultPromise
 
-            commandChecker(msg, { description: 'check count of schedules should be 4', send: { topic: 'status-all', payload: '' }, expected: { command: 'status-all', scheduleCount: 4 } })
+            commandChecker(msg, { description: 'check count of schedules should be 5', send: { topic: 'status-all', payload: '' }, expected: { command: 'status-all', scheduleCount: 5 } })
 
             const dyn1 = msg.payload.result.find(s => s.config.name === 'dyn-2')
             should.exist(dyn1, 'dyn-2 should be in the result')
@@ -1141,10 +1253,10 @@ describe('cron-plus Node', function () {
             testNode.receive(msg)
             sleep(50) // let it unwind
             const resultPromise = new Promise(resolve => {
-                helperNode4DynamicSchedules.on('input', (msg) => {
+                helperNodeDynamicSchedules.on('input', (msg) => {
                     resolve(msg)
                 })
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
@@ -1160,14 +1272,14 @@ describe('cron-plus Node', function () {
             testNode.receive(msg)
             sleep(50) // let it unwind
             const resultPromise = new Promise(resolve => {
-                helperNode5CommandResponses.on('input', (msg) => {
+                helperNodeCommandResponses.on('input', (msg) => {
                     resolve(msg)
                 })
             })
             const test = {
                 description: t.name,
                 send: { topic: 'status-all', payload: '' },
-                expected: { command: 'status-all', scheduleCount: 2 }
+                expected: { command: 'status-all', scheduleCount: 3 }
             }
             testNode.receive(test.send)
             const result = await resultPromise
