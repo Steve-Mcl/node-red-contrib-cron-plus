@@ -47,6 +47,73 @@ const PERMITTED_SOLAR_EVENTS = [
     'nadir'
 ]
 
+// Matches a custom solar-angle event token e.g. "angle:-4:rise" or "angle:6.5:set"
+// angle is degrees above (positive) or below (negative) the horizon; direction is
+// whether the sun is rising through that angle (morning) or setting through it (evening)
+const SOLAR_ANGLE_EVENT_REGEX = /^angle:(-?\d+(?:\.\d+)?):(rise|set)$/i
+
+/**
+ * Parse a custom solar-angle event token into its angle (degrees) & direction
+ * @param {string} value e.g. "angle:-4:rise"
+ * @returns {{angle: number, direction: ('rise'|'set')}|null} null if invalid, malformed, or out of range
+ */
+function parseCustomSolarAngleEvent (value) {
+    const match = SOLAR_ANGLE_EVENT_REGEX.exec(String(value || '').trim())
+    if (!match) return null
+    const angle = parseFloat(match[1])
+    if (isNaN(angle) || angle < -90 || angle > 90) return null
+    return { angle, direction: match[2].toLowerCase() }
+}
+
+/**
+ * Determine whether a string is a valid (well formed AND in-range) custom solar-angle event
+ * token (e.g. "angle:-4:rise"). This is the single source of truth for validity - it delegates
+ * to parseCustomSolarAngleEvent() so that anything accepted here is guaranteed to parse.
+ * @param {string} value the candidate solar event token
+ * @returns {boolean}
+ */
+function isCustomSolarAngleEvent (value) {
+    return typeof value === 'string' && parseCustomSolarAngleEvent(value) !== null
+}
+
+/**
+ * Produce a human friendly description of a custom solar-angle event token
+ * @param {string} value e.g. "angle:-4:rise"
+ * @returns {string}
+ */
+function describeCustomSolarAngleEvent (value) {
+    const parsed = parseCustomSolarAngleEvent(value)
+    if (!parsed) return value
+    const { angle, direction } = parsed
+    const verb = direction === 'rise' ? 'rising' : 'setting'
+    const position = angle === 0 ? 'at the horizon' : (angle > 0 ? `${angle}° above the horizon` : `${Math.abs(angle)}° below the horizon`)
+    return `sun ${verb} ${position}`
+}
+
+// Cache of custom angles already registered with SunCalc. SunCalc.addTime() simply pushes
+// a new entry onto its internal (module scoped) `times` array every time it's called with
+// no de-duplication, so registering the same angle repeatedly (e.g. every time a schedule
+// is (re)computed) would leak memory and duplicate work - this cache prevents that.
+const registeredSolarAngles = new Map()
+
+/**
+ * Ensure a custom solar angle is registered with SunCalc, returning the generated rise/set
+ * property names that SunCalc.getTimes() will then populate for that angle.
+ * @param {number} angle Angle in degrees above (positive) or below (negative) the horizon
+ * @returns {{riseName: string, setName: string}}
+ */
+function ensureCustomSolarAngleRegistered (angle) {
+    const key = angle.toFixed(4)
+    let names = registeredSolarAngles.get(key)
+    if (!names) {
+        const safeKey = key.replace('-', 'n').replace('.', 'p')
+        names = { riseName: `customAngle_${safeKey}_rise`, setName: `customAngle_${safeKey}_set` }
+        SunCalc.addTime(angle, names.riseName, names.setName)
+        registeredSolarAngles.set(key, names)
+    }
+    return names
+}
+
 // accepted commands using topic as the command & (in compatible cases, the payload is the schedule name)
 // commands not supported by topic are : add/update & describe
 const controlTopics = [
@@ -175,8 +242,8 @@ function validateOpt (opt, permitDefaults = true) {
             }
             for (let index = 0; index < solarEvents.length; index++) {
                 const element = solarEvents[index].trim()
-                if (!PERMITTED_SOLAR_EVENTS.includes(element)) {
-                    throw new Error(`Schedule '${opt.name}' - solarEvents entry '${element}' is invalid`)
+                if (!PERMITTED_SOLAR_EVENTS.includes(element) && !isCustomSolarAngleEvent(element)) {
+                    throw new Error(`Schedule '${opt.name}' - solarEvents entry '${element}' is invalid. Must be one of ${PERMITTED_SOLAR_EVENTS.join(',')} or a custom angle in the form 'angle:<degrees>:rise' or 'angle:<degrees>:set' (degrees between -90 and 90)`)
                 }
             }
         }
@@ -337,7 +404,11 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
                 if (solarType === 'all') {
                     result.description = 'All Solar Events'
                 } else {
-                    result.description = "Solar Events: '" + solarEvents.split(',').join(', ') + "'"
+                    const labels = solarEvents.split(',').map((se) => {
+                        se = se.trim()
+                        return isCustomSolarAngleEvent(se) ? describeCustomSolarAngleEvent(se) : se
+                    })
+                    result.description = "Solar Events: '" + labels.join(', ') + "'"
                 }
             } else {
                 if (count === 1) {
@@ -544,10 +615,21 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
     }
     for (let index = 0; index < solarEventsArrTemp.length; index++) {
         const se = solarEventsArrTemp[index].trim()
-        if (PERMITTED_SOLAR_EVENTS.includes(se)) {
+        if (PERMITTED_SOLAR_EVENTS.includes(se) || isCustomSolarAngleEvent(se)) {
             solarEventsArr.push(se)
         }
     }
+
+    // custom (user specified angle) events are tracked separately since they are not part of
+    // SunCalc's/PERMITTED_SOLAR_EVENTS' fixed set of named presets - they must be registered with
+    // SunCalc (once) before SunCalc.getTimes() will return a time for them.
+    const customAngleEventDefs = solarEventsArr.filter(isCustomSolarAngleEvent).map((token) => {
+        const parsed = parseCustomSolarAngleEvent(token)
+        const names = ensureCustomSolarAngleRegistered(parsed.angle)
+        return { token, internalName: parsed.direction === 'rise' ? names.riseName : names.setName }
+    })
+    const customAngleEventsPast = [...customAngleEventDefs]
+    const customAngleEventsFuture = [...customAngleEventDefs]
 
     offset = isNumber(offset) ? parseInt(offset) : 0
     elevation = isNumber(elevation) ? parseInt(elevation) : 0// not used for now
@@ -563,7 +645,7 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
     // performance.mark('FirstScanStart');
 
     // first scan backwards to get prior solar events
-    while (loopMonitor < 3 && solarEventsPast.length) {
+    while (loopMonitor < 3 && (solarEventsPast.length || customAngleEventsPast.length)) {
         loopMonitor++
         const timesIteration1 = SunCalc.getTimes(scanDate, lat, lng)
         // timesIteration1 = new SolarCalc(scanDate,lat,lng);
@@ -578,6 +660,16 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
                 index--
             }
         }
+        for (let index = 0; index < customAngleEventsPast.length; index++) {
+            const ce = customAngleEventsPast[index]
+            const seTime = timesIteration1[ce.internalName]
+            const seTimeOffset = isValidDateObject(seTime) ? new Date(seTime.getTime() + offset * 60000) : seTime
+            if (isValidDateObject(seTimeOffset) && seTimeOffset <= startDate) {
+                result.push({ event: ce.token, time: seTime, timeOffset: seTimeOffset })
+                customAngleEventsPast.splice(index, 1)// remove that item
+                index--
+            }
+        }
         scanDate.setDate(scanDate.getDate() - 1)
     }
 
@@ -585,10 +677,20 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
     scanDate.setDate(scanDate.getDate() - 1)// back one day to catch times ahead of current day
     loopMonitor = 0
     // now scan forwards to get future events
-    while (loopMonitor < 183 && solarEventsFuture.length) {
+    while (loopMonitor < 183 && (solarEventsFuture.length || customAngleEventsFuture.length)) {
         loopMonitor++
         const timesIteration2 = SunCalc.getTimes(scanDate, lat, lng)
         // timesIteration2 = new SolarCalc(scanDate,lat,lng);
+        for (let index = 0; index < customAngleEventsFuture.length; index++) {
+            const ce = customAngleEventsFuture[index]
+            const seTime = timesIteration2[ce.internalName]
+            const seTimeOffset = isValidDateObject(seTime) ? new Date(seTime.getTime() + offset * 60000) : seTime
+            if (isValidDateObject(seTimeOffset) && seTimeOffset > startDate) {
+                result.push({ event: ce.token, time: seTime, timeOffset: seTimeOffset })
+                customAngleEventsFuture.splice(index, 1)// remove that item
+                index--
+            }
+        }
         for (let index = 0; index < solarEventsFuture.length; index++) {
             const se = solarEventsFuture[index]
             const seTime = timesIteration2[se]
@@ -704,6 +806,9 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
         if (solarEventsArr.includes(fe.event)) {
             wantedFutureEvents.push(fe)
         }
+    }
+    if (!wantedFutureEvents.length) {
+        throw new Error(`Unable to determine a time for solar event(s) '${solarEventsArr.join(',')}' at this location - for custom sun angles, the sun may never reach the specified angle here (e.g. at high latitudes)`)
     }
     const nextType = wantedFutureEvents[0].event
     const nextTime = wantedFutureEvents[0].time
