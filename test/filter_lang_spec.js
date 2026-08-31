@@ -304,6 +304,17 @@ describe('filter-lang parse: moon', function () {
         onlyTerm('new moon').phase.should.equal('new')
     })
 
+    it('parses "seasonal blue moon" distinctly from "blue moon"', function () {
+        onlyTerm('seasonal blue moon').should.have.properties({ kind: 'moonPhase', phase: 'seasonalBlue' })
+    })
+
+    it('parses "blue moon" and its compositions with nothing ignored', function () {
+        onlyTerm('blue moon').should.have.properties({ kind: 'moonPhase', phase: 'blue' })
+        lang.parse('blue moon').description.should.equal('the moon is a blue moon (the second full moon of a calendar month)')
+        lang.parse('blue moon at the weekend').unmatched.should.have.length(0)
+        lang.parse('blue moon and within 30 minutes of sunset').unmatched.should.have.length(0)
+    })
+
     it('parses "moon more than 50% illuminated"', function () {
         const term = onlyTerm('moon more than 50% illuminated')
         term.kind.should.equal('moonIllumination')

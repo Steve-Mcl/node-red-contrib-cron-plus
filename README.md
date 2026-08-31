@@ -101,7 +101,7 @@ Type the condition in plain English; a live "understanding" line below the field
 * `between 15 minutes and 30 minutes past the hour`, `quarter past`, `half past`, `ten past`, `5 to` (every hour; `quarter past five` is the clock time 05:15)
 * `is night`, `after dark`, `golden hour`, `sun rising`, `during daylight`
 * `after sunset`, `before sunrise`, `2 hours after sunset`, `within 30 minutes of sunrise`, `between sunset and sunrise`
-* `when the moon is visible`, `full moon`, `moon more than 50% illuminated`, `moon is 90% illuminated` (bare percentages mean "at least")
+* `when the moon is visible`, `full moon`, `blue moon` (second full moon of a calendar month), `seasonal blue moon` (third full moon in a season of four), `moon more than 50% illuminated`, `moon is 90% illuminated` (bare percentages mean "at least")
 * `sun is between 10 and 12 degrees`, `sun above 30 degrees`, `sun is high`/`sun is low`, `moon is high`/`moon is low`
 * combined: `on weekdays and during daylight`, `on weekends or after sunset`, `weekends or evenings except tuesday`
 * brackets group mixed and/or: `(last day of the month or wednesday) and after 10pm` - without brackets `and` binds tighter than `or`, and the understanding line always shows the grouping it settled on

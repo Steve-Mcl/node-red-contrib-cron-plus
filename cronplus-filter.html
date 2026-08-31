@@ -256,7 +256,8 @@ copies or substantial portions of the Software.
             if (data.windows.length) {
                 html += buildWindowsTable(data.windows, tz)
             } else {
-                html += '<p><i class="fa fa-exclamation-triangle"></i> No matches found up to ' + escapeHtml(fmtStamp(data.scannedUntil, tz)) + '.</p>'
+                html += '<p><i class="fa fa-exclamation-triangle"></i> No matches found up to ' + escapeHtml(fmtStamp(data.scannedUntil, tz)) + '.' +
+                    (data.truncated ? '' : ' A rare condition may still match beyond the scanned range.') + '</p>'
             }
             html += '<p class="cronplus-filter-muted">Sampled every ' + data.resolutionMinutes + ' minute' + (data.resolutionMinutes === 1 ? '' : 's') + ', edges exact to the minute' +
                 (data.truncated ? '; the scan stopped early (time budget)' : '; scanned to ' + escapeHtml(fmtStamp(data.scannedUntil, tz))) +
@@ -623,7 +624,11 @@ copies or substantial portions of the Software.
             (a quantity shifts the boundary: "2 hours after sunset" passes from
             sunset&nbsp;+&nbsp;2h until the end of the local day)</li>
         <li><b>Moon:</b> <code>when the moon is visible</code> (above the horizon),
-            <code>full moon</code>, <code>new moon</code>, <code>waxing</code>/<code>waning</code>,
+            <code>full moon</code>, <code>new moon</code>, <code>blue moon</code> (the second
+            full moon of a calendar month, judged in the node timezone),
+            <code>seasonal blue moon</code> (the third full moon in an astronomical
+            season containing four),
+            <code>waxing</code>/<code>waning</code>,
             <code>moon more than 50% illuminated</code>,
             <code>moon is 90% illuminated</code> (bare percentages read as "at least"),
             <code>moon at most 20% illuminated</code></li>

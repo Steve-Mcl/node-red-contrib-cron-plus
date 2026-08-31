@@ -531,6 +531,77 @@ describe('filter-eval: parenthesized conditions', function () {
     })
 })
 
+describe('filter-eval: blue moon', function () {
+    // full-moon peak instants in a range, by hourly scan of the phase
+    function fullMoonPeaks (fromIso, toIso) {
+        const peaks = []
+        let best = null
+        for (let ts = Date.parse(fromIso); ts < Date.parse(toIso); ts += 3600000) {
+            const dist = Math.abs(SunCalc.getMoonIllumination(new Date(ts)).phase - 0.5)
+            if (dist <= 0.017) {
+                if (!best || dist < best.dist) { best = { ts, dist } }
+            } else if (best) {
+                peaks.push(best.ts)
+                best = null
+            }
+        }
+        if (best) { peaks.push(best.ts) }
+        return peaks
+    }
+
+    it('May 2026 has two full moons and only the second is blue', { timeout: 20000 }, function () {
+        const peaks = fullMoonPeaks('2026-05-01T00:00:00Z', '2026-06-01T00:00:00Z')
+        peaks.length.should.equal(2)
+        evalText('blue moon', { ts: peaks[1], tz: 'UTC' }).pass.should.be.true()
+        evalText('blue moon', { ts: peaks[0], tz: 'UTC' }).pass.should.be.false()
+        evalText('full moon', { ts: peaks[1], tz: 'UTC' }).pass.should.be.true() // a blue moon is still full
+    })
+
+    it('an ordinary full moon is not blue', { timeout: 20000 }, function () {
+        const peaks = fullMoonPeaks('2026-06-10T00:00:00Z', '2026-07-10T00:00:00Z')
+        peaks.length.should.equal(1)
+        evalText('blue moon', { ts: peaks[0], tz: 'UTC' }).pass.should.be.false()
+    })
+
+    it('a non-full instant is never blue', function () {
+        evalText('blue moon', { ts: Date.parse('2026-05-15T12:00:00Z'), tz: 'UTC' }).pass.should.be.false()
+    })
+
+    it('computes equinox/solstice instants to the minute (Meeus)', function () {
+        const seasonInstant = evaluator._internal.seasonInstant
+        // published instants (UTC) for 2026; allow a generous +/-15 min
+        const known = [
+            [seasonInstant(2026, 0), '2026-03-20T14:46:00Z'],
+            [seasonInstant(2026, 1), '2026-06-21T08:25:00Z'],
+            [seasonInstant(2026, 2), '2026-09-23T00:05:00Z'],
+            [seasonInstant(2026, 3), '2026-12-21T20:50:00Z']
+        ]
+        known.forEach(function (pair) {
+            Math.abs(pair[0] - Date.parse(pair[1])).should.be.below(15 * 60000, 'expected ' + pair[1] + ' got ' + new Date(pair[0]).toISOString())
+        })
+    })
+
+    it('20 May 2027 is a seasonal blue moon but not a monthly one', { timeout: 30000 }, function () {
+        // find the full-moon peak near the published date by hourly scan
+        let best = null
+        for (let ts = Date.parse('2027-05-18T00:00:00Z'); ts < Date.parse('2027-05-23T00:00:00Z'); ts += 3600000) {
+            const dist = Math.abs(SunCalc.getMoonIllumination(new Date(ts)).phase - 0.5)
+            if (!best || dist < best.dist) { best = { ts, dist } }
+        }
+        evalText('seasonal blue moon', { ts: best.ts, tz: 'UTC' }).pass.should.be.true()
+        evalText('blue moon', { ts: best.ts, tz: 'UTC' }).pass.should.be.false() // only one full moon in May 2027
+    })
+
+    it('ordinary full moons are not seasonal blue moons', { timeout: 30000 }, function () {
+        let best = null
+        for (let ts = Date.parse('2026-06-25T00:00:00Z'); ts < Date.parse('2026-07-05T00:00:00Z'); ts += 3600000) {
+            const dist = Math.abs(SunCalc.getMoonIllumination(new Date(ts)).phase - 0.5)
+            if (!best || dist < best.dist) { best = { ts, dist } }
+        }
+        evalText('seasonal blue moon', { ts: best.ts, tz: 'UTC' }).pass.should.be.false()
+    })
+})
+
 describe('filter-eval: combinators and reasons', function () {
     it('AND groups require all terms', function () {
         // 2026-06-21 is a Sunday; noon London is daylight

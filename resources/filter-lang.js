@@ -251,6 +251,8 @@
         { words: ['no', 'moon'], sym: { type: 'TERM', term: { kind: 'moonAltitude', op: 'below', degrees: 0 } } },
         { words: ['full', 'moon'], sym: { type: 'TERM', term: { kind: 'moonPhase', phase: 'full' } } },
         { words: ['moon', 'full'], sym: { type: 'TERM', term: { kind: 'moonPhase', phase: 'full' } } },
+        { words: ['blue', 'moon'], sym: { type: 'TERM', term: { kind: 'moonPhase', phase: 'blue' } } },
+        { words: ['seasonal', 'blue', 'moon'], sym: { type: 'TERM', term: { kind: 'moonPhase', phase: 'seasonalBlue' } } },
         { words: ['new', 'moon'], sym: { type: 'TERM', term: { kind: 'moonPhase', phase: 'new' } } },
         { words: ['first', 'quarter', 'moon'], sym: { type: 'TERM', term: { kind: 'moonPhase', phase: 'firstQuarter' } } },
         { words: ['last', 'quarter', 'moon'], sym: { type: 'TERM', term: { kind: 'moonPhase', phase: 'lastQuarter' } } },
@@ -1781,6 +1783,8 @@
             case 'moonPhase': {
                 const phases = {
                     full: 'full (within about a day)',
+                    blue: 'a blue moon (the second full moon of a calendar month)',
+                    seasonalBlue: 'a seasonal blue moon (the third full moon in an astronomical season of four)',
                     new: 'new (within about a day)',
                     firstQuarter: 'at first quarter (within about a day)',
                     lastQuarter: 'at last quarter (within about a day)',
