@@ -19,13 +19,22 @@ copies or substantial portions of the Software.
 (function ($) {
     'use strict'
 
-    // The condition parser is shared with the runtime (resources/filter-lang.js).
-    // $.getScript (not a script tag) so the request carries admin auth when
-    // adminAuth is enabled. Loaded once per editor session.
+    // Shared editor scripts are fetched with $.getScript (not a script tag) so
+    // the request carries admin auth when adminAuth is enabled. The published
+    // package ships only the minified builds; a dev checkout usually has only
+    // the source files - try .min.js first, fall back to the source.
+    function getSharedScript (basename) {
+        return $.getScript('resources/node-red-contrib-cron-plus/' + basename + '.min.js')
+            .catch(function () {
+                return $.getScript('resources/node-red-contrib-cron-plus/' + basename + '.js')
+            })
+    }
+
+    // The condition parser is shared with the runtime. Loaded once per editor session.
     let filterLangPromise = null
     function loadFilterLang () {
         if (!filterLangPromise) {
-            filterLangPromise = $.getScript('resources/node-red-contrib-cron-plus/filter-lang.js')
+            filterLangPromise = getSharedScript('filter-lang')
                 .then(function () { return window.cronplusFilterLang })
                 .catch(function (err) {
                     filterLangPromise = null // allow retry next time the dialog opens
@@ -258,7 +267,7 @@ copies or substantial portions of the Software.
         })
     }
 
-    // Map picker shared with the cronplus node (resources/location-picker.js)
+    // Map picker shared with the cronplus node (resources/location-picker[.min].js)
     let locationPickerPromise = null
     function showMap (srcInput) {
         if (window.cronplusLocationPicker) { // may already be loaded (cronplus.html loads it too)
@@ -266,7 +275,7 @@ copies or substantial portions of the Software.
             return
         }
         if (!locationPickerPromise) {
-            locationPickerPromise = $.getScript('resources/node-red-contrib-cron-plus/location-picker.js')
+            locationPickerPromise = getSharedScript('location-picker')
                 .catch(function (err) {
                     locationPickerPromise = null
                     console.error('cronplus-filter: failed to load location picker', err)

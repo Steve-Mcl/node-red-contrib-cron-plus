@@ -10,13 +10,16 @@
         "cronplus-filter.html",
         "icons/",
         "lib/",
-        "resources/",
+        "resources/filter-lang.min.js",
+        "resources/location-picker.min.js",
         "examples/"
     ],
     "scripts": {
         "test": "node --test test/test1_spec.js test/filter_lang_spec.js test/filter_eval_spec.js test/filter_node_spec.js",
         "lint": "eslint -c eslint.config.mjs",
         "lint:fix": "eslint -c eslint.config.mjs --fix",
+        "build": "terser resources/filter-lang.js -c -m -o resources/filter-lang.min.js && terser resources/location-picker.js -c -m -o resources/location-picker.min.js",
+        "prepack": "npm run build",
         "check-npm-versions": "node scripts/check-npm-versions.js"
     },
     "repository": {
@@ -84,7 +87,8 @@
         "node-red": "^4.1.13",
         "node-red-node-test-helper": "^0.3.6",
         "should": "^13.2.3",
-        "sinon": "^22.1.0"
+        "sinon": "^22.1.0",
+        "terser": "^5.51.2"
     },
     "maintainers": [
         {

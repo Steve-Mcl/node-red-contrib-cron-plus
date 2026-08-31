@@ -7,7 +7,14 @@
 module.exports = function (RED) {
     'use strict'
     const coordParser = require('coord-parser')
-    const filterLang = require('./resources/filter-lang.js')
+    // the published package ships only the minified parser build; a source
+    // checkout (dev) has the readable file and must prefer it (never stale)
+    let filterLang
+    try {
+        filterLang = require('./resources/filter-lang.js')
+    } catch (_e) {
+        filterLang = require('./resources/filter-lang.min.js')
+    }
     const filterEval = require('./lib/filter-eval.js')
 
     function evaluateNodeProperty (value, type, node, msg) {

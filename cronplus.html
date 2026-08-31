@@ -351,9 +351,10 @@ copies or substantial portions of the Software.
     if (RED._cron_plus_debug) console.debug('Initializing cron-plus')
     const cronTooltipClass = 'cron-plus-expression-tip form-tips ui-corner-all ui-widget-shadow'
 
-    // The map picker lives in resources/location-picker.js (shared with the cronplus-filter
-    // node) and is fetched on first use. $.getScript is used (not a script tag) so the
-    // request carries admin auth when adminAuth is enabled.
+    // The map picker lives in resources/location-picker[.min].js (shared with the
+    // cronplus-filter node) and is fetched on first use. $.getScript is used (not a
+    // script tag) so the request carries admin auth when adminAuth is enabled. The
+    // published package ships only the minified build; dev checkouts have the source.
     let locationPickerPromise = null
     function showMap (srcInput) {
         if (window.cronplusLocationPicker) { // may already be loaded (cronplus-filter.html loads it too)
@@ -361,7 +362,10 @@ copies or substantial portions of the Software.
             return
         }
         if (!locationPickerPromise) {
-            locationPickerPromise = $.getScript('resources/node-red-contrib-cron-plus/location-picker.js')
+            locationPickerPromise = $.getScript('resources/node-red-contrib-cron-plus/location-picker.min.js')
+                .catch(function () {
+                    return $.getScript('resources/node-red-contrib-cron-plus/location-picker.js')
+                })
                 .catch(function (err) {
                     locationPickerPromise = null // allow retry on next click
                     console.error('cron-plus: failed to load location picker', err)
