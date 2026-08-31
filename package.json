@@ -6,11 +6,15 @@
     "files": [
         "cronplus.js",
         "cronplus.html",
+        "cronplus-filter.js",
+        "cronplus-filter.html",
+        "icons/",
         "lib/",
+        "resources/",
         "examples/"
     ],
     "scripts": {
-        "test": "node --test test/test1_spec.js",
+        "test": "node --test test/test1_spec.js test/filter_lang_spec.js test/filter_eval_spec.js test/filter_node_spec.js",
         "lint": "eslint -c eslint.config.mjs",
         "lint:fix": "eslint -c eslint.config.mjs --fix",
         "check-npm-versions": "node scripts/check-npm-versions.js"
@@ -37,12 +41,20 @@
         "suntime",
         "sun time",
         "sunrise",
-        "sunset"
+        "sunset",
+        "lunar",
+        "lunar event",
+        "lunar events",
+        "moontime",
+        "moon time",
+        "moonrise",
+        "moonset"
     ],
     "node-red": {
-        "version": ">=1.0.0",
+        "version": ">=1.3.0",
         "nodes": {
-            "cronplus": "cronplus.js"
+            "cronplus": "cronplus.js",
+            "cronplus-filter": "cronplus-filter.js"
         }
     },
     "engines": {
