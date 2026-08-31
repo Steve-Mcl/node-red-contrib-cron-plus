@@ -91,7 +91,7 @@ The **Cron Filter** node (`cronplus-filter`) receives any message and routes it 
 
 Type the condition in plain English; a live "understanding" line below the field shows exactly how it was interpreted (or suggests examples when it wasn't), and a "details & upcoming matches" popout breaks the condition down (days/dates/months/years/times per alternative) and previews the next periods when messages would be allowed. Parsing is pure logic - no AI involved. Examples:
 
-* `on saturday only`, `weekdays`, `mon-wed`, `not on tuesday`, `on the sabbath`
+* `on saturday only`, `weekdays`, `mon-wed`, `not on tuesday`
 * `first monday of the month`, `3rd tuesday of the month`, `last friday of the month`, `last day of the month`, `last day of the week` (weeks start Monday; the understanding line shows which day it resolved to)
 * `in december`, `june to august`, `on the 1st of the month`, `christmas day`
 * `january 2027`, `2027 to 2029`, `first monday of the year`, `2nd tuesday of 2028`, `first monday of january`

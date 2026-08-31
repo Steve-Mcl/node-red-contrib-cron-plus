@@ -47,7 +47,8 @@
         fri: 5,
         saturday: 6,
         sat: 6,
-        sabbath: 6 // from Shabbat (documented in the node help; Sunday-sabbath users type "sunday")
+        sabbath: 6 // from Shabbat. Deliberately undocumented (the term is fluid across
+        // traditions); anyone typing it sees the Saturday reading in the understanding line
     }
 
     const DAY_SETS = {
