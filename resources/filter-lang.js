@@ -717,7 +717,7 @@
             case 'NUM': {
                 // "3rd tuesday of the month" - an ordinal number acts like an ordinal word
                 if (sym.ordinal && Number.isInteger(sym.value) && sym.value >= 1 && sym.value <= 53 &&
-                    peek(state, 1) && ['DAY', 'DAY_GENERIC', 'MONTH_GENERIC', 'WEEK_GENERIC'].indexOf(peek(state, 1).type) >= 0) {
+                    peek(state, 1) && ['DAY', 'DAY_GENERIC', 'MONTH_GENERIC', 'WEEK_GENERIC', 'ORD'].indexOf(peek(state, 1).type) >= 0) {
                     state.symbols[state.pos] = { type: 'ORD', nth: sym.value, raw: sym.raw }
                     return parseOrdinal(state)
                 }
@@ -955,8 +955,16 @@
     // "last day of the month", "first/last day of the week", "first of the month",
     // "first monday of the year", "2nd tuesday of 2028", "first monday of january"
     function parseOrdinal (state) {
-        const ord = peek(state)
+        let ord = peek(state)
         state.pos++
+        // "2nd last X" / "second last X": a numeric ordinal followed by 'last'
+        // counts from the end (fromEnd 1 = last, 2 = second last, ...)
+        let fromEnd = ord.nth === 'last' ? 1 : 0
+        if (Number.isInteger(ord.nth) && peek(state) && peek(state).type === 'ORD' && peek(state).nth === 'last') {
+            fromEnd = ord.nth
+            ord = { nth: 'last', raw: ord.raw + ' last' }
+            state.pos++
+        }
         let next = peek(state)
         // ORD month of (the year | 2027): "last month of the year" -> December,
         // "last month of 2027" -> December 2027
@@ -975,7 +983,8 @@
             }
             let month = null
             if (ord.nth === 'last') {
-                month = 12
+                month = 12 - (fromEnd - 1) // "2nd last month of the year" = November
+                if (month < 1) { month = null }
             } else if (Number.isInteger(ord.nth) && ord.nth >= 1 && ord.nth <= 12) {
                 month = ord.nth
             }
@@ -1027,6 +1036,7 @@
                 state.unmatched.push(ord.raw + ' week')
                 return null
             }
+            if (ord.nth === 'last' && fromEnd > 1) { term.fromEnd = fromEnd }
             return term
         }
         // ORD DAY [of] [the month|the year|january|2028] -> nth weekday of a scope
@@ -1037,6 +1047,7 @@
             }
             state.pos++
             const term = { kind: 'nthWeekday', nth: ord.nth, day: next.day, source: ord.raw + ' ' + next.raw }
+            if (ord.nth === 'last' && fromEnd > 1) { term.fromEnd = fromEnd } // "2nd last friday"
             if (peek(state) && peek(state).type === 'OF') { state.pos++ }
             const scope = peek(state)
             if (scope && scope.type === 'MONTH_GENERIC') {
@@ -1082,7 +1093,9 @@
         if (scope && scope.type === 'MONTH_GENERIC') {
             state.pos++
             if (ord.nth === 'last') {
-                return { kind: 'dayOfMonth', days: [], last: true, source: ord.raw + ' day of the month' }
+                const term = { kind: 'dayOfMonth', days: [], last: true, source: ord.raw + ' day of the month' }
+                if (fromEnd > 1) { term.lastOffset = fromEnd - 1 } // "2nd last day of the month"
+                return term
             }
             return { kind: 'dayOfMonth', days: [ord.nth], source: ord.raw + ' day of the month' }
         }
@@ -1096,6 +1109,7 @@
             }
             if (ord.nth === 'last') {
                 term.last = true
+                if (fromEnd > 1) { term.lastOffset = fromEnd - 1 }
             } else if (Number.isInteger(ord.nth) && ord.nth >= 1 && ord.nth <= 31) {
                 term.days = [ord.nth]
             } else {
@@ -1107,7 +1121,9 @@
         if (scope && scope.type === 'YEAR_GENERIC') {
             state.pos++
             if (ord.nth === 'last') {
-                return { kind: 'namedDate', month: 12, day: 31, name: 'last day of the year', source: ord.raw + ' day of the year' }
+                const term = { kind: 'namedDate', month: 12, day: 31, name: 'last day of the year', source: ord.raw + ' day of the year' }
+                if (fromEnd > 1) { term.offsetDays = -(fromEnd - 1) } // "2nd last day of the year" = 30 Dec
+                return term
             }
             if (ord.nth === 1) {
                 return { kind: 'namedDate', month: 1, day: 1, name: 'first day of the year', source: ord.raw + ' day of the year' }
@@ -1207,26 +1223,78 @@
         state.pos += 3
         const anchor = peek(state)
         const quantityRaw = (num.synth ? '' : num.raw + ' ') + unit.raw
-        // date anchor: N days/weeks/months before|after a named date (whole units only)
-        if (anchor && anchor.type === 'TERM' && anchor.term.kind === 'namedDate' &&
-            Number.isInteger(num.value) &&
-            (unit.unit === 'day' || unit.unit === 'week' || unit.unit === 'month')) {
-            state.pos++
-            const term = clone(anchor.term)
-            const sign = dir === 'before' ? -1 : 1
-            if (unit.unit === 'month') {
-                term.offsetMonths = (term.offsetMonths || 0) + (sign * num.value)
-            } else {
-                term.offsetDays = (term.offsetDays || 0) + (sign * num.value * unit.factor)
-            }
-            term.source = quantityRaw + ' ' + dir + ' ' + anchor.raw
-            return term
-        }
+        const sign = dir === 'before' ? -1 : 1
+        const minuteUnit = unit.unit === 'minute' || unit.unit === 'hour'
+        const dateUnit = unit.unit === 'day' || unit.unit === 'week' || unit.unit === 'month'
         // solar anchor: N minutes/hours before|after a solar event
         const ev = eventFromSym(anchor)
-        if (ev && (unit.unit === 'minute' || unit.unit === 'hour')) {
+        if (ev && minuteUnit) {
             state.pos++
             return { kind: 'solarEvent', event: ev, op: dir, offsetMin: num.value * unit.factor, source: quantityRaw + ' ' + dir + ' ' + anchor.raw }
+        }
+        // clock anchor: "2 hours before noon" = before 10:00
+        if (minuteUnit && anchor && (anchor.type === 'TIME' || anchor.type === 'TIMEWORD')) {
+            state.pos++
+            const bound = anchor.minutes + (sign * Math.round(num.value * unit.factor))
+            const source = quantityRaw + ' ' + dir + ' ' + anchor.raw
+            if (dir === 'before') {
+                return { kind: 'timeRange', style: 'before', startMin: 0, endMin: bound <= 0 ? 1440 + bound : bound, source }
+            }
+            return { kind: 'timeRange', style: 'after', startMin: bound % 1440, endMin: 1440, source }
+        }
+        // date-ish anchors are full sub-conditions: "2 days before the last day of
+        // the month", "day after blue moon", "2 days before friday", "before xmas"
+        if (dateUnit && Number.isInteger(num.value)) {
+            const savedPos = state.pos
+            const anchorTerm = parseCondition(state)
+            const offsetDays = num.value * unit.factor
+            const source = quantityRaw + ' ' + dir + ' ' + (anchorTerm ? anchorTerm.source : '')
+            if (anchorTerm && anchorTerm.kind === 'namedDate' && unit.unit === 'month') {
+                anchorTerm.offsetMonths = (anchorTerm.offsetMonths || 0) + (sign * num.value)
+                anchorTerm.source = source
+                return anchorTerm
+            }
+            if (anchorTerm && unit.unit !== 'month') {
+                if (anchorTerm.kind === 'namedDate') {
+                    anchorTerm.offsetDays = (anchorTerm.offsetDays || 0) + (sign * offsetDays)
+                    anchorTerm.source = source
+                    return anchorTerm
+                }
+                if (anchorTerm.kind === 'moonPhase') { // "day before blue moon"
+                    anchorTerm.offsetDays = (anchorTerm.offsetDays || 0) + (sign * offsetDays)
+                    anchorTerm.source = source
+                    return anchorTerm
+                }
+                if (anchorTerm.kind === 'day' && !anchorTerm.weekOrdinal && anchorTerm.days.length === 1) {
+                    // "2 days before friday" = Wednesday
+                    const day = ((anchorTerm.days[0] + (sign * offsetDays)) % 7 + 7) % 7
+                    return { kind: 'day', days: [day], source }
+                }
+                if (anchorTerm.kind === 'dayOfMonth' && anchorTerm.last) {
+                    if (dir === 'before') { // "2 days before the last day of the month"
+                        anchorTerm.lastOffset = (anchorTerm.lastOffset || 0) + offsetDays
+                        anchorTerm.source = source
+                        return anchorTerm
+                    }
+                    // "N days after the last day of the month" = the Nth of the NEXT month
+                    const term = { kind: 'dayOfMonth', days: [offsetDays - (anchorTerm.lastOffset || 0)], source }
+                    if (anchorTerm.month) {
+                        term.month = (anchorTerm.month % 12) + 1
+                        if (anchorTerm.year) { term.year = anchorTerm.month === 12 ? anchorTerm.year + 1 : anchorTerm.year }
+                    }
+                    if (term.days[0] >= 1 && term.days[0] <= 28) { return term }
+                }
+                if (anchorTerm.kind === 'dayOfMonth' && !anchorTerm.last && anchorTerm.days.length === 1) {
+                    // "2 days before the 15th of the month" = the 13th
+                    const day = anchorTerm.days[0] + (sign * offsetDays)
+                    if (day >= 1 && day <= 31) {
+                        anchorTerm.days = [day]
+                        anchorTerm.source = source
+                        return anchorTerm
+                    }
+                }
+            }
+            state.pos = savedPos // anchor was not date-ish - give the symbols back
         }
         // no usable anchor ("day before noon"): ignore the quantity and parse the
         // plain before/after so the rest of the meaning survives
@@ -1614,7 +1682,7 @@
                     // spell the convention out - "last day of the week" is ambiguous
                     // between conventions, so show which day it resolved to
                     const nthText = term.weekOrdinal === 'last' ? 'last' : ORDINAL_WORDS[term.weekOrdinal]
-                    text = 'day is ' + DAY_NAMES[term.days[0]] + ' (the ' + nthText + ' day of the week, weeks starting Monday)'
+                    text = 'day is ' + DAY_NAMES[term.days[0]] + ' (the ' + nthText + ' day of the week; ISO 8601 weeks start on Monday)'
                 } else if (term.setName === 'weekend') {
                     text = 'day is a weekend'
                 } else if (term.setName === 'weekday') {
@@ -1631,7 +1699,9 @@
                 break
             }
             case 'nthWeekday': {
-                const nthText = term.nth === 'last' ? 'last' : ORDINAL_WORDS[term.nth]
+                const nthText = term.nth === 'last'
+                    ? (term.fromEnd > 1 ? ordinalNumber(term.fromEnd) + ' last' : 'last')
+                    : ORDINAL_WORDS[term.nth]
                 let scopeText = 'the month'
                 if (term.month) {
                     scopeText = MONTH_NAMES[term.month] + (term.year ? ' ' + term.year : '')
@@ -1669,7 +1739,8 @@
             case 'dayOfMonth': {
                 const scopeText = term.month ? MONTH_NAMES[term.month] + (term.year ? ' ' + term.year : '') : 'the month'
                 if (term.last) {
-                    text = 'day is the last day of ' + scopeText
+                    const fromEndText = term.lastOffset ? ordinalNumber(term.lastOffset + 1) + ' last' : 'last'
+                    text = 'day is the ' + fromEndText + ' day of ' + scopeText
                 } else if (term.month) {
                     text = 'date is ' + listJoin(term.days.map(String), 'or') + ' ' + scopeText
                 } else {
@@ -1678,7 +1749,9 @@
                 break
             }
             case 'ordinalWeek': {
-                const nthText = term.nth === 'last' ? 'last' : (ORDINAL_WORDS[term.nth] || ordinalNumber(term.nth))
+                const nthText = term.nth === 'last'
+                    ? (term.fromEnd > 1 ? ordinalNumber(term.fromEnd) + ' last' : 'last')
+                    : (ORDINAL_WORDS[term.nth] || ordinalNumber(term.nth))
                 let scopeText = 'the month'
                 if (term.month) {
                     scopeText = MONTH_NAMES[term.month] + (term.year ? ' ' + term.year : '')
@@ -1799,6 +1872,22 @@
                 }
                 break
             case 'moonPhase': {
+                if (term.offsetDays) { // "day before blue moon", "2 days after a full moon"
+                    const nouns = {
+                        full: 'a full moon',
+                        blue: 'a blue moon (the second full moon of a calendar month)',
+                        seasonalBlue: 'a seasonal blue moon',
+                        new: 'a new moon',
+                        firstQuarter: 'a first-quarter moon',
+                        lastQuarter: 'a last-quarter moon',
+                        waxing: 'a waxing moon',
+                        waning: 'a waning moon'
+                    }
+                    const magnitude = Math.abs(term.offsetDays)
+                    text = 'it is ' + (magnitude === 1 ? 'the day' : magnitude + ' days') + ' ' +
+                        (term.offsetDays > 0 ? 'after' : 'before') + ' ' + (nouns[term.phase] || term.phase)
+                    break
+                }
                 const phases = {
                     full: 'full (within about a day)',
                     blue: 'a blue moon (the second full moon of a calendar month)',

@@ -342,6 +342,29 @@ describe('filter-eval: years', function () {
         evalText('last week of 2027', { ts: Date.parse('2026-12-28T12:00:00Z'), tz }).pass.should.be.false() // wrong year
     })
 
+    it('2nd-last and before/after-the-last day arithmetic (June 2026 has 30 days)', function () {
+        evalText('2nd last day of month', { ts: Date.parse('2026-06-29T12:00:00Z'), tz }).pass.should.be.true()
+        evalText('2nd last day of month', { ts: Date.parse('2026-06-30T12:00:00Z'), tz }).pass.should.be.false()
+        evalText('2 days before the last day of month', { ts: Date.parse('2026-06-28T12:00:00Z'), tz }).pass.should.be.true()
+        evalText('day after the last day of month', { ts: Date.parse('2026-07-01T12:00:00Z'), tz }).pass.should.be.true()
+        evalText('day after the last day of month', { ts: Date.parse('2026-06-30T12:00:00Z'), tz }).pass.should.be.false()
+        // 2nd last Friday of June 2026 (Fridays: 5, 12, 19, 26) is the 19th
+        evalText('2nd last friday of the month', { ts: Date.parse('2026-06-19T12:00:00Z'), tz }).pass.should.be.true()
+        evalText('2nd last friday of the month', { ts: Date.parse('2026-06-26T12:00:00Z'), tz }).pass.should.be.false()
+    })
+
+    it('day before/after a moon phase shifts the evaluation day', { timeout: 20000 }, function () {
+        // full moon near 29 Jun 2026: find the peak, then test the neighbouring days
+        let best = null
+        for (let ts = Date.parse('2026-06-25T00:00:00Z'); ts < Date.parse('2026-07-05T00:00:00Z'); ts += 3600000) {
+            const dist = Math.abs(SunCalc.getMoonIllumination(new Date(ts)).phase - 0.5)
+            if (!best || dist < best.dist) { best = { ts, dist } }
+        }
+        evalText('day after full moon', { ts: best.ts + (24 * 3600000), tz }).pass.should.be.true()
+        evalText('day after full moon', { ts: best.ts - (24 * 3600000), tz }).pass.should.be.false()
+        evalText('day before full moon', { ts: best.ts - (24 * 3600000), tz }).pass.should.be.true()
+    })
+
     it('last month of 2027', function () {
         evalText('last month of 2027', { ts: Date.parse('2027-12-15T12:00:00Z'), tz }).pass.should.be.true()
         evalText('last month of 2027', { ts: Date.parse('2027-11-15T12:00:00Z'), tz }).pass.should.be.false()

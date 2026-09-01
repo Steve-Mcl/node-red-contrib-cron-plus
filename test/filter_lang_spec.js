@@ -865,11 +865,33 @@ describe('filter-lang parse: ordinal days (nth weekday, day of week/month)', fun
         const term = onlyTerm('last day of the week')
         term.kind.should.equal('day')
         term.days.should.eql([0])
-        lang.parse('last day of the week').description.should.match(/Sunday.*last day of the week.*starting Monday/)
+        lang.parse('last day of the week').description.should.match(/Sunday.*last day of the week.*ISO 8601 weeks start on Monday/)
     })
 
     it('parses "first day of the week" as Monday', function () {
         onlyTerm('first day of the week').days.should.eql([1])
+    })
+
+    it('counts from the end: "2nd last day of month" (regression: parsed as day-2 AND last-day)', function () {
+        const term = onlyTerm('2nd last day of month')
+        term.should.have.properties({ kind: 'dayOfMonth', last: true, lastOffset: 1 })
+        lang.parse('2nd last day of month').description.should.equal('day is the 2nd last day of the month')
+        onlyTerm('second last day of the month').lastOffset.should.equal(1)
+        onlyTerm('2nd last friday of the month').should.have.properties({ kind: 'nthWeekday', nth: 'last', fromEnd: 2 })
+        onlyTerm('2nd last month of the year').months.should.eql([11])
+    })
+
+    it('offsets anchor on date-like sub-conditions, not just named dates', function () {
+        onlyTerm('day before the last day of month').should.have.properties({ kind: 'dayOfMonth', last: true, lastOffset: 1 })
+        onlyTerm('2 days before the last day of month').lastOffset.should.equal(2)
+        onlyTerm('day after the last day of month').days.should.eql([1]) // 1st of the next month
+        onlyTerm('2 days after the last day of month').days.should.eql([2])
+        onlyTerm('2 days after last day of january').should.have.properties({ kind: 'dayOfMonth', month: 2 })
+        onlyTerm('day before blue moon').should.have.properties({ kind: 'moonPhase', phase: 'blue', offsetDays: -1 })
+        onlyTerm('2 days after full moon').offsetDays.should.equal(2)
+        onlyTerm('2 days before friday').days.should.eql([3]) // Wednesday
+        onlyTerm('2 hours before noon').should.have.properties({ kind: 'timeRange', style: 'before', endMin: 600 })
+        onlyTerm('2 days before the 15th of the month').days.should.eql([13])
     })
 
     it('does not set-union flagged terms with plain day terms', function () {
