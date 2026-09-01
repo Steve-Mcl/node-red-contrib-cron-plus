@@ -775,12 +775,21 @@
                 return parseBeforeAfter(state)
             case 'WITHIN':
                 return parseWithin(state)
-            case 'TIME': { // bare time = that exact minute
-                state.pos++
-                return { kind: 'timeRange', style: 'at', startMin: sym.minutes, endMin: sym.minutes, source: sym.raw }
-            }
+            case 'TIME':
             case 'TIMEWORD': {
                 state.pos++
+                // "10pm to 6am" / "9am - 5pm" / "noon to 3pm": a bare time followed
+                // by a range word is a range (no "between" needed)
+                const joiner = peek(state)
+                if (joiner && (joiner.type === 'TO' || joiner.type === 'DASH')) {
+                    const endSym = peek(state, 1)
+                    const endMin = clockMinutesFromSym(endSym)
+                    if (endMin !== null) {
+                        state.pos += 2
+                        return { kind: 'timeRange', style: 'between', startMin: sym.minutes, endMin, source: sym.raw + ' to ' + endSym.raw }
+                    }
+                }
+                // otherwise = that exact minute
                 return { kind: 'timeRange', style: 'at', startMin: sym.minutes, endMin: sym.minutes, source: sym.raw }
             }
             case 'MOON_WORD':
@@ -1224,6 +1233,15 @@
         state.unmatched.push(quantityRaw)
         state.pos = opIdx
         return parseBeforeAfter(state)
+    }
+
+    // minutes-of-day from a time-ish symbol: a TIME/TIMEWORD, or a bare hour
+    // number ("9am to 17" - matches what parseBetween accepts). Null otherwise.
+    function clockMinutesFromSym (sym) {
+        if (!sym) { return null }
+        if (sym.type === 'TIME' || sym.type === 'TIMEWORD') { return sym.minutes }
+        if (sym.type === 'NUM' && !sym.ordinal && Number.isInteger(sym.value) && sym.value <= 23) { return sym.value * 60 }
+        return null
     }
 
     // consume an hour anchor after a minute-of-hour phrase ("quarter past FIVE",

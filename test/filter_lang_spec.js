@@ -198,6 +198,17 @@ describe('filter-lang parse: time ranges', function () {
         onlyTerm('at 12am').startMin.should.equal(0)
         onlyTerm('at 12pm').startMin.should.equal(720)
     })
+
+    it('bare "TIME to TIME" is a range (regression: "10pm to 6am" parsed as at-22:00 AND before-06:00)', function () {
+        const term = onlyTerm('10pm to 6am')
+        term.should.have.properties({ kind: 'timeRange', style: 'between', startMin: 1320, endMin: 360 })
+        lang.parse('10pm to 6am').unmatched.should.have.length(0)
+        onlyTerm('9am to 5pm').should.have.properties({ startMin: 540, endMin: 1020 })
+        onlyTerm('9am - 5pm').should.have.properties({ startMin: 540, endMin: 1020 })
+        onlyTerm('noon to 3pm').should.have.properties({ startMin: 720, endMin: 900 })
+        onlyTerm('9am to 17').should.have.properties({ startMin: 540, endMin: 1020 })
+        onlyTerm('at 10pm').style.should.equal('at') // bare time without a range word unchanged
+    })
 })
 
 describe('filter-lang parse: solar', function () {
