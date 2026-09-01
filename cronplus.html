@@ -1858,10 +1858,13 @@ copies or substantial portions of the Software.
                     const isAngleMode = scheduleTypeField.val() === 'solar' && solarEventsField.typedInput('type') === 'selected' &&
                         (events.includes(CUSTOM_ANGLE_RISE_SENTINEL) || events.includes(CUSTOM_ANGLE_SET_SENTINEL))
                     if (isAngleMode) {
-                        offsetField.attr({ min: -90, max: 90, placeholder: 'custom angle °' })
+                        // 'any' permits fractional degrees (e.g. 1.5) - without it the browser's
+                        // native number-input validation defaults to step=1 and flags any decimal
+                        // value as invalid (red outline), even though the field itself accepts it
+                        offsetField.attr({ min: -90, max: 90, step: 'any', placeholder: 'custom angle °' })
                         offsetField.prop('title', "Custom angle in degrees, above (+) or below (-) the horizon - used by the 'custom angle (rising)'/'custom angle (setting)' checkboxes above")
                     } else {
-                        offsetField.attr({ min: -1439, max: 1439, placeholder: 'offset' })
+                        offsetField.attr({ min: -1439, max: 1439, step: 1, placeholder: 'offset' })
                         offsetField.prop('title', 'Minutes Offset +/- 1439')
                     }
                 }
