@@ -292,6 +292,19 @@ function validateOpt (opt, permitDefaults = true) {
 }
 
 /**
+ * Human-friendly label for a "next event" identifier, for user-facing text only (node status,
+ * the dynamic-schedules viewer, tooltips, "pretty" descriptions). Named presets (solar or lunar)
+ * and non-solar events are returned unchanged; custom solar-angle tokens are expanded to a
+ * readable phrase. Callers that need the exact machine identifier (e.g. msg.cronplus.status.solarEvent,
+ * or the `nextEvent` field itself) should keep using the raw value - this helper is for display text only.
+ * @param {string} eventId the raw event identifier, e.g. "sunrise" or "angle:-4:rise"
+ * @returns {string}
+ */
+function getEventDisplayLabel (eventId) {
+    return isCustomSolarAngleEvent(eventId) ? describeCustomSolarAngleEvent(eventId) : eventId
+}
+
+/**
  * Tests if a string or array of date like items are a date or date sequence
  * @param {String|Array} data An array of date like entries or a CSV string of dates
  */
@@ -441,7 +454,7 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
         if (task && task._sequence && count) {
             result.nextDate = dsFutureDates[0]
             const ms = result.nextDate.valueOf() - now.valueOf()
-            result.prettyNext = (result.nextEvent ? result.nextEvent + ' ' : '') + `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
+            result.prettyNext = (result.nextEvent ? getEventDisplayLabel(result.nextEvent) + ' ' : '') + `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
             if (expressionType === 'solar') {
                 if (solarType === 'all') {
                     result.description = 'All Solar Events'
@@ -2246,7 +2259,7 @@ module.exports = function (RED) {
                 const indicator = node.nextIndicator || 'dot'
                 if (node.nextDate) {
                     const d = formatShortDateTimeWithTZ(node.nextDate, node.timeZone) || 'Never'
-                    node.status({ fill: 'blue', shape: indicator, text: (node.nextEvent || 'Next') + ': ' + d })
+                    node.status({ fill: 'blue', shape: indicator, text: (node.nextEvent ? getEventDisplayLabel(node.nextEvent) : 'Next') + ': ' + d })
                 } else if (node.tasks && node.tasks.length) {
                     node.status({ fill: 'grey', shape: indicator, text: 'All stopped' })
                 } else {
@@ -2471,7 +2484,7 @@ module.exports = function (RED) {
                         // next: next,
                         next: h.nextEventTimeOffset,
                         // nextEventDesc: nextEventDesc,
-                        nextEventDesc: h.nextEvent,
+                        nextEventDesc: h.nextEvent ? getEventDisplayLabel(h.nextEvent) : h.nextEvent,
                         // prettyNext: prettyNext,
                         prettyNext: h.prettyNext,
                         // nextDates: nextDates

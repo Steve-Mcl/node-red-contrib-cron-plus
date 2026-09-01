@@ -164,6 +164,84 @@ describe('cron-plus Node', function () {
         })
     })
 
+    describe('custom solar angle events - dynamic schedule persistence shape', function () {
+        // NOTE: this repo's test harness intentionally forces FSAvailable/contextAvailable to
+        // false under `testMode` (see cronplus.js) so tests never touch real files or context
+        // stores - genuine disk/context round-tripping therefore cannot be unit-tested here.
+        // What *is* tested: the exact JSON shape serialise()/exportTask() produce for a
+        // custom-angle dynamic schedule round-trips through JSON.stringify/JSON.parse losslessly,
+        // and that shape is accepted by validateOpt()/createTask() unchanged - which is the same
+        // code path deserialise() uses on restart, so if this passes, restore is a JSON.parse away
+        // from working. (Confirmed manually end-to-end with real file persistence too - see PR notes.)
+        it('produces a JSON-safe, round-trippable shape for a custom-angle dynamic schedule, and that shape is re-creatable', async function () {
+            const nodeId = 'shapeAngle1'
+            const flow = [
+                { id: 'helperCmd', type: 'helper' },
+                {
+                    id: nodeId,
+                    type: 'cronplus',
+                    name: 'shape-angle-test',
+                    outputField: 'payload',
+                    timeZone: '',
+                    persistDynamic: false,
+                    commandResponseMsgOutput: 'output1',
+                    outputs: 1,
+                    options: [],
+                    wires: [['helperCmd']]
+                }
+            ]
+            await helper.load(cronplusNode, flow)
+            const node = helper.getNode(nodeId)
+            const helperCmd = helper.getNode('helperCmd')
+
+            node.receive({
+                payload: {
+                    command: 'add',
+                    name: 'dynAngle1',
+                    topic: 'dynAngle1',
+                    expressionType: 'solar',
+                    location: '54.9992500,-1.4170300',
+                    solarType: 'selected',
+                    solarEvents: 'angle:-4:rise',
+                    offset: 0,
+                    payloadType: 'default'
+                }
+            })
+            await sleep(50)
+
+            const listPromise = new Promise(resolve => helperCmd.once('input', resolve))
+            node.receive({ payload: { command: 'list', name: 'dynAngle1' } })
+            const listResult = await listPromise
+            const exportedConfig = listResult.payload.result.config
+
+            // this is exactly the shape serialise() would write to disk/context for this schedule
+            exportedConfig.should.have.property('expressionType', 'solar')
+            exportedConfig.should.have.property('solarType', 'selected')
+            exportedConfig.should.have.property('solarEvents', 'angle:-4:rise')
+
+            // the human-facing description must be the friendly label, not the raw token -
+            // this is what the dynamic-schedules viewer and node status text render
+            listResult.payload.result.status.should.have.property('nextDescription').which.is.a.String()
+            listResult.payload.result.status.nextDescription.should.match(/below the horizon/)
+            listResult.payload.result.status.nextDescription.should.not.match(/angle:-4:rise/)
+
+            // simulate what deserialise() does: JSON round-trip the exported config, then feed
+            // it back in as a fresh 'add' (same code path createTask()/validateOpt() take on
+            // restart) - if this is accepted and produces the same schedule, restore will work
+            const roundTripped = JSON.parse(JSON.stringify(exportedConfig))
+            node.receive({ payload: { command: 'remove', name: 'dynAngle1' } })
+            await sleep(50)
+            node.receive({ payload: { command: 'add', ...roundTripped } })
+            await sleep(50)
+
+            const listPromise2 = new Promise(resolve => helperCmd.once('input', resolve))
+            node.receive({ payload: { command: 'list', name: 'dynAngle1' } })
+            const listResult2 = await listPromise2
+            listResult2.payload.result.config.should.have.property('solarEvents', 'angle:-4:rise')
+            listResult2.payload.result.status.nextDescription.should.match(/below the horizon/)
+        })
+    })
+
     describe('DST transition handling (Debian cron rules)', function () {
         // Jobs whose minute or hour field starts with `*` ("wildcard jobs") keep
         // their real-time interval across a DST change, so they also run during
