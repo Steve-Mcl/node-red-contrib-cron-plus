@@ -801,6 +801,47 @@ describe('filter-lang parse: failures and partial matches', function () {
     })
 })
 
+describe('filter-lang failure suggestions', function () {
+    it('every suggestion-corpus example parses cleanly (they are shown to users as known-good)', function () {
+        lang._internal.SUGGESTION_EXAMPLES.forEach(function (example) {
+            const r = lang.parse(example)
+            r.ok.should.be.true('corpus example does not parse: "' + example + '" - ' + r.suggestion)
+            r.unmatched.should.have.length(0, 'corpus example has ignored words: "' + example + '"')
+        })
+    })
+
+    it('offers near matches for partially-recognised input ("last days")', function () {
+        const r = lang.parse('last days')
+        r.ok.should.be.false()
+        r.suggestions.length.should.be.above(0)
+        r.suggestions.some(function (s) { return /last day/.test(s) }).should.be.true()
+        r.suggestion.should.match(/Did you mean/)
+    })
+
+    it('offers topic matches ("moon" input suggests moon examples)', function () {
+        const suggestions = lang._internal.suggestExamples('moon glow shine')
+        suggestions.length.should.be.above(0)
+        suggestions.every(function (s) { return /moon/.test(s) }).should.be.true()
+    })
+
+    it('falls back to the generic hint for total gibberish', function () {
+        const r = lang.parse('xyzzy blorp')
+        r.suggestions.should.have.length(0)
+        r.suggestion.should.match(/Try phrases like/)
+    })
+
+    it('successful parses carry an empty suggestions array', function () {
+        lang.parse('on saturdays').suggestions.should.have.length(0)
+    })
+
+    it('typo-corrects words whose correct form ends in s (regression: "cristmas")', function () {
+        const r = lang.parse('cristmas')
+        r.ok.should.be.true()
+        r.ast.groups[0].terms[0].should.have.properties({ kind: 'namedDate', month: 12, day: 25 })
+        r.warnings[0].should.match(/assumed 'christmas'/)
+    })
+})
+
 describe('filter-lang requiresLocation', function () {
     it('is false for pure calendar/time conditions', function () {
         lang.requiresLocation(lang.parse('weekdays between 9am and 5pm').ast).should.be.false()

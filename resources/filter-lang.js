@@ -497,7 +497,9 @@
             // multi-word phrase (e.g. 'first' from "first quarter moon") fuzzy-matches
             // itself yet still resolves to nothing, so an identity "correction" - or a
             // second correction of the same token - must fall through to unmatched.
-            const fixed = tok.fuzzed ? null : fuzzyLookup(stripPlural(tok.word))
+            // try the raw word first: stripping a plural 's' from a word whose
+            // correct form ends in s ("cristmas") pushes it out of fuzzy range
+            const fixed = tok.fuzzed ? null : (fuzzyLookup(tok.word) || fuzzyLookup(stripPlural(tok.word)))
             if (fixed && fixed !== tok.word && fixed !== stripPlural(tok.word)) {
                 warnings.push('assumed \'' + fixed + '\' for \'' + tok.word + '\'')
                 tokens[i] = { type: 'word', word: fixed, raw: tok.raw, fuzzed: true }
@@ -2103,6 +2105,90 @@
     }
 
     // ------------------------------------------------------------------
+    // Failure suggestions: when input is not understood, offer the nearest
+    // known-good examples instead of a generic hint. Every entry MUST parse
+    // cleanly - a test sweeps the corpus to keep that true.
+    // ------------------------------------------------------------------
+
+    const SUGGESTION_EXAMPLES = [
+        // days
+        'on saturdays', 'weekdays', 'weekends', 'monday to friday', 'not on tuesday', '2 days before friday',
+        // ordinals
+        'first monday of the month', '3rd tuesday of the month', 'last friday of the month',
+        '2nd last friday of the month', 'last day of the month', '2nd last day of the month',
+        'first day of the week', 'last day of the week', 'first week of the month', 'last week of 2027',
+        'last month of the year', 'first monday of january', 'last day of jan', 'first day of the year',
+        'last day of the year', 'last 2 days of the month', 'first 3 days of march', 'last 5 days of the year',
+        // months, years, parity
+        'in december', 'june to august', 'january 2027', '2027 to 2029', 'on even years', 'when day is odd',
+        'on the 1st of the month',
+        // dates
+        'christmas day', 'christmas eve', 'day before christmas', '4 days after christmas',
+        'within 2 days of christmas', 'new years day',
+        // clock times
+        'between 9am and 5pm', '10pm to 6am', 'before noon', 'after 10pm', 'until 6pm',
+        'quarter past five', 'ten past', 'between 15 minutes and 30 minutes past the hour', '2 hours before noon',
+        // sun
+        'is night', 'during daylight', 'after dark', 'golden hour', 'sun rising', 'after sunset',
+        'before sunrise', '2 hours after sunset', 'within 30 minutes of sunrise', 'between sunset and sunrise',
+        'sun above 30 degrees', 'sun is between 10 and 12 degrees', 'sun is high',
+        // moon
+        'when the moon is visible', 'full moon', 'blue moon', 'seasonal blue moon', 'day before blue moon',
+        'moon is high', 'moon is 90% illuminated', 'moon more than 50% illuminated', 'new moon',
+        // combinations
+        'on weekdays and during daylight', 'on weekends or after sunset', 'weekends or evenings except tuesday',
+        '(last day of the month or wednesday) and after 10pm', 'every day'
+    ]
+
+    // connective words carry no topical signal for matching
+    const SUGGESTION_STOP_WORDS = ['and', 'or', 'not', 'but', 'except', 'to']
+
+    function significantWords (text) {
+        const words = []
+        String(text || '').toLowerCase().split(/[^a-z0-9%:]+/).forEach(function (raw) {
+            let word = raw
+            if (!word) { return }
+            if (/^[a-z]+$/.test(word)) { word = stripPlural(word) }
+            if (NOISE_WORDS.indexOf(word) >= 0 || SUGGESTION_STOP_WORDS.indexOf(word) >= 0) { return }
+            if (words.indexOf(word) < 0) { words.push(word) }
+        })
+        return words
+    }
+
+    let suggestionIndex = null
+    function suggestExamples (text) {
+        if (!suggestionIndex) {
+            suggestionIndex = SUGGESTION_EXAMPLES.map(function (example) {
+                return { text: example, words: significantWords(example) }
+            })
+        }
+        const inputWords = significantWords(text)
+        if (!inputWords.length) { return [] }
+        const scored = []
+        suggestionIndex.forEach(function (example) {
+            let score = 0
+            inputWords.forEach(function (word) {
+                if (example.words.indexOf(word) >= 0) {
+                    score += 2 // exact word overlap
+                } else if (word.length >= 4) {
+                    for (let i = 0; i < example.words.length; i++) {
+                        if (example.words[i].length >= 4 && editDistanceLE1(word, example.words[i]) <= 1) {
+                            score += 1 // near-miss (typo) overlap
+                            break
+                        }
+                    }
+                }
+            })
+            // one exact word normally required; a lone typo'd word may qualify
+            // on its fuzzy match alone
+            if (score >= 2 || (score >= 1 && inputWords.length === 1)) { scored.push({ example, score }) }
+        })
+        // best score first; prefer the shorter example on ties (easier to adapt)
+        scored.sort(function (a, b) { return (b.score - a.score) || (a.example.words.length - b.example.words.length) })
+        return scored.slice(0, 3).map(function (entry) { return entry.example.text })
+    }
+
+    // ------------------------------------------------------------------
     // Public API
     // ------------------------------------------------------------------
 
@@ -2110,7 +2196,7 @@
         const warnings = []
         const trimmed = String(text || '').trim()
         if (!trimmed) {
-            return { ok: false, ast: null, description: '', unmatched: [], warnings, suggestion: suggestionText('') }
+            return { ok: false, ast: null, description: '', unmatched: [], warnings, suggestions: [], suggestion: suggestionText('', []) }
         }
         const tokens = tokenize(trimmed)
         const matched = matchSymbols(tokens, warnings)
@@ -2119,14 +2205,18 @@
         const unmatched = matched.unmatched
         const hasTerms = ast.groups.some(function (g) { return g.terms.length > 0 })
         if (!hasTerms) {
-            return { ok: false, ast: null, description: '', unmatched, warnings, suggestion: suggestionText(trimmed) }
+            const suggestions = suggestExamples(trimmed)
+            return { ok: false, ast: null, description: '', unmatched, warnings, suggestions, suggestion: suggestionText(trimmed, suggestions) }
         }
         unmatched.forEach(function (u) { warnings.push('Ignored: \'' + u + '\'') })
-        return { ok: true, ast, description: describe(ast), unmatched, warnings, suggestion: '' }
+        return { ok: true, ast, description: describe(ast), unmatched, warnings, suggestions: [], suggestion: '' }
     }
 
-    function suggestionText (text) {
+    function suggestionText (text, suggestions) {
         const quoted = text ? 'Did not understand \'' + text + '\'. ' : ''
+        if (suggestions && suggestions.length) {
+            return quoted + 'Did you mean \'' + suggestions.join('\', \'') + '\'?'
+        }
         return quoted + 'Try phrases like \'weekdays between 9am and 5pm\', \'after sunset\', or \'when the moon is visible\'.'
     }
 
@@ -2158,6 +2248,8 @@
         _internal: {
             tokenize,
             matchSymbols,
+            suggestExamples,
+            SUGGESTION_EXAMPLES,
             editDistanceLE1,
             fuzzyLookup,
             toMinutes,

@@ -405,7 +405,11 @@ copies or substantial portions of the Software.
                     tip.text(understood)
                 } else {
                     tip.addClass('cronplus-filter-tip-error')
-                    tip.text('Do not understand. Try entering "When the moon is visible" or "Sundays only"')
+                    if (result.suggestions && result.suggestions.length) {
+                        tip.text('Do not understand. Did you mean "' + result.suggestions.join('", "') + '"?')
+                    } else {
+                        tip.text('Do not understand. Try entering "when the moon is visible" or "weekdays between 9am and 5pm"')
+                    }
                 }
                 // nudge when a sun/moon condition has no configured location
                 // (not an error - the location can also arrive on the message)
