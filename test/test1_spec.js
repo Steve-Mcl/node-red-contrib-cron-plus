@@ -794,6 +794,57 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
+        it('describe a custom solar angle event (angle:-4:rise)', async function (t) {
+            const test = {
+                description: t.name,
+                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'selected', solarEvents: 'angle:-4:rise', timeZone: 'Europe/London' } },
+                expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', "Solar Events: 'sun rising 4° below the horizon'"]] }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNodeCommandResponses.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+            result.payload.result.should.have.property('nextEvent', 'angle:-4:rise')
+            result.payload.result.should.have.property('nextEventTimeOffset').which.is.a.Date()
+        })
+        it('describe a custom solar angle event mixed with a preset event', async function (t) {
+            const test = {
+                description: t.name,
+                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'selected', solarEvents: 'angle:6:set,sunrise', timeZone: 'Europe/London' } },
+                expected: { command: 'describe', propertyValues: [['payload.result.nextEvent', 'string']] }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNodeCommandResponses.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+            result.payload.result.nextEvent.should.be.oneOf('angle:6:set', 'sunrise')
+        })
+        it('should reject adding a schedule with an out-of-range custom solar angle', async function () {
+            testNode.receive({
+                payload: {
+                    command: 'add',
+                    name: 'dynBadAngle',
+                    topic: 'dynBadAngle',
+                    expressionType: 'solar',
+                    location: '54.9992500,-1.4170300',
+                    solarType: 'selected',
+                    solarEvents: 'angle:120:rise',
+                    payloadType: 'default',
+                    limit: 1
+                }
+            })
+            await sleep(50) // let it unwind
+            const warnCall = testNode.warn.getCalls().find(c => c.args[0] && String(c.args[0].message || c.args[0]).includes("solarEvents entry 'angle:120:rise' is invalid"))
+            should(warnCall).not.be.undefined()
+        })
         it('describe lunar events for a location', async function (t) {
             const test = {
                 description: t.name,

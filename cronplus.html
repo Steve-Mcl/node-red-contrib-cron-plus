@@ -432,6 +432,63 @@ copies or substantial portions of the Software.
         }
     }
 
+    // Matches a custom solar-angle event token e.g. "angle:-4:rise" or "angle:6.5:set"
+    // (kept in sync with SOLAR_ANGLE_EVENT_REGEX in cronplus.js)
+    const SOLAR_ANGLE_EVENT_REGEX = /^angle:(-?\d+(?:\.\d+)?):(rise|set)$/i
+
+    // Sentinel values shown as two extra checkboxes in the "Selected Solar Events" list, meaning
+    // "use the angle entered in the offset box below" (which doubles as the custom-angle degrees
+    // box while either of these is ticked - see updateOffsetFieldMode() in generateOption()).
+    // These are swapped for real angle:<degrees>:rise|set tokens when persisting (see
+    // getSolarEventsForOption()) and swapped back to sentinels (with the box pre-filled) when a
+    // schedule is reopened for editing - this keeps the custom-angle feature living inside the
+    // existing preset-events checkbox widget instead of a separate control.
+    const CUSTOM_ANGLE_RISE_SENTINEL = 'customAngleRise'
+    const CUSTOM_ANGLE_SET_SENTINEL = 'customAngleSet'
+
+    /**
+     * Given a schedule row's <li> element, combine the preset solar-event checkbox selector's
+     * value with the offset/angle box into the final solarType/solarEvents/offset that should be
+     * persisted. The offset box doubles as the custom-angle degrees box: if the schedule is a
+     * *solar* schedule and either of the "custom angle (rising)"/"custom angle (setting)"
+     * checkboxes is ticked, the sentinel is swapped out for a real angle:<degrees>:rise|set token
+     * using the box's value (as degrees, not minutes), and the persisted offset is forced to 0
+     * since the box is being used for the angle instead in that case. Lunar schedules (which
+     * share the same offset field) are never affected by this, even if a solar row's stale
+     * selection still contains a custom-angle sentinel.
+     * @param {JQuery} $optionLi the <li> element for this schedule row
+     * @returns {{solarType: string, solarEvents: string, offset: (string|number)}}
+     */
+    function getSolarEventsForOption ($optionLi) {
+        const $solarEventsField = $optionLi.find('.node-input-option-solarEvents')
+        const $offsetField = $optionLi.find('.node-input-option-offset')
+        const expressionType = $optionLi.find('.node-input-option-expressionType').val()
+        const solarType = $solarEventsField.typedInput('type') || 'all'
+        const rawOffset = $offsetField.val()
+        if (expressionType !== 'solar' || solarType !== 'selected') {
+            $offsetField.removeClass('input-error')
+            return { solarType, solarEvents: $solarEventsField.typedInput('value') || '', offset: rawOffset }
+        }
+        let events = String($solarEventsField.typedInput('value') || '').split(',').map(function (s) { return s.trim() }).filter(Boolean)
+        const wantsRise = events.includes(CUSTOM_ANGLE_RISE_SENTINEL)
+        const wantsSet = events.includes(CUSTOM_ANGLE_SET_SENTINEL)
+        let offset = rawOffset
+        if (wantsRise || wantsSet) {
+            const angleVal = parseFloat(rawOffset)
+            const angleValid = rawOffset !== '' && !isNaN(angleVal) && angleVal >= -90 && angleVal <= 90
+            $offsetField.toggleClass('input-error', !angleValid)
+            events = events.filter(function (e) { return e !== CUSTOM_ANGLE_RISE_SENTINEL && e !== CUSTOM_ANGLE_SET_SENTINEL })
+            if (angleValid) {
+                if (wantsRise) events.push(`angle:${angleVal}:rise`)
+                if (wantsSet) events.push(`angle:${angleVal}:set`)
+            }
+            offset = 0 // the box holds the angle in this mode, not a minutes offset
+        } else {
+            $offsetField.removeClass('input-error')
+        }
+        return { solarType, solarEvents: events.join(','), offset }
+    }
+
     function showSidebarHelpPanel () {
         if (RED.sidebar.help) {
             RED.sidebar.help.show()//  >= V1.1.0
@@ -1306,7 +1363,9 @@ copies or substantial portions of the Software.
                 makeSolarChoice('nauticalDusk', 'nautical dusk', 'nautical twilight ends, astronomical twilight starts (-12°)'),
                 // makeSolarChoice("astronomicalDusk", "astronomical dusk", "astronomical twilight ends, night starts (-18°)"),
                 makeSolarChoice('nightStart', 'astronomical dusk / night start', 'astronomical twilight ends, night starts (-18°)'), // needed? same as astronomicalDusk
-                makeSolarChoice('nadir', 'solar midnight', 'when the sun is closest to nadir and the night is equidistant from dusk and dawn')
+                makeSolarChoice('nadir', 'solar midnight', 'when the sun is closest to nadir and the night is equidistant from dusk and dawn'),
+                makeSolarChoice(CUSTOM_ANGLE_RISE_SENTINEL, 'custom angle (rising)', 'fires as the sun rises through the angle entered in the offset box (used as degrees, not minutes, while this is ticked)'),
+                makeSolarChoice(CUSTOM_ANGLE_SET_SENTINEL, 'custom angle (setting)', 'fires as the sun sets through the angle entered in the offset box (used as degrees, not minutes, while this is ticked)')
             ]
             const lunarChoices = [
                 makeSolarChoice('rise', 'moon rise', 'the moon rises above the horizon'),
@@ -1455,10 +1514,18 @@ copies or substantial portions of the Software.
                             content: function (callback) {
                                 if (RED._cron_plus_debug) console.debug('initTooltip-->content')
 
-                                const solarType = $solarEvents.typedInput('type')
-                                const solarEvents = $solarEvents.typedInput('value')
                                 const expressionType = $expressionType.val()
-                                const offset = $offset.val()
+                                let solarType, solarEvents, offset
+                                if (expressionType === 'solar') {
+                                    const solarMerged = getSolarEventsForOption($this.closest('li'))
+                                    solarType = solarMerged.solarType
+                                    solarEvents = solarMerged.solarEvents
+                                    offset = solarMerged.offset
+                                } else {
+                                    solarType = $solarEvents.typedInput('type')
+                                    solarEvents = $solarEvents.typedInput('value')
+                                    offset = $offset.val()
+                                }
                                 const timeZone = $timeZone.val()
                                 let titleHtml
                                 const e = { expressionType }
@@ -1691,9 +1758,19 @@ copies or substantial portions of the Software.
                 } catch (_error) { }
                 expressionField.combobox('value', option.expression || '')
 
-                // generate the solar events field
+                // generate the solar events field - any existing angle:<deg>:rise|set tokens are
+                // converted to the CUSTOM_ANGLE_*_SENTINEL checkbox values here, with the degrees
+                // extracted for pre-filling the offset box (which doubles as the angle box - see below)
                 const solarEventsDiv = $('<div/>', { style: solarEventsStyle }).appendTo(cell2Solar)
-                const solarEventsField = $('<input/>', { class: 'node-input-option-solarEvents', type: 'text', style: 'width: 100%', placeholder: 'select solar events', value: option.solarEvents || '' }).appendTo(solarEventsDiv)
+                const solarEventsRaw = (option.solarEvents || '').split(',').map(function (s) { return s.trim() }).filter(Boolean)
+                let initialCustomAngleValue = null
+                const initialSolarEvents = solarEventsRaw.map(function (token) {
+                    const m = SOLAR_ANGLE_EVENT_REGEX.exec(token)
+                    if (!m) return token
+                    initialCustomAngleValue = m[1]
+                    return m[2].toLowerCase() === 'rise' ? CUSTOM_ANGLE_RISE_SENTINEL : CUSTOM_ANGLE_SET_SENTINEL
+                }).join(',')
+                const solarEventsField = $('<input/>', { class: 'node-input-option-solarEvents', type: 'text', style: 'width: 100%', placeholder: 'select solar events', value: initialSolarEvents }).appendTo(solarEventsDiv)
                 solarEventsField.typedInput({
                     default: 'all',
                     types: [
@@ -1718,7 +1795,7 @@ copies or substantial portions of the Software.
                     ]
                 })
                 solarEventsField.typedInput('type', option.solarType || 'all')
-                solarEventsField.typedInput('value', option.solarEvents || '')// added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
+                solarEventsField.typedInput('value', initialSolarEvents)// added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
 
                 // generate the lunar events field (occupies the same slot as solar events - visibility is switched by schedule type)
                 const lunarEventsDiv = $('<div/>', { style: solarEventsStyle }).appendTo(cell2Solar)
@@ -1768,9 +1845,28 @@ copies or substantial portions of the Software.
                 })
                 locationField.typedInput('value', option.location || '')
 
-                // offset fields
-                const offsetField = $('<input/>', { class: 'node-input-option-offset', type: 'number', min: -1439, max: 1439, style: solarOffsetStyle, value: option.offset || 0, placeholder: 'offset' }).appendTo(cell2Solar)
-                offsetField.prop('title', 'Minutes Offset +/- 1439')
+                // offset field - shared between solar & lunar schedules (minutes offset applied to
+                // whichever event time is calculated). It also doubles as the custom-angle degrees
+                // box: while the schedule is a *solar* schedule AND either "custom angle (rising)"/
+                // "custom angle (setting)" is ticked above, this field's value is used as the angle
+                // (in degrees) instead of a minutes offset (see getSolarEventsForOption() and
+                // updateOffsetFieldMode() below). Lunar schedules always use it as a plain offset.
+                const offsetField = $('<input/>', { class: 'node-input-option-offset', type: 'number', style: solarOffsetStyle, value: (initialCustomAngleValue != null ? initialCustomAngleValue : (option.offset || 0)) }).appendTo(cell2Solar)
+
+                function updateOffsetFieldMode () {
+                    const events = String(solarEventsField.typedInput('value') || '').split(',').map(function (s) { return s.trim() })
+                    const isAngleMode = scheduleTypeField.val() === 'solar' && solarEventsField.typedInput('type') === 'selected' &&
+                        (events.includes(CUSTOM_ANGLE_RISE_SENTINEL) || events.includes(CUSTOM_ANGLE_SET_SENTINEL))
+                    if (isAngleMode) {
+                        offsetField.attr({ min: -90, max: 90, placeholder: 'custom angle °' })
+                        offsetField.prop('title', "Custom angle in degrees, above (+) or below (-) the horizon - used by the 'custom angle (rising)'/'custom angle (setting)' checkboxes above")
+                    } else {
+                        offsetField.attr({ min: -1439, max: 1439, placeholder: 'offset' })
+                        offsetField.prop('title', 'Minutes Offset +/- 1439')
+                    }
+                }
+                updateOffsetFieldMode()
+                solarEventsField.on('change', updateOffsetFieldMode)
 
                 // init tooltips
                 initTooltip(offsetField, 'solar', { my: 'middle top', at: 'middle bottom+5', of: cell2Solar, collision: 'flipfit' })
@@ -1827,6 +1923,7 @@ copies or substantial portions of the Software.
                             expressionField.combobox('showMenu')
                             break
                     }
+                    updateOffsetFieldMode()
                 })
                 scheduleTypeField.triggerHandler('change')
                 $('#node-input-option-container').append(container)
@@ -1917,6 +2014,7 @@ copies or substantial portions of the Software.
             // eslint-disable-next-line no-unused-vars
             options.each(function (i) {
                 const option = $(this)
+                const solar = getSolarEventsForOption(option)
                 const o = {
                     name: option.find('.node-input-option-name').val(),
                     topic: option.find('.node-input-option-topic').val(),
@@ -1925,9 +2023,9 @@ copies or substantial portions of the Software.
                     expressionType: option.find('.node-input-option-expressionType').val(),
                     expression: option.find('.node-input-option-expression').val(),
                     location: option.find('.node-input-option-location').typedInput('value'),
-                    offset: option.find('.node-input-option-offset').val(),
-                    solarType: option.find('.node-input-option-solarEvents').typedInput('type') || 'all',
-                    solarEvents: option.find('.node-input-option-solarEvents').typedInput('value'),
+                    offset: solar.offset,
+                    solarType: solar.solarType,
+                    solarEvents: solar.solarEvents,
                     lunarType: option.find('.node-input-option-lunarEvents').typedInput('type') || 'all',
                     lunarEvents: option.find('.node-input-option-lunarEvents').typedInput('value')
                 }
@@ -2514,6 +2612,20 @@ function onSchedulesExpandCompress () {
                 <tr><td>nightStart</td><td>astronomical dusk / night start</td><td>astronomical twilight ends, night starts (-18°)</td></tr>
                 <tr><td>nadir</td><td>solar midnight</td><td>when the sun is closest to nadir and the night is equidistant from dusk and dawn</td></tr>
             </table>
+            <p>
+                <b>Custom sun angle</b> - if none of the presets above are the angle you need, tick
+                <i>custom angle (rising)</i> and/or <i>custom angle (setting)</i> in the list above,
+                then enter the angle (in degrees, -90 to 90) in the <i>offset</i> box (see
+                <a href="#cron-plus-solar-offset-info">Schedules - Offset</a> below - while either
+                of these is ticked, that box is used as the angle in degrees instead of a minutes
+                offset). Ticking both fires on the same angle both as the sun rises through it
+                (morning) and as it sets through it (evening). Internally this is stored as an extra
+                solar event of the form <code>angle:&lt;degrees&gt;:rise</code> or
+                <code>angle:&lt;degrees&gt;:set</code> (e.g. <code>angle:-4:rise</code>), so it can
+                also be set directly via <code>solarEvents</code> when adding/updating a schedule
+                dynamically via msg (in which case a normal minutes <code>offset</code> can still be
+                combined with it).
+            </p>
         </div>
         <h4 id="cron-plus-lunar-events-info">Schedules - Lunar Events</h4>
         <div style="padding-left: 15px">
@@ -2539,10 +2651,14 @@ function onSchedulesExpandCompress () {
                 <li>GPS E.g: <code>N54°59'57.3, W1°25'1.308"</code>, <code>54°59'57.3"N, 1°25'1.308"W</code>, <code>54d 59' 57" N 1d 25' 1" W</code> or <code>54:59:57.3N 1:25:1.308W</code></li>
             </ul>
         </div>
-        <h4>Schedules - Offset</h4>
+        <h4 id="cron-plus-solar-offset-info">Schedules - Offset</h4>
         <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
-            The offset field can be used to add a positive or negative offset in minutes to the sunrise or sunset time.
+            <i>NOTE: Only displayed when the type is set to <b>solar events</b> or <b>lunar events</b></i><br>
+            The offset field can be used to add a positive or negative offset in minutes to the calculated event time.<br>
+            <i>NOTE: for solar schedules, while either <b>custom angle (rising)</b> or <b>custom angle
+            (setting)</b> is ticked in the solar events list above, this field is repurposed as the
+            custom angle in degrees (-90 to 90) instead of a minutes offset - see <b>Custom sun angle</b>
+            above.</i>
         </div>
 
     </dl>
@@ -2642,7 +2758,7 @@ function onSchedulesExpandCompress () {
                         <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
                         <li>expressionType: (string|required) specify the schedule type. Set to "solar" for solar events</li>
                         <li>solarType: (string|required) specify the events to fire.  Accepted values are "all" or "selected"</li>
-                        <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected". Accepted values are listed under <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">see above</a> </li>
+                        <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected". Accepted values are listed under <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">see above</a>, plus custom sun angle events in the form <code>angle:&lt;degrees&gt;:rise</code> or <code>angle:&lt;degrees&gt;:set</code> (e.g. <code>angle:-4:rise</code>) </li>
                         <li>location: (string|required) longitude latitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
                         <li>offset: (number|optional) number of minutes to offset a sunrise or sunset</li>
                         <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>

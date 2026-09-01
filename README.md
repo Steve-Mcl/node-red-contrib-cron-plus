@@ -18,6 +18,7 @@ FEATURES
 * Multiple schedules can be entered by the node editor UI or dynamically at runtime
 * Send a default payload or any of the following: timestamp, string, number, boolean, flow variable, global variable, JSON, JSONata, Buffer or Env variable as the output.
 * Example CRON expressions provided in the dropdown to get you started
+* Solar event schedules aren't limited to the usual presets (sunrise, sunset, dusk, dawn, golden hour etc.) - you can also fire on any custom sun angle (e.g. "when the sun is 4° below the horizon, rising") via the "custom angle" checkboxes, or by setting `solarEvents` to `angle:<degrees>:rise` / `angle:<degrees>:set` directly
 * Map popup to help you enter coordinates for solar events
   * Location coordinates can be per schedule, per cron node or set by an environment variable (as of V2.0.0)
   * NOTE: Map is 100% CDN dynamic and requires and internet connection. If there is no internet, the popup will provide information to help you get location coordinates from another source
