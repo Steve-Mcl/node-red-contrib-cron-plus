@@ -759,12 +759,17 @@
             }
             case 'SOLAR_AMBIG': { // standalone dawn/dusk = the twilight state
                 state.pos++
+                const range = parseEventRangeTail(state, sym.event, sym.raw)
+                if (range) { return range } // "dawn until noon"
                 const term = clone(sym.state)
                 term.source = sym.raw
                 return term
             }
-            case 'EVENT': { // standalone "sunrise" = within 30 minutes of it
+            case 'EVENT': {
                 state.pos++
+                const range = parseEventRangeTail(state, sym.event, sym.raw)
+                if (range) { return range } // "sunrise until 6pm", "sunset to sunrise"
+                // standalone "sunrise" = within 30 minutes of it
                 return { kind: 'solarEvent', event: sym.event, op: 'within', withinMin: 30, source: sym.raw, assumed: true }
             }
             case 'BETWEEN':
@@ -789,6 +794,11 @@
                     if (endMin !== null) {
                         state.pos += 2
                         return { kind: 'timeRange', style: 'between', startMin: sym.minutes, endMin, source: sym.raw + ' to ' + endSym.raw }
+                    }
+                    const endEv = eventFromSym(endSym)
+                    if (endEv) { // "10pm to sunrise": clock start, solar end
+                        state.pos += 2
+                        return { kind: 'solarBetween', fromTime: sym.minutes, to: endEv, source: sym.raw + ' to ' + endSym.raw }
                     }
                 }
                 // otherwise = that exact minute
@@ -1373,6 +1383,26 @@
         return parseBeforeAfter(state)
     }
 
+    // "sunrise until 6pm" / "sunset to sunrise": a solar event followed by a
+    // range word starts a window ending at a clock time or another event.
+    // The event symbol itself is already consumed. Null when not a range.
+    function parseEventRangeTail (state, eventName, raw) {
+        const joiner = peek(state)
+        if (!joiner || (joiner.type !== 'TO' && joiner.type !== 'DASH')) { return null }
+        const endSym = peek(state, 1)
+        const endMin = clockMinutesFromSym(endSym)
+        if (endMin !== null) {
+            state.pos += 2
+            return { kind: 'solarBetween', from: eventName, toTime: endMin, source: raw + ' to ' + endSym.raw }
+        }
+        const endEv = eventFromSym(endSym)
+        if (endEv) {
+            state.pos += 2
+            return { kind: 'solarBetween', from: eventName, to: endEv, source: raw + ' to ' + endSym.raw }
+        }
+        return null
+    }
+
     // minutes-of-day from a time-ish symbol: a TIME/TIMEWORD, or a bare hour
     // number ("9am to 17" - matches what parseBetween accepts). Null otherwise.
     function clockMinutesFromSym (sym) {
@@ -1450,11 +1480,16 @@
                 state.pos++
                 return { kind: 'timeRange', style: 'between', startMin, endMin, source: start.raw + ' ' + a.raw + ' and ' + b.raw }
             }
+            const endEv = eventFromSym(b)
+            if (endEv) { // "between 10pm and sunrise"
+                state.pos++
+                return { kind: 'solarBetween', fromTime: startMin, to: endEv, source: start.raw + ' ' + a.raw + ' and ' + b.raw }
+            }
             // dangling "between 9am and ..." - give back what we can
             state.unmatched.push(start.raw + ' ' + a.raw)
             return null
         }
-        // solar range: between EVENT and EVENT
+        // solar range: between EVENT and (EVENT | clock time)
         const evA = eventFromSym(a)
         if (evA) {
             state.pos++
@@ -1465,6 +1500,11 @@
             if (evB) {
                 state.pos++
                 return { kind: 'solarBetween', from: evA, to: evB, source: start.raw + ' ' + a.raw + ' and ' + b.raw }
+            }
+            const endMin = clockMinutesFromSym(b)
+            if (endMin !== null) { // "between sunset and 11pm"
+                state.pos++
+                return { kind: 'solarBetween', from: evA, toTime: endMin, source: start.raw + ' ' + a.raw + ' and ' + b.raw }
             }
             state.unmatched.push(start.raw + ' ' + a.raw)
             return null
@@ -1936,9 +1976,12 @@
                 }
                 break
             }
-            case 'solarBetween':
-                text = 'between ' + (EVENT_LABELS[term.from] || term.from) + ' and ' + (EVENT_LABELS[term.to] || term.to)
+            case 'solarBetween': {
+                const fromText = typeof term.fromTime === 'number' ? fmtMinutes(term.fromTime) : (EVENT_LABELS[term.from] || term.from)
+                const toText = typeof term.toTime === 'number' ? fmtMinutes(term.toTime) : (EVENT_LABELS[term.to] || term.to)
+                text = 'between ' + fromText + ' and ' + toText
                 break
+            }
             case 'moonAltitude':
                 if (term.label) {
                     text = 'the moon is ' + term.label + ' (' + (term.op === 'between' ? 'between ' + term.low + ' and ' + term.high : term.op + ' ' + term.degrees) + ' degrees)'

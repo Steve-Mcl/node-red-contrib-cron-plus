@@ -116,6 +116,20 @@ describe('filter-eval: solar terms (London)', function () {
         evalText('within 30 minutes of sunrise', { ts: sunrise + 3600000, tz, ...LONDON }).pass.should.be.false()
     })
 
+    it('mixed clock/event windows: "10pm to sunrise" and "sunrise until 6pm"', function () {
+        const sunrise = SunCalc.getTimes(new Date('2026-01-15T12:00:00Z'), LONDON.lat, LONDON.lon).sunrise.valueOf()
+        const opts = { tz, ...LONDON }
+        evalText('10pm to sunrise', { ts: Date.parse('2026-01-14T23:00:00Z'), ...opts }).pass.should.be.true()
+        evalText('10pm to sunrise', { ts: Date.parse('2026-01-15T03:00:00Z'), ...opts }).pass.should.be.true()
+        evalText('10pm to sunrise', { ts: sunrise - 600000, ...opts }).pass.should.be.true()
+        evalText('10pm to sunrise', { ts: sunrise + 600000, ...opts }).pass.should.be.false()
+        evalText('10pm to sunrise', { ts: Date.parse('2026-01-15T21:00:00Z'), ...opts }).pass.should.be.false()
+        evalText('sunrise until 6pm', { ts: sunrise + 3600000, ...opts }).pass.should.be.true()
+        evalText('sunrise until 6pm', { ts: Date.parse('2026-01-15T17:59:00Z'), ...opts }).pass.should.be.true()
+        evalText('sunrise until 6pm', { ts: Date.parse('2026-01-15T18:30:00Z'), ...opts }).pass.should.be.false()
+        evalText('sunrise until 6pm', { ts: sunrise - 3600000, ...opts }).pass.should.be.false()
+    })
+
     it('between sunset and sunrise spans midnight', function () {
         evalText('between sunset and sunrise', { ts: Date.parse('2026-01-15T23:00:00Z'), tz, ...LONDON }).pass.should.be.true()
         evalText('between sunset and sunrise', { ts: Date.parse('2026-01-15T12:00:00Z'), tz, ...LONDON }).pass.should.be.false()

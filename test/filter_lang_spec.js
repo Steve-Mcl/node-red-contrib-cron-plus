@@ -293,6 +293,18 @@ describe('filter-lang parse: solar', function () {
         term.kind.should.equal('solarState')
         term.states.should.eql(['goldenHour'])
     })
+
+    it('mixed clock/event ranges (regression: "10pm to sunrise" parsed as at-22:00 AND before-sunrise)', function () {
+        onlyTerm('10pm to sunrise').should.have.properties({ kind: 'solarBetween', fromTime: 1320, to: 'sunrise' })
+        onlyTerm('sunrise until 6pm').should.have.properties({ kind: 'solarBetween', from: 'sunrise', toTime: 1080 })
+        onlyTerm('between 10pm and sunrise').should.have.properties({ fromTime: 1320, to: 'sunrise' })
+        onlyTerm('between sunset and 11pm').should.have.properties({ from: 'sunset', toTime: 1380 })
+        onlyTerm('sunset to sunrise').should.have.properties({ from: 'sunset', to: 'sunrise' })
+        onlyTerm('dawn until noon').should.have.properties({ from: 'civilDawn', toTime: 720 })
+        lang.parse('10pm to sunrise').unmatched.should.have.length(0)
+        lang.parse('sunrise until 6pm').unmatched.should.have.length(0)
+        onlyTerm('sunrise').op.should.equal('within') // standalone event unchanged
+    })
 })
 
 describe('filter-lang parse: moon', function () {
