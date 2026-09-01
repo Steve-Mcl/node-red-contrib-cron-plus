@@ -637,7 +637,7 @@
                 if (peek(state) && peek(state).type === 'RPAREN') { state.pos++ } // tolerate a missing ')'
             } else {
                 const startPos = state.pos
-                const term = parseCondition(state)
+                const term = negate ? parseCoalescedTerm(state) : parseCondition(state)
                 if (term) {
                     term.negate = !!term.negate
                     unitGroups = [{ type: 'and', terms: [term] }]
@@ -665,6 +665,34 @@
             groups = groups === null ? unitGroups : andCombine(groups, unitGroups, state)
         }
         return groups || []
+    }
+
+    // the term straight after "not"/"except": greedily folds a bare
+    // "and"/"or"-joined run of same-kind mutually-exclusive terms into one
+    // coalesced term before it gets negated - "except march and april" and
+    // "not tuesday or wednesday" exclude every named alternative, mirroring
+    // how the positive path already unions such lists (coalesceAnd). Stops
+    // (without consuming) as soon as the run breaks, so an unrelated clause
+    // like "except march and after 10pm" is left for the outer parser.
+    function parseCoalescedTerm (state) {
+        const term = parseCondition(state)
+        if (!term || !coalescable(term)) { return term }
+        const prop = MUTUALLY_EXCLUSIVE[term.kind]
+        for (;;) {
+            const joiner = peek(state)
+            if (!joiner || (joiner.type !== 'AND' && joiner.type !== 'OR')) { break }
+            const savedPos = state.pos
+            state.pos++
+            const next = parseCondition(state)
+            if (next && next.kind === term.kind && coalescable(next)) {
+                term[prop] = uniqSorted(term[prop].concat(next[prop]))
+                term.source += ' ' + joiner.raw + ' ' + next.source
+                continue
+            }
+            state.pos = savedPos // not a same-kind continuation - leave it for the outer parser
+            break
+        }
+        return term
     }
 
     // cartesian AND of two OR-of-AND-group lists: every alternative on the left

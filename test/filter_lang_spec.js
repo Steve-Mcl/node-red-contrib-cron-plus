@@ -395,6 +395,37 @@ describe('filter-lang parse: combinators', function () {
         r.description.should.match(/day is not Tuesday/)
     })
 
+    it('regression: "except march and april" excludes both months, not just march', function () {
+        const r = lang.parse('except march and april')
+        r.ok.should.be.true()
+        r.description.should.equal('always and month is not March or April')
+        const term = r.ast.groups[0].terms.find(function (t) { return t.kind === 'month' })
+        term.negate.should.be.true()
+        term.months.should.eql([3, 4])
+    })
+
+    it('regression: "except tuesday or wednesday" excludes both days', function () {
+        const term = onlyGroupTerms('except tuesday or wednesday').find(function (t) { return t.kind === 'day' })
+        term.negate.should.be.true()
+        term.days.should.eql([2, 3])
+    })
+
+    it('regression: "not march and april" matches the bracketed and range-based equivalents', function () {
+        const bare = lang.parse('not march and april').description
+        bare.should.equal(lang.parse('not (march and april)').description)
+        bare.should.equal(lang.parse('not march to april').description)
+    })
+
+    it('leaves a mixed-kind run after except/not alone (only the first term is negated)', function () {
+        const terms = onlyGroupTerms('except march and after 10pm')
+        terms.should.have.length(2)
+        const month = terms.find(function (t) { return t.kind === 'month' })
+        const time = terms.find(function (t) { return t.kind === 'timeRange' })
+        month.negate.should.be.true()
+        month.months.should.eql([3])
+        time.negate.should.be.false()
+    })
+
     it('supports "but not" as except', function () {
         const r = lang.parse('weekends but not sunday')
         r.ok.should.be.true()
