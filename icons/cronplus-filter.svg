@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="60" viewBox="0 0 40 60">
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <!-- stopwatch body: identical geometry to the cronplus timer icon
+         (dial centre 20,30 radius 16.25, gap at top-left, button on top) -->
+    <path stroke-width="3" d="M25.43 14.54c6.562 2.089 11.316 8.233 11.316 15.488 0 8.975-7.275 16.25-16.25 16.25s-16.25-7.275-16.25-16.25c0-2.802.71-5.438 1.958-7.74"/>
+    <circle stroke-width="3" cx="20" cy="14.04" r="1.5"/>
+    <!-- tick (allow) - left half of the dial -->
+    <path stroke-width="2.8" d="M7.8 30.6l4.3 4.3 6.6-8"/>
+    <!-- cross (deny) - right half of the dial -->
+    <path stroke-width="2.8" d="M23.4 26.8l7.2 7.2M30.6 26.8l-7.2 7.2"/>
+  </g>
+</svg>

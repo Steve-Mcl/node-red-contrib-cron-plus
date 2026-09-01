@@ -1,0 +1,720 @@
+<!--
+MIT License
+Copyright (c) 2026 Steve-Mcl
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+-->
+
+<script type="text/javascript">
+/* global RED, jQuery */
+
+(function ($) {
+    'use strict'
+
+    // Shared editor scripts are fetched with $.getScript (not a script tag) so
+    // the request carries admin auth when adminAuth is enabled. The published
+    // package ships only the minified builds; a dev checkout usually has only
+    // the source files - try .min.js first, fall back to the source.
+    function getSharedScript (basename) {
+        return $.getScript('resources/node-red-contrib-cron-plus/' + basename + '.min.js')
+            .catch(function () {
+                return $.getScript('resources/node-red-contrib-cron-plus/' + basename + '.js')
+            })
+    }
+
+    // The condition parser is shared with the runtime. Loaded once per editor session.
+    let filterLangPromise = null
+    function loadFilterLang () {
+        if (!filterLangPromise) {
+            filterLangPromise = getSharedScript('filter-lang')
+                .then(function () { return window.cronplusFilterLang })
+                .catch(function (err) {
+                    filterLangPromise = null // allow retry next time the dialog opens
+                    console.error('cronplus-filter: failed to load condition parser', err)
+                })
+        }
+        return filterLangPromise
+    }
+
+    // ---- details popout: breakdown + upcoming matches --------------------
+    // The dialog markup is appended to document.body once (node templates only
+    // exist while their edit dialog is open, and jQuery UI dialogs re-parent).
+    let detailDialogReady = false
+    function ensureDetailDialog () {
+        if (detailDialogReady) { return }
+        $('<style>').text(`
+            #cronplus-filter-detail-dialog {
+                padding-top: 6px !important;
+            }
+            #cronplus-filter-detail-content > p:first-child {
+                margin-top: 0;
+            }
+            #cronplus-filter-detail-dialog table.cronplus-filter-facets {
+                border-collapse: collapse;
+                width: 100%;
+                margin-bottom: 8px;
+            }
+            #cronplus-filter-detail-dialog table.cronplus-filter-facets td {
+                border: 1px solid var(--red-ui-secondary-border-color, #ddd);
+                padding: 3px 8px;
+                vertical-align: top;
+            }
+            #cronplus-filter-detail-dialog table.cronplus-filter-facets td:first-child {
+                font-weight: bold;
+                width: 90px;
+                white-space: nowrap;
+            }
+            #cronplus-filter-detail-dialog h4 {
+                margin: 10px 0 4px 0;
+            }
+            #cronplus-filter-detail-dialog table.cronplus-filter-windows {
+                border-collapse: collapse;
+                width: 100%;
+                margin: 4px 0 8px 0;
+            }
+            #cronplus-filter-detail-dialog table.cronplus-filter-windows th {
+                text-align: left;
+                font-weight: normal;
+                color: var(--red-ui-tertiary-text-color, #888);
+                font-size: 11px;
+                padding: 2px 10px 2px 0;
+                border-bottom: 1px solid var(--red-ui-secondary-border-color, #ddd);
+            }
+            #cronplus-filter-detail-dialog table.cronplus-filter-windows td {
+                padding: 3px 10px 3px 0;
+                border-bottom: 1px solid var(--red-ui-secondary-border-color, #eee);
+                white-space: nowrap;
+                font-variant-numeric: tabular-nums;
+            }
+            #cronplus-filter-detail-dialog table.cronplus-filter-windows td:last-child {
+                color: var(--red-ui-tertiary-text-color, #888);
+            }
+            #cronplus-filter-detail-dialog .cronplus-filter-muted {
+                color: var(--red-ui-tertiary-text-color, #888);
+                font-size: 11px;
+            }
+        `).appendTo('head')
+        $('<div id="cronplus-filter-detail-dialog" style="display:none" title="Condition details"><div id="cronplus-filter-detail-content"></div></div>').appendTo('body')
+        $('#cronplus-filter-detail-dialog').dialog({
+            autoOpen: false,
+            modal: true,
+            width: Math.min(560, $(window).width() - 40),
+            maxHeight: Math.min(600, $(window).height() - 60)
+        })
+        detailDialogReady = true
+    }
+
+    function escapeHtml (text) {
+        return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+
+    const FACET_ORDER = ['Days', 'Dates', 'Months', 'Years', 'Times', 'Sun', 'Moon', 'Always', 'Other']
+
+    function buildBreakdownHtml (description, alternatives) {
+        let html = '<p>Allow when: <b>' + escapeHtml(description) + '</b></p>'
+        alternatives.forEach(function (alt, index) {
+            if (alternatives.length > 1) {
+                html += '<h4>Option ' + (index + 1) + (index > 0 ? ' (or)' : '') + '</h4>'
+            }
+            const byCategory = {}
+            const excepts = []
+            alt.facets.forEach(function (facet) {
+                if (facet.negate) {
+                    excepts.push(facet.text)
+                } else {
+                    (byCategory[facet.category] = byCategory[facet.category] || []).push(facet.text)
+                }
+            })
+            html += '<table class="cronplus-filter-facets">'
+            FACET_ORDER.forEach(function (category) {
+                if (byCategory[category]) {
+                    html += '<tr><td>' + category + '</td><td>' + byCategory[category].map(escapeHtml).join('<br>') + '</td></tr>'
+                }
+            })
+            if (excepts.length) {
+                html += '<tr><td>Except</td><td>' + excepts.map(escapeHtml).join('<br>') + '</td></tr>'
+            }
+            html += '</table>'
+        })
+        return html
+    }
+
+    function fmtStamp (ms, tz) {
+        try {
+            return new Date(ms).toLocaleString(undefined, {
+                timeZone: tz || undefined,
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+        } catch (_e) {
+            return new Date(ms).toISOString()
+        }
+    }
+
+    function fmtDateOnly (ms, tz) {
+        try {
+            return new Date(ms).toLocaleDateString(undefined, { timeZone: tz || undefined, weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+        } catch (_e) {
+            return new Date(ms).toISOString().slice(0, 10)
+        }
+    }
+
+    function fmtTimeOnly (ms, tz) {
+        try {
+            return new Date(ms).toLocaleTimeString(undefined, { timeZone: tz || undefined, hour: '2-digit', minute: '2-digit' })
+        } catch (_e) {
+            return new Date(ms).toISOString().slice(11, 16)
+        }
+    }
+
+    function fmtDuration (ms) {
+        const mins = Math.round(ms / 60000)
+        if (mins < 60) { return mins + ' min' }
+        const hours = Math.floor(mins / 60)
+        const rem = mins % 60
+        if (hours < 48) { return hours + ' h' + (rem ? ' ' + rem + ' min' : '') }
+        const days = Math.floor(hours / 24)
+        return days + ' day' + (days === 1 ? '' : 's') + (hours % 24 ? ' ' + (hours % 24) + ' h' : '')
+    }
+
+    function buildWindowsTable (windows, tz) {
+        let html = '<table class="cronplus-filter-windows"><tr><th>Starts</th><th>Ends</th><th>Length</th></tr>'
+        windows.forEach(function (win) {
+            const start = fmtDateOnly(win.start, tz) + ', ' + fmtTimeOnly(win.start, tz)
+            let end = 'ongoing'
+            let length = '&mdash;'
+            if (win.end) {
+                // same local day: repeat only the time, so the eye can scan the column
+                end = fmtDateOnly(win.end, tz) === fmtDateOnly(win.start, tz)
+                    ? fmtTimeOnly(win.end, tz)
+                    : fmtDateOnly(win.end, tz) + ', ' + fmtTimeOnly(win.end, tz)
+                length = escapeHtml(fmtDuration(win.end - win.start))
+            }
+            html += '<tr><td>' + escapeHtml(start) + '</td><td>' + escapeHtml(end) + '</td><td>' + length + '</td></tr>'
+        })
+        return html + '</table>'
+    }
+
+    function showDetailDialog (node) {
+        const lang = window.cronplusFilterLang
+        const conditionType = $('#node-input-condition').typedInput('type')
+        const condition = $('#node-input-condition').typedInput('value')
+        if (!condition || conditionType === 'msg') { return }
+        ensureDetailDialog()
+        const tz = $('#node-input-timeZone').val() || ''
+        const content = $('#cronplus-filter-detail-content')
+        const upcomingShell = '<h4>Upcoming matches</h4>' +
+            '<div class="cronplus-filter-upcoming"><i class="fa fa-spinner fa-spin"></i> checking&hellip;</div>'
+        let breakdownDone = false
+        if (conditionType === 'str' && lang) {
+            const result = lang.parse(condition)
+            if (!result.ok) { return }
+            content.html(buildBreakdownHtml(result.description, lang.summarize(result.ast)) + upcomingShell)
+            breakdownDone = true
+        } else {
+            // env: the runtime resolves and parses it - everything comes from the endpoint
+            content.html('<div class="cronplus-filter-upcoming"><i class="fa fa-spinner fa-spin"></i> checking&hellip;</div>')
+        }
+        $('#cronplus-filter-detail-dialog').dialog('open')
+        $.ajax({
+            type: 'POST',
+            url: 'cronplus-filter/' + node.id + '/preview',
+            contentType: 'application/json',
+            dataType: 'json',
+            data: JSON.stringify({
+                condition,
+                conditionType,
+                location: $('#node-input-location').typedInput('value'),
+                locationType: $('#node-input-location').typedInput('type'),
+                timeZone: tz
+            })
+        }).done(function (data) {
+            if (!breakdownDone && !data.error) {
+                content.html(
+                    '<p class="cronplus-filter-muted">Condition from env var: ' + escapeHtml(condition) + ' = &quot;' + escapeHtml(data.condition || '') + '&quot;</p>' +
+                    buildBreakdownHtml(data.description, data.summary) + upcomingShell)
+            }
+            const target = content.find('.cronplus-filter-upcoming')
+            if (data.error) {
+                target.html('<i class="fa fa-exclamation-triangle"></i> ' + escapeHtml(data.error) +
+                    (data.needsLocation ? ' - set a location on the node to preview sun/moon conditions (at runtime it may also arrive on the message).' : ''))
+                return
+            }
+            let html = '<p>Right now this condition would <b>' + (data.now ? 'ALLOW' : 'BLOCK') + '</b> a message.</p>'
+            if (data.windows.length) {
+                html += buildWindowsTable(data.windows, tz)
+            } else {
+                html += '<p><i class="fa fa-exclamation-triangle"></i> No matches found up to ' + escapeHtml(fmtStamp(data.scannedUntil, tz)) + '.' +
+                    (data.truncated ? '' : ' A rare condition may still match beyond the scanned range.') + '</p>'
+            }
+            html += '<p class="cronplus-filter-muted">Sampled every ' + data.resolutionMinutes + ' minute' + (data.resolutionMinutes === 1 ? '' : 's') + ', edges exact to the minute' +
+                (data.truncated ? '; the scan stopped early (time budget)' : '; scanned to ' + escapeHtml(fmtStamp(data.scannedUntil, tz))) +
+                '. Timezone: ' + escapeHtml(tz || 'system') + '.</p>'
+            target.html(html)
+        }).fail(function () {
+            content.find('.cronplus-filter-upcoming').html('<i class="fa fa-exclamation-triangle"></i> preview unavailable (is the node deployed runtime reachable?)')
+        })
+    }
+
+    // Map picker shared with the cronplus node (resources/location-picker[.min].js)
+    let locationPickerPromise = null
+    function showMap (srcInput) {
+        if (window.cronplusLocationPicker) { // may already be loaded (cronplus.html loads it too)
+            window.cronplusLocationPicker.showMap(srcInput)
+            return
+        }
+        if (!locationPickerPromise) {
+            locationPickerPromise = getSharedScript('location-picker')
+                .catch(function (err) {
+                    locationPickerPromise = null
+                    console.error('cronplus-filter: failed to load location picker', err)
+                })
+        }
+        locationPickerPromise.then(function () {
+            if (window.cronplusLocationPicker) {
+                window.cronplusLocationPicker.showMap(srcInput)
+            }
+        })
+    }
+
+    RED.nodes.registerType('cronplus-filter', {
+        category: 'function',
+        paletteLabel: 'Cron Filter',
+        icon: 'cronplus-filter.svg',
+        color: '#a6bbcf',
+        inputs: 1,
+        outputs: 2,
+        defaults: {
+            name: { value: '' },
+            condition: {
+                value: '',
+                required: true,
+                validate: function (v) {
+                    if (!v) { return false }
+                    if ((this.conditionType || 'str') !== 'str') { return true } // msg/env resolved at runtime
+                    const lang = window.cronplusFilterLang
+                    // before the parser has been fetched (first workspace paint)
+                    // don't false-flag saved nodes; revalidated once it loads
+                    return lang ? lang.parse(v).ok : true
+                }
+            },
+            conditionType: { value: 'str' },
+            location: { value: '' },
+            locationType: { value: 'none' },
+            timeZone: { value: '' }
+        },
+        inputLabels: 'message to filter',
+        outputLabels: function (index) {
+            return index === 0 ? 'allowed' : 'blocked'
+        },
+        label: function () {
+            return this.name || this.condition || 'Cron Filter'
+        },
+        oneditprepare: function () {
+            const node = this
+
+            // ---- condition typedInput: fixed text (default), msg property, env var ----
+            $('#node-input-condition').typedInput({
+                default: 'str',
+                typeField: $('#node-input-conditionType'),
+                types: ['str', 'msg', 'env']
+            })
+            $('#node-input-condition').typedInput('type', node.conditionType || 'str')
+            $('#node-input-condition').typedInput('value', node.condition || '')
+
+            // ---- location typedInput (typeField keeps locationType in sync) ----
+            $('#node-input-location').typedInput({
+                default: 'none',
+                typeField: $('#node-input-locationType'),
+                types: [
+                    {
+                        value: 'none',
+                        label: 'No fixed location',
+                        hasValue: false,
+                        icon: 'fa fa-ban'
+                    },
+                    {
+                        value: 'fixed',
+                        label: 'Fixed Location',
+                        icon: 'fa fa-map-pin',
+                        expand: function () {
+                            showMap($('#node-input-location'))
+                        },
+                        validate: function (v, _opt) { return !!v && v.length >= 3 }
+                    },
+                    'env'
+                ]
+            })
+            $('#node-input-location').typedInput('type', node.locationType || 'none')
+            $('#node-input-location').typedInput('value', node.location || '')
+
+            // ---- live "parsed understanding" preview ----
+            const tip = $('#cronplus-filter-tip')
+            // the typedInput widget edits its own inner input and only syncs the
+            // original element on blur - read the visible input for live typing
+            function currentConditionText () {
+                const visible = $('#node-input-condition').next('.red-ui-typedInput-container').find('input.red-ui-typedInput-input')
+                if (visible.length && visible.is(':visible')) { return visible.val() }
+                return $('#node-input-condition').typedInput('value')
+            }
+            function renderTip () {
+                const lang = window.cronplusFilterLang
+                const conditionType = $('#node-input-condition').typedInput('type')
+                const text = currentConditionText()
+                tip.removeClass('cronplus-filter-tip-ok cronplus-filter-tip-warn cronplus-filter-tip-error')
+                if (conditionType === 'msg') {
+                    tip.text(text ? 'The condition will be read from msg.' + text + ' when each message arrives.' : '')
+                    $('#cronplus-filter-location-hint').hide()
+                    $('#cronplus-filter-detail-row').hide()
+                    return
+                }
+                if (conditionType === 'env') {
+                    tip.text(text ? 'The condition comes from the environment variable "' + text + '" - open details below to preview it.' : '')
+                    $('#cronplus-filter-location-hint').hide()
+                    $('#cronplus-filter-detail-row').toggle(!!text)
+                    return
+                }
+                if (!lang || !text || !text.trim()) {
+                    tip.text('')
+                    $('#cronplus-filter-location-hint').hide()
+                    $('#cronplus-filter-detail-row').hide()
+                    return
+                }
+                const result = lang.parse(text)
+                $('#cronplus-filter-detail-row').toggle(result.ok)
+                if (result.ok) {
+                    let understood = 'Allow when: ' + result.description
+                    if (result.warnings && result.warnings.length) {
+                        tip.addClass('cronplus-filter-tip-warn')
+                        understood += ' - ' + result.warnings.join('; ')
+                    } else {
+                        tip.addClass('cronplus-filter-tip-ok')
+                    }
+                    tip.text(understood)
+                } else {
+                    tip.addClass('cronplus-filter-tip-error')
+                    if (result.suggestions && result.suggestions.length) {
+                        tip.text('Do not understand. Did you mean "' + result.suggestions.join('", "') + '"?')
+                    } else {
+                        tip.text('Do not understand. Try entering "when the moon is visible" or "weekdays between 9am and 5pm"')
+                    }
+                }
+                // nudge when a sun/moon condition has no configured location
+                // (not an error - the location can also arrive on the message)
+                const needsLocation = result.ok && lang.requiresLocation(result.ast)
+                const noConfigured = $('#node-input-location').typedInput('type') === 'none'
+                $('#cronplus-filter-location-hint').toggle(needsLocation && noConfigured)
+            }
+            let debounceTimer
+            function queueRenderTip () {
+                clearTimeout(debounceTimer)
+                debounceTimer = setTimeout(renderTip, 250)
+            }
+            $('#node-input-condition').on('input change', queueRenderTip)
+            // keystrokes land in the typedInput's inner input, not the original element
+            $('#node-input-condition').next('.red-ui-typedInput-container')
+                .on('keyup input paste', 'input.red-ui-typedInput-input', queueRenderTip)
+            $('#node-input-location').on('change', function () {
+                renderTip()
+            })
+            $('#cronplus-filter-detail-btn').on('click', function (evt) {
+                evt.preventDefault()
+                showDetailDialog(node)
+            })
+            loadFilterLang().then(function () {
+                renderTip()
+                // settle the red-triangle state now that real validation is possible
+                RED.editor.validateNode(node)
+            })
+
+            // ---- timezone autocomplete (shared package-level endpoint) ----
+            let tzData
+            $.ajax({
+                type: 'POST',
+                url: 'cronplus/0/tz',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                dataType: 'json',
+                data: '{}' // dummy data
+            })
+                .done(function (data) {
+                    tzData = data
+                    $('#node-input-timeZone').autocomplete({
+                        source: function (request, response) {
+                            const matcher = new RegExp($.ui.autocomplete.escapeRegex(request.term), 'i')
+                            response($.map(tzData, function (item) {
+                                if (item && item.tz) {
+                                    const label = (item.code ? item.code + ', ' : '') + item.tz + ' (UTC: ' + item.UTCOffset + ', DST: ' + item.UTCDSTOffset + ')'
+                                    if (label && (!request.term || matcher.test(label))) {
+                                        return {
+                                            label,
+                                            value: item
+                                        }
+                                    }
+                                }
+                            }))
+                        },
+                        minLength: 1,
+                        open: function () {
+                            $(this).removeClass('ui-corner-all').addClass('ui-corner-top')
+                        },
+                        close: function () {
+                            $(this).removeClass('ui-corner-top').addClass('ui-corner-all')
+                        },
+                        focus: function (event, ui) {
+                            event.preventDefault()
+                            $('#node-input-timeZone').val(ui.item.label)
+                        },
+                        select: function (event, ui) {
+                            event.preventDefault()
+                            this.value = ui.item.value.tz
+                        }
+                    })
+                })
+                .fail(function (_jqXHR, _textStatus, _errorThrown) {
+                    // endpoint unavailable (e.g. cronplus node disabled) - plain text entry still works
+                })
+        },
+        oneditsave: function () {
+            $('#node-input-condition').off()
+            $('#node-input-timeZone').off()
+            $('#cronplus-filter-detail-btn').off()
+            if ($('#cronplus-filter-detail-dialog').length) { $('#cronplus-filter-detail-dialog').dialog('close') }
+        },
+        oneditcancel: function () {
+            $('#node-input-condition').off()
+            $('#node-input-timeZone').off()
+            $('#cronplus-filter-detail-btn').off()
+            if ($('#cronplus-filter-detail-dialog').length) { $('#cronplus-filter-detail-dialog').dialog('close') }
+        }
+    })
+})(jQuery)
+</script>
+
+<script type="text/html" data-template-name="cronplus-filter">
+    <style>
+        .cronplus-filter-form-row > label {
+            width: 120px !important;
+        }
+        #cronplus-filter-tip {
+            margin: 2px 0 0 125px;
+            font-size: 12px;
+            min-height: 16px;
+            white-space: pre-wrap;
+        }
+        .cronplus-filter-tip-ok {
+            color: var(--red-ui-text-color-success, #3a3);
+        }
+        .cronplus-filter-tip-warn {
+            color: var(--red-ui-text-color-warning, #a80);
+        }
+        .cronplus-filter-tip-error {
+            color: var(--red-ui-text-color-error, #d33);
+        }
+        #cronplus-filter-location-hint {
+            display: none;
+            margin: 2px 0 0 125px;
+            font-size: 12px;
+            color: var(--red-ui-text-color-warning, #a80);
+        }
+    </style>
+    <div class="form-row cronplus-filter-form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
+        <input type="text" id="node-input-name" style="width: calc(100% - 130px)" placeholder="Name">
+    </div>
+    <div class="form-row cronplus-filter-form-row">
+        <label for="node-input-condition"><i class="fa fa-filter"></i> Condition</label>
+        <input type="text" id="node-input-condition" style="width: calc(100% - 130px)" placeholder='e.g. "weekdays between 9am and 5pm" or "when the moon is visible"'>
+        <input type="hidden" id="node-input-conditionType">
+        <div id="cronplus-filter-tip"></div>
+        <div id="cronplus-filter-detail-row" style="display:none; margin: 2px 0 0 125px;">
+            <a href="#" id="cronplus-filter-detail-btn" style="font-size: 12px;"><i class="fa fa-calendar-check-o"></i> details &amp; upcoming matches&hellip;</a>
+        </div>
+        <div id="cronplus-filter-location-hint"><i class="fa fa-info-circle"></i> This condition needs a location. Set one below, or make sure incoming messages carry one (msg.location, or a cronplus solar/lunar schedule).</div>
+    </div>
+    <div class="form-row cronplus-filter-form-row">
+        <label for="node-input-location"><i class="fa fa-globe"></i> Location</label>
+        <input type="text" id="node-input-location" style="width: calc(100% - 130px)" placeholder="lat lon">
+        <input type="hidden" id="node-input-locationType">
+    </div>
+    <div class="form-row cronplus-filter-form-row">
+        <label for="node-input-timeZone"><i class="fa fa-clock-o"></i> Timezone</label>
+        <input type="text" id="node-input-timeZone" style="width: calc(100% - 130px)" placeholder="Leave empty for system timezone">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="cronplus-filter">
+    <p>Allows or blocks messages based on a free-text temporal condition, such as
+    <code>on saturdays</code>, <code>when the moon is visible</code> or
+    <code>weekdays between 9am and 5pm</code>. Typically wired after a <b>cronplus</b>
+    node to gate schedule events on conditions cron syntax cannot express, but any
+    message can be filtered.</p>
+
+    <h3>Outputs</h3>
+    <ol class="node-ports">
+        <li>allowed - messages that match the condition</li>
+        <li>blocked - messages that do not match</li>
+    </ol>
+    <p>In both cases the original message is passed through untouched, with one
+    addition: <code>msg.filter</code> describes the decision:</p>
+    <pre>{
+  "pass": true,
+  "condition": "on saturdays",
+  "description": "day is Saturday",
+  "ts": 1766232000000,
+  "reasons": [ { "source": "...", "description": "...", "pass": true, "detail": "..." } ]
+}</pre>
+
+    <h3>Writing conditions</h3>
+    <p>Type what you mean in plain English. The understanding line below the field
+    shows exactly how the condition was interpreted - trust that line, not this list.
+    A single condition can combine clauses with <code>and</code>, <code>or</code>,
+    <code>not</code> and <code>except</code>.</p>
+    <ul>
+        <li><b>Days:</b> <code>saturday</code>, <code>saturdays only</code>, <code>weekends</code>,
+            <code>weekdays</code>, <code>monday to friday</code>, <code>mon-wed</code>,
+            <code>not on tuesday</code></li>
+        <li><b>Ordinal days:</b> <code>first monday of the month</code>, <code>3rd tuesday of the month</code>,
+            <code>last friday of the month</code>, <code>first/last day of the month</code>,
+            <code>first/last day of the week</code> (weeks start Monday, so the first day is
+            Monday and the last is Sunday - the understanding line always shows which day it resolved to)</li>
+        <li><b>Months and dates:</b> <code>in december</code>, <code>june to august</code>,
+            <code>on the 1st of the month</code>, <code>christmas day</code>, <code>halloween</code>,
+            <code>new years day</code></li>
+        <li><b>Years:</b> <code>in 2027</code>, <code>2027 to 2029</code>, <code>january 2027</code>,
+            <code>first monday of the year</code>, <code>2nd tuesday of 2028</code>,
+            <code>first monday of january</code>, <code>first/last day of the year</code></li>
+        <li><b>Even/odd:</b> <code>when day is odd</code> (the day of the month),
+            <code>odd days</code>, <code>on even months</code>, <code>on even years</code>,
+            <code>month is even</code></li>
+        <li><b>Date offsets:</b> <code>christmas eve</code>, <code>new years eve</code>,
+            <code>day before christmas</code>, <code>day after christmas</code>,
+            <code>4 days after christmas</code>, <code>2 weeks before christmas</code>,
+            <code>1 month before christmas</code>, <code>within 2 days of christmas</code>
+            (a month offset landing on a day that does not exist clamps to the month end,
+            e.g. 1 month after halloween is 30 November)</li>
+        <li><b>Clock time:</b> <code>between 9am and 5pm</code>, <code>from 09:00 to 17:30</code>,
+            <code>before noon</code>, <code>after 10pm</code>, <code>between 10pm and 6am</code>
+            (ranges that end at or before their start cross midnight; the end is exclusive)</li>
+        <li><b>Minute of the hour:</b> <code>between 15 minutes and 30 minutes past the hour</code>,
+            <code>from 0 minutes to 10 minutes</code>, <code>quarter past</code>, <code>half past</code>,
+            <code>quarter to</code>, <code>ten past</code>, <code>5 to</code> (every hour).
+            With an hour they become clock times: <code>quarter past five</code> = 05:15,
+            <code>quarter to five</code> = 04:45, <code>half past 10pm</code> = 22:30.
+            Time matching is minute-granular: an exact time like <code>quarter past five</code>
+            allows the whole minute (05:15:00 to 05:15:59), so an every-second schedule
+            would pass ~60 messages through it</li>
+        <li><b>Sunlight:</b> <code>is day</code> / <code>daylight</code> / <code>sun up</code>,
+            <code>is night</code>, <code>after dark</code>, <code>dawn</code>, <code>dusk</code>,
+            <code>golden hour</code>, <code>civil twilight</code> (also nautical/astronomical),
+            <code>sun rising</code> / <code>sun setting</code> (before/after solar noon)</li>
+        <li><b>Sun events:</b> <code>after sunset</code>, <code>before sunrise</code>,
+            <code>within 30 minutes of sunrise</code>, <code>between sunset and sunrise</code>,
+            <code>2 hours after sunset</code>, <code>30 minutes before sunrise</code>
+            (a quantity shifts the boundary: "2 hours after sunset" passes from
+            sunset&nbsp;+&nbsp;2h until the end of the local day)</li>
+        <li><b>Moon:</b> <code>when the moon is visible</code> (above the horizon),
+            <code>full moon</code>, <code>new moon</code>, <code>blue moon</code> (the second
+            full moon of a calendar month, judged in the node timezone),
+            <code>seasonal blue moon</code> (the third full moon in an astronomical
+            season containing four),
+            <code>waxing</code>/<code>waning</code>,
+            <code>moon more than 50% illuminated</code>,
+            <code>moon is 90% illuminated</code> (bare percentages read as "at least"),
+            <code>moon at most 20% illuminated</code></li>
+        <li><b>Sun/moon position:</b> <code>sun is between 10 and 12 degrees</code>,
+            <code>sun above 30 degrees</code>, <code>moon below -5 degrees</code>,
+            <code>sun is high</code> / <code>moon is high</code> (above 45&deg;),
+            <code>sun is low</code> / <code>moon is low</code> (up, between 0&deg; and 15&deg;) -
+            the understanding line always shows the exact thresholds</li>
+        <li><b>Combining:</b> <code>on weekdays and during daylight</code>,
+            <code>on weekends or after sunset</code>,
+            <code>weekends or evenings except tuesday</code> (an <code>except</code> clause
+            applies to the whole condition)</li>
+        <li><b>Brackets:</b> without brackets <code>and</code> binds tighter than
+            <code>or</code>, so <code>A or B and C</code> means <i>A, or (B and C)</i>.
+            Use brackets to group: <code>(last day of the month or wednesday) and after 10pm</code>.
+            The understanding line always shows the grouping it settled on - check it
+            whenever a condition mixes <code>and</code> with <code>or</code>.
+            <code>not (saturday or sunday)</code> works too.</li>
+    </ul>
+    <p>Minor typos in known words are corrected automatically (e.g. <code>saterday</code>)
+    and unrecognised extra words are ignored with a warning in the understanding line.</p>
+
+    <h3>Details &amp; upcoming matches</h3>
+    <p>When a condition parses, a <b>details &amp; upcoming matches</b> link appears under
+    the understanding line. It opens a breakdown of the condition (the days, dates,
+    months, years, times and sun/moon clauses per alternative) plus a preview of the
+    next periods when messages would be allowed, including whether a message arriving
+    right now would pass. The preview samples time on a coarse grid (chosen from the
+    condition's own clock boundaries) and refines each window edge to the exact
+    minute; sun/moon previews need a location configured on the node.</p>
+
+    <h3>Which moment is evaluated?</h3>
+    <p>The first of these that is present on the incoming message:</p>
+    <ol>
+        <li><code>msg.ts</code> - epoch milliseconds, ISO date string or Date (an
+            invalid value raises a catchable error)</li>
+        <li><code>msg.cronplus.triggerTimestamp</code> - set by the cronplus node (also
+            found in <code>msg.payload</code> when the schedule payload is
+            <i>Default - cronplus status</i>)</li>
+        <li>the time the message arrives</li>
+    </ol>
+
+    <h3>Which location is used?</h3>
+    <p>Sun and moon conditions need a latitude/longitude. The first of these wins:</p>
+    <ol>
+        <li><code>msg.location</code> - a coordinate string (<code>"54.99 -1.41"</code>)
+            or an object <code>{ lat, lon }</code></li>
+        <li><code>msg.cronplus.config.location</code> - the schedule location of a
+            cronplus solar/lunar event (also found via <code>msg.payload</code> as above)</li>
+        <li>the <b>Location</b> configured on this node (fixed coordinates or an
+            environment variable)</li>
+    </ol>
+    <p>If a sun/moon condition is used and no location can be found, the node reports
+    a catchable error (wire a <b>catch</b> node to handle it) and the message is not
+    forwarded on either output.</p>
+
+    <h3>Timezone</h3>
+    <p>Day, date and clock-time clauses are evaluated in the configured timezone
+    (blank = the system timezone). Sun and moon positions are absolute and only
+    depend on the location; the timezone merely decides which calendar date
+    "today" means for clauses like <code>after sunset</code>.</p>
+
+    <h3>Condition source</h3>
+    <p>The condition field is a typed input: a fixed string (default), a message
+    property (e.g. <code>msg.condition</code> - evaluated per message, so different
+    messages can carry different conditions), or an environment variable. The live
+    understanding line applies to fixed strings; env-var conditions can be previewed
+    via the details popout, and msg-based conditions are only known at runtime (an
+    ununderstood value raises a catchable error).</p>
+
+    <h3>Status</h3>
+    <p>The node status always reflects <b>now</b>: the current decision and when it
+    next changes - a green dot <code>allow until Sun 16:00</code> or a grey ring
+    <code>deny until 18:45</code> (times in the node timezone; same-day flips show
+    just the time, dates appear for flips further out; plain <code>allow</code>/<code>deny</code>
+    when no change is upcoming). It is shown as soon as the node is deployed and
+    updates itself at each flip - no message traffic needed. Messages are still
+    evaluated against their own timestamp; a message carrying an old or future
+    <code>msg.ts</code> is routed by that time but never changes the status.
+    Conditions read from <code>msg</code>, or sun/moon conditions whose location
+    only arrives on messages, show a grey <code>waiting for message</code> /
+    <code>no location</code> ring until the first message provides the missing
+    piece. Flip times come from the same sampling as the details preview and are
+    exact to the minute.</p>
+</script>
