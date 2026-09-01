@@ -242,6 +242,87 @@ describe('cron-plus Node', function () {
         })
     })
 
+    describe('dynamic schedules and the node-level default location', function () {
+        // bug found while testing custom-angle dynamic schedules: a schedule added via msg is
+        // validated *before* the node's own "Default Location" (fixed/env) setting is applied to
+        // it (that only happened for static schedules, via createTask() -> applyOptionDefaults()).
+        // A dynamic solar/lunar schedule that omits `location` - expecting the node-level default
+        // to supply it, exactly as static schedules already do - was incorrectly rejected with
+        // "location property missing". This is not specific to custom-angle events; it affects any
+        // dynamic solar/lunar schedule when the node has a fixed/env default location configured.
+        const makeNode = (defaultLocationType, defaultLocation) => ([
+            { id: 'helperCmd', type: 'helper' },
+            {
+                id: 'defLocNode',
+                type: 'cronplus',
+                name: 'default-location-test',
+                outputField: 'payload',
+                timeZone: '',
+                defaultLocationType,
+                defaultLocation,
+                persistDynamic: false,
+                commandResponseMsgOutput: 'output1',
+                outputs: 1,
+                options: [],
+                wires: [['helperCmd']]
+            }
+        ])
+
+        it("accepts a dynamic solar schedule with no location when the node's default location is 'fixed'", async function () {
+            await helper.load(cronplusNode, makeNode('fixed', '54.9992500,-1.4170300'))
+            const node = helper.getNode('defLocNode')
+            const helperCmd = helper.getNode('helperCmd')
+
+            node.receive({
+                payload: {
+                    command: 'add',
+                    name: 'testAngle',
+                    topic: 'testAngle',
+                    expressionType: 'solar',
+                    solarType: 'selected',
+                    solarEvents: 'angle:-4:rise',
+                    offset: 0,
+                    payloadType: 'default'
+                    // no `location` - the node-level default must supply it
+                }
+            })
+            await sleep(50)
+
+            const locationWarnings = node.warn.getCalls().filter(c => c.args[0] && String(c.args[0].message || c.args[0]).includes('location property missing'))
+            locationWarnings.should.have.length(0)
+
+            const listPromise = new Promise(resolve => helperCmd.once('input', resolve))
+            node.receive({ payload: { command: 'list', name: 'testAngle' } })
+            const result = await listPromise
+            result.payload.result.should.have.property('config').which.is.an.Object()
+            result.payload.result.config.should.have.property('location', '54.9992500,-1.4170300')
+            result.payload.result.config.should.have.property('solarEvents', 'angle:-4:rise')
+        })
+
+        it("still requires a location on a dynamic schedule when the node's default location is 'per schedule'", async function () {
+            // sanity check the fix doesn't over-relax validation for the normal case
+            await helper.load(cronplusNode, makeNode('default', ''))
+            const node = helper.getNode('defLocNode')
+
+            node.receive({
+                payload: {
+                    command: 'add',
+                    name: 'noLocation',
+                    topic: 'noLocation',
+                    expressionType: 'solar',
+                    solarType: 'all',
+                    offset: 0,
+                    payloadType: 'default'
+                    // no `location`, and no node-level default either - this must still fail
+                }
+            })
+            await sleep(50)
+
+            const locationWarnings = node.warn.getCalls().filter(c => c.args[0] && String(c.args[0].message || c.args[0]).includes('location property missing'))
+            locationWarnings.should.have.length(1)
+        })
+    })
+
     describe('DST transition handling (Debian cron rules)', function () {
         // Jobs whose minute or hour field starts with `*` ("wildcard jobs") keep
         // their real-time interval across a DST change, so they also run during
