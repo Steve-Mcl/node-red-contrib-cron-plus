@@ -881,6 +881,17 @@ describe('filter-lang parse: ordinal days (nth weekday, day of week/month)', fun
         onlyTerm('2nd last month of the year').months.should.eql([11])
     })
 
+    it('counts of days from either end: "last 2 days of feb", "first 3 days of march"', function () {
+        onlyTerm('last 2 days of feb').should.have.properties({ kind: 'dayOfMonth', lastCount: 2, month: 2 })
+        onlyTerm('first 3 days of march').should.have.properties({ kind: 'dayOfMonth', firstCount: 3, month: 3 })
+        onlyTerm('last 5 days of the year').should.have.properties({ lastCount: 5, scope: 'year' })
+        onlyTerm('last 3 days of 2027').should.have.properties({ lastCount: 3, scope: 'year', year: 2027 })
+        onlyTerm('last 2 weeks of the year').lastCount.should.equal(14)
+        onlyTerm('first 3 months of the year').months.should.eql([1, 2, 3])
+        lang.parse('last 2 days of feb').description.should.equal('day is in the last 2 days of February')
+        lang.parse('last 2 days').ok.should.be.false() // "the previous two days" - too ambiguous
+    })
+
     it('offsets anchor on date-like sub-conditions, not just named dates', function () {
         onlyTerm('day before the last day of month').should.have.properties({ kind: 'dayOfMonth', last: true, lastOffset: 1 })
         onlyTerm('2 days before the last day of month').lastOffset.should.equal(2)

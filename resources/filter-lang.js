@@ -966,6 +966,74 @@
             state.pos++
         }
         let next = peek(state)
+        // "last 2 days of feb", "first 3 days of march", "last 5 days of the
+        // year", "last 2 weeks of the year", "first 3 months of the year"
+        if ((ord.nth === 'last' || ord.nth === 1) && next && next.type === 'NUM' && !next.ordinal &&
+            Number.isInteger(next.value) && next.value >= 1 &&
+            peek(state, 1) && peek(state, 1).type === 'UNIT' &&
+            ['day', 'week', 'month'].indexOf(peek(state, 1).unit) >= 0) {
+            const count = next.value
+            const countUnit = peek(state, 1).unit
+            const isLast = ord.nth === 'last'
+            state.pos += 2
+            if (peek(state) && peek(state).type === 'OF') { state.pos++ }
+            const scope = peek(state)
+            let scopeKind = null // 'month' | 'year'
+            let month
+            let year
+            let scopeRaw = ''
+            if (scope && scope.type === 'MONTH_GENERIC') {
+                state.pos++
+                scopeKind = 'month'
+                scopeRaw = 'the month'
+            } else if (scope && scope.type === 'YEAR_GENERIC') {
+                state.pos++
+                scopeKind = 'year'
+                scopeRaw = 'the year'
+            } else if (scope && scope.type === 'MONTH') { // "last 2 days of feb [2027]"
+                state.pos++
+                scopeKind = 'month'
+                month = scope.month
+                scopeRaw = scope.raw
+                if (peek(state) && peek(state).type === 'NUM' && !peek(state).ordinal && isYearNumber(peek(state).value)) {
+                    year = peek(state).value
+                    state.pos++
+                }
+            } else if (scope && scope.type === 'NUM' && !scope.ordinal && isYearNumber(scope.value)) { // "last 5 days of 2027"
+                state.pos++
+                scopeKind = 'year'
+                year = scope.value
+                scopeRaw = String(year)
+            }
+            const source = ord.raw + ' ' + count + ' ' + countUnit + 's of ' + scopeRaw
+            // bare "last 2 days" reads as "the previous two days" - require a scope
+            if (!scopeKind) {
+                state.unmatched.push(ord.raw + ' ' + count + ' ' + countUnit + 's')
+                return null
+            }
+            if (countUnit === 'month') { // "first/last N months of the year"
+                if (scopeKind !== 'year' || count > 12) {
+                    state.unmatched.push(source)
+                    return null
+                }
+                const months = []
+                for (let i = 0; i < count; i++) { months.push(isLast ? 12 - i : 1 + i) }
+                const term = { kind: 'month', months: uniqSorted(months), source }
+                if (year) { term.year = year }
+                return term
+            }
+            const days = count * (countUnit === 'week' ? 7 : 1)
+            if (days > (scopeKind === 'year' ? 366 : 31)) {
+                state.unmatched.push(source)
+                return null
+            }
+            const term = { kind: 'dayOfMonth', days: [], source }
+            term[isLast ? 'lastCount' : 'firstCount'] = days
+            if (scopeKind === 'year') { term.scope = 'year' }
+            if (month) { term.month = month }
+            if (year) { term.year = year }
+            return term
+        }
         // ORD month of (the year | 2027): "last month of the year" -> December,
         // "last month of 2027" -> December 2027
         if (next && next.type === 'MONTH_GENERIC') {
@@ -1533,7 +1601,8 @@
     // "last day of january 2027") carry meaning outside their set arrays and
     // must never set-union with plain terms
     function coalescable (term) {
-        return MUTUALLY_EXCLUSIVE[term.kind] && !term.negate && !term.last && !term.weekOrdinal && !term.month && !term.year
+        return MUTUALLY_EXCLUSIVE[term.kind] && !term.negate && !term.last && !term.weekOrdinal &&
+            !term.month && !term.year && !term.firstCount && !term.lastCount && !term.scope
     }
 
     // Within an AND group, positive same-kind day/month terms union together:
@@ -1737,7 +1806,15 @@
                 break
             }
             case 'dayOfMonth': {
-                const scopeText = term.month ? MONTH_NAMES[term.month] + (term.year ? ' ' + term.year : '') : 'the month'
+                const scopeText = term.scope === 'year'
+                    ? (term.year ? String(term.year) : 'the year')
+                    : (term.month ? MONTH_NAMES[term.month] + (term.year ? ' ' + term.year : '') : 'the month')
+                if (term.firstCount || term.lastCount) {
+                    const count = term.firstCount || term.lastCount
+                    text = 'day is in the ' + (term.firstCount ? 'first' : 'last') + ' ' +
+                        (count === 1 ? 'day' : count + ' days') + ' of ' + scopeText
+                    break
+                }
                 if (term.last) {
                     const fromEndText = term.lastOffset ? ordinalNumber(term.lastOffset + 1) + ' last' : 'last'
                     text = 'day is the ' + fromEndText + ' day of ' + scopeText

@@ -353,6 +353,20 @@ describe('filter-eval: years', function () {
         evalText('2nd last friday of the month', { ts: Date.parse('2026-06-26T12:00:00Z'), tz }).pass.should.be.false()
     })
 
+    it('first/last N days of a month or year (leap-aware)', function () {
+        evalText('last 2 days of feb', { ts: Date.parse('2027-02-27T12:00:00Z'), tz }).pass.should.be.true() // 2027: 28 days
+        evalText('last 2 days of feb', { ts: Date.parse('2027-02-26T12:00:00Z'), tz }).pass.should.be.false()
+        evalText('last 2 days of feb', { ts: Date.parse('2028-02-28T12:00:00Z'), tz }).pass.should.be.true() // 2028: leap
+        evalText('last 2 days of feb', { ts: Date.parse('2028-02-27T12:00:00Z'), tz }).pass.should.be.false()
+        evalText('first 3 days of march', { ts: Date.parse('2026-03-03T12:00:00Z'), tz }).pass.should.be.true()
+        evalText('first 3 days of march', { ts: Date.parse('2026-03-04T12:00:00Z'), tz }).pass.should.be.false()
+        evalText('first 3 days of march', { ts: Date.parse('2026-04-02T12:00:00Z'), tz }).pass.should.be.false() // wrong month
+        evalText('last 5 days of the year', { ts: Date.parse('2026-12-27T12:00:00Z'), tz }).pass.should.be.true()
+        evalText('last 5 days of the year', { ts: Date.parse('2026-12-26T12:00:00Z'), tz }).pass.should.be.false()
+        evalText('first 3 months of the year', { ts: Date.parse('2026-02-15T12:00:00Z'), tz }).pass.should.be.true()
+        evalText('first 3 months of the year', { ts: Date.parse('2026-04-15T12:00:00Z'), tz }).pass.should.be.false()
+    })
+
     it('day before/after a moon phase shifts the evaluation day', { timeout: 20000 }, function () {
         // full moon near 29 Jun 2026: find the peak, then test the neighbouring days
         let best = null
