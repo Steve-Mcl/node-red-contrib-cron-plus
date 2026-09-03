@@ -1,9 +1,9 @@
-/* Free-text temporal condition language for the cronplus-filter node.
+/* Free-text temporal condition language for the cronplus-when-gate node.
    Pure logic/semantics - no AI. Runs in BOTH the Node-RED runtime (require)
-   and the editor (loaded via $.getScript, attaches window.cronplusFilterLang)
+   and the editor (loaded via $.getScript, attaches window.cronplusWhenGateLang)
    so the same parser backs runtime evaluation, editor validation and the
    live "parsed understanding" preview. Must therefore stay dependency-free -
-   evaluation against actual sun/moon positions lives in lib/filter-eval.js.
+   evaluation against actual sun/moon positions lives in lib/when-gate-eval.js.
 
    API:
      parse(text) => { ok, ast, description, unmatched, warnings, suggestion }
@@ -15,7 +15,7 @@
     if (typeof module === 'object' && module.exports) {
         module.exports = factory()
     } else {
-        root.cronplusFilterLang = factory()
+        root.cronplusWhenGateLang = factory()
     }
 }(typeof self !== 'undefined' ? self : this, function () {
     'use strict'
@@ -90,7 +90,7 @@
         halloween: { month: 10, day: 31, name: 'halloween' }
     }
 
-    // getSunTimes event keys (lib/filter-eval.js maps them onto suncalc v2)
+    // getSunTimes event keys (lib/when-gate-eval.js maps them onto suncalc v2)
     const SOLAR_EVENT_WORDS = {
         sunrise: 'sunrise',
         sunset: 'sunset',

@@ -352,12 +352,12 @@ copies or substantial portions of the Software.
     const cronTooltipClass = 'cron-plus-expression-tip form-tips ui-corner-all ui-widget-shadow'
 
     // The map picker lives in resources/location-picker[.min].js (shared with the
-    // cronplus-filter node) and is fetched on first use. $.getScript is used (not a
+    // cronplus-when-gate node) and is fetched on first use. $.getScript is used (not a
     // script tag) so the request carries admin auth when adminAuth is enabled. The
     // published package ships only the minified build; dev checkouts have the source.
     let locationPickerPromise = null
     function showMap (srcInput) {
-        if (window.cronplusLocationPicker) { // may already be loaded (cronplus-filter.html loads it too)
+        if (window.cronplusLocationPicker) { // may already be loaded (cronplus-when-gate.html loads it too)
             window.cronplusLocationPicker.showMap(srcInput)
             return
         }

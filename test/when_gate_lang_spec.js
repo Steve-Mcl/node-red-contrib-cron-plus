@@ -1,8 +1,8 @@
 /// <reference types="should" />
-// Parser tests for resources/filter-lang.js - pure module, no node-red helper needed.
+// Parser tests for resources/when-gate-lang.js - pure module, no node-red helper needed.
 const should = require('should')
 const { describe, it } = require('node:test')
-const lang = require('../resources/filter-lang.js')
+const lang = require('../resources/when-gate-lang.js')
 
 // convenience: parse and return the flat term list of the only AND group
 function onlyGroupTerms (text) {
@@ -18,7 +18,7 @@ function onlyTerm (text) {
     return terms[0]
 }
 
-describe('filter-lang parse: days', function () {
+describe('when-gate-lang parse: days', function () {
     ;['saturday', 'on saturday only', 'just on saturday', 'saturdays'].forEach(function (text) {
         it(`parses "${text}" as day Saturday`, function () {
             const term = onlyTerm(text)
@@ -110,7 +110,7 @@ describe('filter-lang parse: days', function () {
     })
 })
 
-describe('filter-lang parse: months and dates', function () {
+describe('when-gate-lang parse: months and dates', function () {
     it('parses "in december"', function () {
         const term = onlyTerm('in december')
         term.kind.should.equal('month')
@@ -150,7 +150,7 @@ describe('filter-lang parse: months and dates', function () {
     })
 })
 
-describe('filter-lang parse: time ranges', function () {
+describe('when-gate-lang parse: time ranges', function () {
     it('parses "weekdays between 9am and 5pm"', function () {
         const terms = onlyGroupTerms('weekdays between 9am and 5pm')
         terms.should.have.length(2)
@@ -211,7 +211,7 @@ describe('filter-lang parse: time ranges', function () {
     })
 })
 
-describe('filter-lang parse: solar', function () {
+describe('when-gate-lang parse: solar', function () {
     ;['is night', 'at night', 'night'].forEach(function (text) {
         it(`parses "${text}" as the night state`, function () {
             const term = onlyTerm(text)
@@ -307,7 +307,7 @@ describe('filter-lang parse: solar', function () {
     })
 })
 
-describe('filter-lang parse: moon', function () {
+describe('when-gate-lang parse: moon', function () {
     ;['when the moon is visible', 'moon visible', 'moon is up', 'moon above the horizon'].forEach(function (text) {
         it(`parses "${text}" as moon above horizon`, function () {
             const term = onlyTerm(text)
@@ -367,7 +367,7 @@ describe('filter-lang parse: moon', function () {
     })
 })
 
-describe('filter-lang parse: combinators', function () {
+describe('when-gate-lang parse: combinators', function () {
     it('parses "on weekends or after sunset" as two OR groups', function () {
         const r = lang.parse('on weekends or after sunset')
         r.ok.should.be.true()
@@ -442,7 +442,7 @@ describe('filter-lang parse: combinators', function () {
     })
 })
 
-describe('filter-lang parse: last-day-of-month combinations', function () {
+describe('when-gate-lang parse: last-day-of-month combinations', function () {
     it('"last day of the month except friday" ANDs a negated Friday', function () {
         const terms = onlyGroupTerms('last day of the month except friday')
         terms.should.have.length(2)
@@ -470,7 +470,7 @@ describe('filter-lang parse: last-day-of-month combinations', function () {
     })
 })
 
-describe('filter-lang parse: years', function () {
+describe('when-gate-lang parse: years', function () {
     it('parses a bare year and "in <year>"', function () {
         onlyTerm('2027').should.have.properties({ kind: 'year' })
         onlyTerm('in 2027').years.should.eql([2027])
@@ -575,7 +575,7 @@ describe('filter-lang parse: years', function () {
     })
 })
 
-describe('filter-lang parse: even/odd', function () {
+describe('when-gate-lang parse: even/odd', function () {
     it('parses "when day is odd" as day-of-month parity', function () {
         const term = onlyTerm('when day is odd')
         term.kind.should.equal('parity')
@@ -600,7 +600,7 @@ describe('filter-lang parse: even/odd', function () {
     })
 })
 
-describe('filter-lang summarize', function () {
+describe('when-gate-lang summarize', function () {
     it('categorises terms per alternative with negation separated', function () {
         const r = lang.parse('weekdays between 9am and 5pm except tuesday')
         const alts = lang.summarize(r.ast)
@@ -619,7 +619,7 @@ describe('filter-lang summarize', function () {
     })
 })
 
-describe('filter-lang parse: sun/moon position', function () {
+describe('when-gate-lang parse: sun/moon position', function () {
     it('parses "sun is between 10 and 12 degrees"', function () {
         const term = onlyTerm('sun is between 10 and 12 degrees')
         term.kind.should.equal('sunAltitude')
@@ -660,7 +660,7 @@ describe('filter-lang parse: sun/moon position', function () {
     })
 })
 
-describe('filter-lang parse: minute of the hour', function () {
+describe('when-gate-lang parse: minute of the hour', function () {
     it('parses "between 15 minutes and 30 minutes past the hour"', function () {
         const term = onlyTerm('between 15 minutes and 30 minutes past the hour')
         term.kind.should.equal('minuteOfHour')
@@ -738,7 +738,7 @@ describe('filter-lang parse: minute of the hour', function () {
     })
 })
 
-describe('filter-lang parse: decimal numbers', function () {
+describe('when-gate-lang parse: decimal numbers', function () {
     it('parses float degrees: "sun is between 43.2 and 80.5 deg"', function () {
         const term = onlyTerm('sun is between 43.2 and 80.5 deg')
         term.low.should.equal(43.2)
@@ -764,7 +764,7 @@ describe('filter-lang parse: decimal numbers', function () {
     })
 })
 
-describe('filter-lang parse: parentheses and precedence', function () {
+describe('when-gate-lang parse: parentheses and precedence', function () {
     it('distributes "(A or B) and C" so C applies to both alternatives', function () {
         const r = lang.parse('(last day of the month or wednesday) and time is after 10pm')
         r.ok.should.be.true()
@@ -822,7 +822,7 @@ describe('filter-lang parse: parentheses and precedence', function () {
     })
 })
 
-describe('filter-lang parse: failures and partial matches', function () {
+describe('when-gate-lang parse: failures and partial matches', function () {
     it('rejects gibberish with a helpful suggestion', function () {
         const r = lang.parse('flurble quickly')
         r.ok.should.be.false()
@@ -844,7 +844,7 @@ describe('filter-lang parse: failures and partial matches', function () {
     })
 })
 
-describe('filter-lang failure suggestions', function () {
+describe('when-gate-lang failure suggestions', function () {
     it('every suggestion-corpus example parses cleanly (they are shown to users as known-good)', function () {
         lang._internal.SUGGESTION_EXAMPLES.forEach(function (example) {
             const r = lang.parse(example)
@@ -885,7 +885,7 @@ describe('filter-lang failure suggestions', function () {
     })
 })
 
-describe('filter-lang requiresLocation', function () {
+describe('when-gate-lang requiresLocation', function () {
     it('is false for pure calendar/time conditions', function () {
         lang.requiresLocation(lang.parse('weekdays between 9am and 5pm').ast).should.be.false()
         lang.requiresLocation(lang.parse('every day').ast).should.be.false()
@@ -902,7 +902,7 @@ describe('filter-lang requiresLocation', function () {
     })
 })
 
-describe('filter-lang parse: ordinal days (nth weekday, day of week/month)', function () {
+describe('when-gate-lang parse: ordinal days (nth weekday, day of week/month)', function () {
     it('parses "first monday of the month"', function () {
         const term = onlyTerm('first monday of the month')
         term.kind.should.equal('nthWeekday')
@@ -1002,7 +1002,7 @@ describe('filter-lang parse: ordinal days (nth weekday, day of week/month)', fun
     })
 })
 
-describe('filter-lang parse: date offsets (eve, day before/after, N units before/after)', function () {
+describe('when-gate-lang parse: date offsets (eve, day before/after, N units before/after)', function () {
     it('parses "christmas eve" as 24 December', function () {
         const term = onlyTerm('christmas eve')
         term.kind.should.equal('namedDate')
@@ -1072,7 +1072,7 @@ describe('filter-lang parse: date offsets (eve, day before/after, N units before
     })
 })
 
-describe('filter-lang parse: solar event offsets', function () {
+describe('when-gate-lang parse: solar event offsets', function () {
     it('parses "2 hours after sunset"', function () {
         const term = onlyTerm('2 hours after sunset')
         term.kind.should.equal('solarEvent')
@@ -1095,7 +1095,7 @@ describe('filter-lang parse: solar event offsets', function () {
     })
 })
 
-describe('filter-lang parse: termination (regression: parse("first") hung the editor)', function () {
+describe('when-gate-lang parse: termination (regression: parse("first") hung the editor)', function () {
     // Words that only exist inside multi-word phrases (e.g. 'first' from
     // "first quarter moon") fuzzy-match themselves without ever resolving to a
     // symbol, which used to loop forever in matchSymbols. Every vocabulary word
@@ -1132,7 +1132,7 @@ describe('filter-lang parse: termination (regression: parse("first") hung the ed
     })
 })
 
-describe('filter-lang internals', function () {
+describe('when-gate-lang internals', function () {
     it('editDistanceLE1 basics', function () {
         lang._internal.editDistanceLE1('sabbath', 'sabath').should.equal(1) // deletion
         lang._internal.editDistanceLE1('wednesday', 'wedensday').should.equal(1) // transposition

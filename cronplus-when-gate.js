@@ -1,21 +1,21 @@
-/* cronplus-filter ("Cron Filter") - gate messages on a free-text temporal
+/* cronplus-when-gate ("when gate") - gate messages on a free-text temporal
    condition ("on saturdays", "when the moon is visible", "weekdays between
    9am and 5pm"). Output 1 = allowed, output 2 = blocked.
-   Parsing lives in resources/filter-lang.js (shared with the editor for the
-   live "parsed understanding" preview); evaluation in lib/filter-eval.js. */
+   Parsing lives in resources/when-gate-lang.js (shared with the editor for
+   the live "parsed understanding" preview); evaluation in lib/when-gate-eval.js. */
 
 module.exports = function (RED) {
     'use strict'
     const coordParser = require('coord-parser')
     // the published package ships only the minified parser build; a source
     // checkout (dev) has the readable file and must prefer it (never stale)
-    let filterLang
+    let whenGateLang
     try {
-        filterLang = require('./resources/filter-lang.js')
+        whenGateLang = require('./resources/when-gate-lang.js')
     } catch (_e) {
-        filterLang = require('./resources/filter-lang.min.js')
+        whenGateLang = require('./resources/when-gate-lang.min.js')
     }
-    const filterEval = require('./lib/filter-eval.js')
+    const whenGateEval = require('./lib/when-gate-eval.js')
 
     function evaluateNodeProperty (value, type, node, msg) {
         return new Promise(function (resolve, reject) {
@@ -70,7 +70,7 @@ module.exports = function (RED) {
         return coordParser(String(value)) // throws on unparseable input
     }
 
-    function CronPlusFilterNode (config) {
+    function CronPlusWhenGateNode (config) {
         RED.nodes.createNode(this, config)
         const node = this
         node.condition = config.condition || ''
@@ -86,8 +86,8 @@ module.exports = function (RED) {
             text = String(text === undefined || text === null ? '' : text)
             if (parseCache.text !== text) {
                 parseCache.text = text
-                parseCache.parsed = filterLang.parse(text)
-                parseCache.needsLocation = parseCache.parsed.ok ? filterLang.requiresLocation(parseCache.parsed.ast) : false
+                parseCache.parsed = whenGateLang.parse(text)
+                parseCache.needsLocation = parseCache.parsed.ok ? whenGateLang.requiresLocation(parseCache.parsed.ast) : false
             }
             return parseCache.parsed
         }
@@ -110,8 +110,8 @@ module.exports = function (RED) {
                 const now = Date.now()
                 const ast = statusContext.parsed.ast
                 const opts = { ts: now, lat: statusContext.lat, lon: statusContext.lon, tz }
-                const pass = filterEval.evaluate(ast, opts).pass
-                const scan = filterEval.findWindows(ast, Object.assign({ maxWindows: 1, budgetMs: 100 }, opts))
+                const pass = whenGateEval.evaluate(ast, opts).pass
+                const scan = whenGateEval.findWindows(ast, Object.assign({ maxWindows: 1, budgetMs: 100 }, opts))
                 const win = scan.windows[0]
                 let until = null
                 if (pass) {
@@ -224,8 +224,8 @@ module.exports = function (RED) {
                     throw new Error('Condition needs a location: set one on the node or send msg.location (or wire from a cronplus solar/lunar schedule)')
                 }
 
-                const result = filterEval.evaluate(parsed.ast, { ts, lat, lon, tz: node.timeZone || undefined })
-                msg.filter = {
+                const result = whenGateEval.evaluate(parsed.ast, { ts, lat, lon, tz: node.timeZone || undefined })
+                msg.whenGate = {
                     pass: result.pass,
                     condition: parseCache.text,
                     description: parsed.description,
@@ -254,12 +254,12 @@ module.exports = function (RED) {
         })
     }
 
-    RED.nodes.registerType('cronplus-filter', CronPlusFilterNode)
+    RED.nodes.registerType('cronplus-when-gate', CronPlusWhenGateNode)
 
     // Editor support: the details popout asks for upcoming allowed windows.
     // The parse itself is client-side; this endpoint exists because evaluation
     // (suncalc, timezone maths) lives in the runtime.
-    RED.httpAdmin.post('/cronplus-filter/:id/preview', RED.auth.needsPermission('cronplus-filter.read'), async function (req, res) {
+    RED.httpAdmin.post('/cronplus-when-gate/:id/preview', RED.auth.needsPermission('cronplus-when-gate.read'), async function (req, res) {
         try {
             const body = req.body || {}
             // the node may not be deployed yet - evaluate env vars without it
@@ -272,7 +272,7 @@ module.exports = function (RED) {
             if (body.conditionType === 'env') {
                 conditionText = await evaluateNodeProperty(body.condition, 'env', previewNode, null)
             }
-            const parsed = filterLang.parse(conditionText || '')
+            const parsed = whenGateLang.parse(conditionText || '')
             if (!parsed.ok) {
                 res.json({ error: body.conditionType === 'env' ? `invalid condition from env var "${body.condition}"` : 'invalid condition' })
                 return
@@ -286,20 +286,20 @@ module.exports = function (RED) {
                     } catch (_e) { /* fall through to the location check below */ }
                 }
             }
-            if (filterLang.requiresLocation(parsed.ast) && (lat === undefined || lon === undefined)) {
+            if (whenGateLang.requiresLocation(parsed.ast) && (lat === undefined || lon === undefined)) {
                 res.json({ error: 'location required', needsLocation: true })
                 return
             }
             const tz = body.timeZone || undefined
             const now = Date.now()
             // user-initiated and infrequent - worth a bigger scan budget than the status
-            const result = filterEval.findWindows(parsed.ast, { ts: now, lat, lon, tz, budgetMs: 1500 })
-            result.now = filterEval.evaluate(parsed.ast, { ts: now, lat, lon, tz }).pass
+            const result = whenGateEval.findWindows(parsed.ast, { ts: now, lat, lon, tz, budgetMs: 1500 })
+            result.now = whenGateEval.evaluate(parsed.ast, { ts: now, lat, lon, tz }).pass
             // for env conditions the editor cannot parse client-side - hand it
             // the description and breakdown too
             result.condition = conditionText
             result.description = parsed.description
-            result.summary = filterLang.summarize(parsed.ast)
+            result.summary = whenGateLang.summarize(parsed.ast)
             res.json(result)
         } catch (err) {
             res.status(500).json({ error: err.message })

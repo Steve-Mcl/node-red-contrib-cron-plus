@@ -6,19 +6,19 @@
     "files": [
         "cronplus.js",
         "cronplus.html",
-        "cronplus-filter.js",
-        "cronplus-filter.html",
+        "cronplus-when-gate.js",
+        "cronplus-when-gate.html",
         "icons/",
         "lib/",
-        "resources/filter-lang.min.js",
+        "resources/when-gate-lang.min.js",
         "resources/location-picker.min.js",
         "examples/"
     ],
     "scripts": {
-        "test": "node --test test/test1_spec.js test/filter_lang_spec.js test/filter_eval_spec.js test/filter_node_spec.js",
+        "test": "node --test test/test1_spec.js test/when_gate_lang_spec.js test/when_gate_eval_spec.js test/when_gate_node_spec.js",
         "lint": "eslint -c eslint.config.mjs",
         "lint:fix": "eslint -c eslint.config.mjs --fix",
-        "build": "terser resources/filter-lang.js -c -m -o resources/filter-lang.min.js && terser resources/location-picker.js -c -m -o resources/location-picker.min.js",
+        "build": "terser resources/when-gate-lang.js -c -m -o resources/when-gate-lang.min.js && terser resources/location-picker.js -c -m -o resources/location-picker.min.js",
         "prepack": "npm run build",
         "check-npm-versions": "node scripts/check-npm-versions.js"
     },
@@ -57,7 +57,7 @@
         "version": ">=1.3.0",
         "nodes": {
             "cronplus": "cronplus.js",
-            "cronplus-filter": "cronplus-filter.js"
+            "cronplus-when-gate": "cronplus-when-gate.js"
         }
     },
     "engines": {

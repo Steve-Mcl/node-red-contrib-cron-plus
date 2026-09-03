@@ -31,17 +31,17 @@ copies or substantial portions of the Software.
     }
 
     // The condition parser is shared with the runtime. Loaded once per editor session.
-    let filterLangPromise = null
-    function loadFilterLang () {
-        if (!filterLangPromise) {
-            filterLangPromise = getSharedScript('filter-lang')
-                .then(function () { return window.cronplusFilterLang })
+    let whenGateLangPromise = null
+    function loadWhenGateLang () {
+        if (!whenGateLangPromise) {
+            whenGateLangPromise = getSharedScript('when-gate-lang')
+                .then(function () { return window.cronplusWhenGateLang })
                 .catch(function (err) {
-                    filterLangPromise = null // allow retry next time the dialog opens
-                    console.error('cronplus-filter: failed to load condition parser', err)
+                    whenGateLangPromise = null // allow retry next time the dialog opens
+                    console.error('cronplus-when-gate: failed to load condition parser', err)
                 })
         }
-        return filterLangPromise
+        return whenGateLangPromise
     }
 
     // ---- details popout: breakdown + upcoming matches --------------------
@@ -51,36 +51,36 @@ copies or substantial portions of the Software.
     function ensureDetailDialog () {
         if (detailDialogReady) { return }
         $('<style>').text(`
-            #cronplus-filter-detail-dialog {
+            #cronplus-when-gate-detail-dialog {
                 padding-top: 6px !important;
             }
-            #cronplus-filter-detail-content > p:first-child {
+            #cronplus-when-gate-detail-content > p:first-child {
                 margin-top: 0;
             }
-            #cronplus-filter-detail-dialog table.cronplus-filter-facets {
+            #cronplus-when-gate-detail-dialog table.cronplus-when-gate-facets {
                 border-collapse: collapse;
                 width: 100%;
                 margin-bottom: 8px;
             }
-            #cronplus-filter-detail-dialog table.cronplus-filter-facets td {
+            #cronplus-when-gate-detail-dialog table.cronplus-when-gate-facets td {
                 border: 1px solid var(--red-ui-secondary-border-color, #ddd);
                 padding: 3px 8px;
                 vertical-align: top;
             }
-            #cronplus-filter-detail-dialog table.cronplus-filter-facets td:first-child {
+            #cronplus-when-gate-detail-dialog table.cronplus-when-gate-facets td:first-child {
                 font-weight: bold;
                 width: 90px;
                 white-space: nowrap;
             }
-            #cronplus-filter-detail-dialog h4 {
+            #cronplus-when-gate-detail-dialog h4 {
                 margin: 10px 0 4px 0;
             }
-            #cronplus-filter-detail-dialog table.cronplus-filter-windows {
+            #cronplus-when-gate-detail-dialog table.cronplus-when-gate-windows {
                 border-collapse: collapse;
                 width: 100%;
                 margin: 4px 0 8px 0;
             }
-            #cronplus-filter-detail-dialog table.cronplus-filter-windows th {
+            #cronplus-when-gate-detail-dialog table.cronplus-when-gate-windows th {
                 text-align: left;
                 font-weight: normal;
                 color: var(--red-ui-tertiary-text-color, #888);
@@ -88,22 +88,22 @@ copies or substantial portions of the Software.
                 padding: 2px 10px 2px 0;
                 border-bottom: 1px solid var(--red-ui-secondary-border-color, #ddd);
             }
-            #cronplus-filter-detail-dialog table.cronplus-filter-windows td {
+            #cronplus-when-gate-detail-dialog table.cronplus-when-gate-windows td {
                 padding: 3px 10px 3px 0;
                 border-bottom: 1px solid var(--red-ui-secondary-border-color, #eee);
                 white-space: nowrap;
                 font-variant-numeric: tabular-nums;
             }
-            #cronplus-filter-detail-dialog table.cronplus-filter-windows td:last-child {
+            #cronplus-when-gate-detail-dialog table.cronplus-when-gate-windows td:last-child {
                 color: var(--red-ui-tertiary-text-color, #888);
             }
-            #cronplus-filter-detail-dialog .cronplus-filter-muted {
+            #cronplus-when-gate-detail-dialog .cronplus-when-gate-muted {
                 color: var(--red-ui-tertiary-text-color, #888);
                 font-size: 11px;
             }
         `).appendTo('head')
-        $('<div id="cronplus-filter-detail-dialog" style="display:none" title="Condition details"><div id="cronplus-filter-detail-content"></div></div>').appendTo('body')
-        $('#cronplus-filter-detail-dialog').dialog({
+        $('<div id="cronplus-when-gate-detail-dialog" style="display:none" title="Condition details"><div id="cronplus-when-gate-detail-content"></div></div>').appendTo('body')
+        $('#cronplus-when-gate-detail-dialog').dialog({
             autoOpen: false,
             modal: true,
             width: Math.min(560, $(window).width() - 40),
@@ -133,7 +133,7 @@ copies or substantial portions of the Software.
                     (byCategory[facet.category] = byCategory[facet.category] || []).push(facet.text)
                 }
             })
-            html += '<table class="cronplus-filter-facets">'
+            html += '<table class="cronplus-when-gate-facets">'
             FACET_ORDER.forEach(function (category) {
                 if (byCategory[category]) {
                     html += '<tr><td>' + category + '</td><td>' + byCategory[category].map(escapeHtml).join('<br>') + '</td></tr>'
@@ -190,7 +190,7 @@ copies or substantial portions of the Software.
     }
 
     function buildWindowsTable (windows, tz) {
-        let html = '<table class="cronplus-filter-windows"><tr><th>Starts</th><th>Ends</th><th>Length</th></tr>'
+        let html = '<table class="cronplus-when-gate-windows"><tr><th>Starts</th><th>Ends</th><th>Length</th></tr>'
         windows.forEach(function (win) {
             const start = fmtDateOnly(win.start, tz) + ', ' + fmtTimeOnly(win.start, tz)
             let end = 'ongoing'
@@ -208,15 +208,15 @@ copies or substantial portions of the Software.
     }
 
     function showDetailDialog (node) {
-        const lang = window.cronplusFilterLang
+        const lang = window.cronplusWhenGateLang
         const conditionType = $('#node-input-condition').typedInput('type')
         const condition = $('#node-input-condition').typedInput('value')
         if (!condition || conditionType === 'msg') { return }
         ensureDetailDialog()
         const tz = $('#node-input-timeZone').val() || ''
-        const content = $('#cronplus-filter-detail-content')
+        const content = $('#cronplus-when-gate-detail-content')
         const upcomingShell = '<h4>Upcoming matches</h4>' +
-            '<div class="cronplus-filter-upcoming"><i class="fa fa-spinner fa-spin"></i> checking&hellip;</div>'
+            '<div class="cronplus-when-gate-upcoming"><i class="fa fa-spinner fa-spin"></i> checking&hellip;</div>'
         let breakdownDone = false
         if (conditionType === 'str' && lang) {
             const result = lang.parse(condition)
@@ -225,12 +225,12 @@ copies or substantial portions of the Software.
             breakdownDone = true
         } else {
             // env: the runtime resolves and parses it - everything comes from the endpoint
-            content.html('<div class="cronplus-filter-upcoming"><i class="fa fa-spinner fa-spin"></i> checking&hellip;</div>')
+            content.html('<div class="cronplus-when-gate-upcoming"><i class="fa fa-spinner fa-spin"></i> checking&hellip;</div>')
         }
-        $('#cronplus-filter-detail-dialog').dialog('open')
+        $('#cronplus-when-gate-detail-dialog').dialog('open')
         $.ajax({
             type: 'POST',
-            url: 'cronplus-filter/' + node.id + '/preview',
+            url: 'cronplus-when-gate/' + node.id + '/preview',
             contentType: 'application/json',
             dataType: 'json',
             data: JSON.stringify({
@@ -243,10 +243,10 @@ copies or substantial portions of the Software.
         }).done(function (data) {
             if (!breakdownDone && !data.error) {
                 content.html(
-                    '<p class="cronplus-filter-muted">Condition from env var: ' + escapeHtml(condition) + ' = &quot;' + escapeHtml(data.condition || '') + '&quot;</p>' +
+                    '<p class="cronplus-when-gate-muted">Condition from env var: ' + escapeHtml(condition) + ' = &quot;' + escapeHtml(data.condition || '') + '&quot;</p>' +
                     buildBreakdownHtml(data.description, data.summary) + upcomingShell)
             }
-            const target = content.find('.cronplus-filter-upcoming')
+            const target = content.find('.cronplus-when-gate-upcoming')
             if (data.error) {
                 target.html('<i class="fa fa-exclamation-triangle"></i> ' + escapeHtml(data.error) +
                     (data.needsLocation ? ' - set a location on the node to preview sun/moon conditions (at runtime it may also arrive on the message).' : ''))
@@ -259,12 +259,12 @@ copies or substantial portions of the Software.
                 html += '<p><i class="fa fa-exclamation-triangle"></i> No matches found up to ' + escapeHtml(fmtStamp(data.scannedUntil, tz)) + '.' +
                     (data.truncated ? '' : ' A rare condition may still match beyond the scanned range.') + '</p>'
             }
-            html += '<p class="cronplus-filter-muted">Sampled every ' + data.resolutionMinutes + ' minute' + (data.resolutionMinutes === 1 ? '' : 's') + ', edges exact to the minute' +
+            html += '<p class="cronplus-when-gate-muted">Sampled every ' + data.resolutionMinutes + ' minute' + (data.resolutionMinutes === 1 ? '' : 's') + ', edges exact to the minute' +
                 (data.truncated ? '; the scan stopped early (time budget)' : '; scanned to ' + escapeHtml(fmtStamp(data.scannedUntil, tz))) +
                 '. Timezone: ' + escapeHtml(tz || 'system') + '.</p>'
             target.html(html)
         }).fail(function () {
-            content.find('.cronplus-filter-upcoming').html('<i class="fa fa-exclamation-triangle"></i> preview unavailable (is the node deployed runtime reachable?)')
+            content.find('.cronplus-when-gate-upcoming').html('<i class="fa fa-exclamation-triangle"></i> preview unavailable (is the node deployed runtime reachable?)')
         })
     }
 
@@ -279,7 +279,7 @@ copies or substantial portions of the Software.
             locationPickerPromise = getSharedScript('location-picker')
                 .catch(function (err) {
                     locationPickerPromise = null
-                    console.error('cronplus-filter: failed to load location picker', err)
+                    console.error('cronplus-when-gate: failed to load location picker', err)
                 })
         }
         locationPickerPromise.then(function () {
@@ -289,10 +289,10 @@ copies or substantial portions of the Software.
         })
     }
 
-    RED.nodes.registerType('cronplus-filter', {
+    RED.nodes.registerType('cronplus-when-gate', {
         category: 'function',
-        paletteLabel: 'Cron Filter',
-        icon: 'cronplus-filter.svg',
+        paletteLabel: 'when gate',
+        icon: 'cronplus-when-gate.svg',
         color: '#a6bbcf',
         inputs: 1,
         outputs: 2,
@@ -304,7 +304,7 @@ copies or substantial portions of the Software.
                 validate: function (v) {
                     if (!v) { return false }
                     if ((this.conditionType || 'str') !== 'str') { return true } // msg/env resolved at runtime
-                    const lang = window.cronplusFilterLang
+                    const lang = window.cronplusWhenGateLang
                     // before the parser has been fetched (first workspace paint)
                     // don't false-flag saved nodes; revalidated once it loads
                     return lang ? lang.parse(v).ok : true
@@ -315,12 +315,12 @@ copies or substantial portions of the Software.
             locationType: { value: 'none' },
             timeZone: { value: '' }
         },
-        inputLabels: 'message to filter',
+        inputLabels: 'message to gate',
         outputLabels: function (index) {
             return index === 0 ? 'allowed' : 'blocked'
         },
         label: function () {
-            return this.name || this.condition || 'Cron Filter'
+            return this.name || this.condition || 'when gate'
         },
         oneditprepare: function () {
             const node = this
@@ -361,7 +361,7 @@ copies or substantial portions of the Software.
             $('#node-input-location').typedInput('value', node.location || '')
 
             // ---- live "parsed understanding" preview ----
-            const tip = $('#cronplus-filter-tip')
+            const tip = $('#cronplus-when-gate-tip')
             // the typedInput widget edits its own inner input and only syncs the
             // original element on blur - read the visible input for live typing
             function currentConditionText () {
@@ -370,41 +370,41 @@ copies or substantial portions of the Software.
                 return $('#node-input-condition').typedInput('value')
             }
             function renderTip () {
-                const lang = window.cronplusFilterLang
+                const lang = window.cronplusWhenGateLang
                 const conditionType = $('#node-input-condition').typedInput('type')
                 const text = currentConditionText()
-                tip.removeClass('cronplus-filter-tip-ok cronplus-filter-tip-warn cronplus-filter-tip-error')
+                tip.removeClass('cronplus-when-gate-tip-ok cronplus-when-gate-tip-warn cronplus-when-gate-tip-error')
                 if (conditionType === 'msg') {
                     tip.text(text ? 'The condition will be read from msg.' + text + ' when each message arrives.' : '')
-                    $('#cronplus-filter-location-hint').hide()
-                    $('#cronplus-filter-detail-row').hide()
+                    $('#cronplus-when-gate-location-hint').hide()
+                    $('#cronplus-when-gate-detail-row').hide()
                     return
                 }
                 if (conditionType === 'env') {
                     tip.text(text ? 'The condition comes from the environment variable "' + text + '" - open details below to preview it.' : '')
-                    $('#cronplus-filter-location-hint').hide()
-                    $('#cronplus-filter-detail-row').toggle(!!text)
+                    $('#cronplus-when-gate-location-hint').hide()
+                    $('#cronplus-when-gate-detail-row').toggle(!!text)
                     return
                 }
                 if (!lang || !text || !text.trim()) {
                     tip.text('')
-                    $('#cronplus-filter-location-hint').hide()
-                    $('#cronplus-filter-detail-row').hide()
+                    $('#cronplus-when-gate-location-hint').hide()
+                    $('#cronplus-when-gate-detail-row').hide()
                     return
                 }
                 const result = lang.parse(text)
-                $('#cronplus-filter-detail-row').toggle(result.ok)
+                $('#cronplus-when-gate-detail-row').toggle(result.ok)
                 if (result.ok) {
                     let understood = 'Allow when: ' + result.description
                     if (result.warnings && result.warnings.length) {
-                        tip.addClass('cronplus-filter-tip-warn')
+                        tip.addClass('cronplus-when-gate-tip-warn')
                         understood += ' - ' + result.warnings.join('; ')
                     } else {
-                        tip.addClass('cronplus-filter-tip-ok')
+                        tip.addClass('cronplus-when-gate-tip-ok')
                     }
                     tip.text(understood)
                 } else {
-                    tip.addClass('cronplus-filter-tip-error')
+                    tip.addClass('cronplus-when-gate-tip-error')
                     if (result.suggestions && result.suggestions.length) {
                         tip.text('Do not understand. Did you mean "' + result.suggestions.join('", "') + '"?')
                     } else {
@@ -415,7 +415,7 @@ copies or substantial portions of the Software.
                 // (not an error - the location can also arrive on the message)
                 const needsLocation = result.ok && lang.requiresLocation(result.ast)
                 const noConfigured = $('#node-input-location').typedInput('type') === 'none'
-                $('#cronplus-filter-location-hint').toggle(needsLocation && noConfigured)
+                $('#cronplus-when-gate-location-hint').toggle(needsLocation && noConfigured)
             }
             let debounceTimer
             function queueRenderTip () {
@@ -429,11 +429,11 @@ copies or substantial portions of the Software.
             $('#node-input-location').on('change', function () {
                 renderTip()
             })
-            $('#cronplus-filter-detail-btn').on('click', function (evt) {
+            $('#cronplus-when-gate-detail-btn').on('click', function (evt) {
                 evt.preventDefault()
                 showDetailDialog(node)
             })
-            loadFilterLang().then(function () {
+            loadWhenGateLang().then(function () {
                 renderTip()
                 // settle the red-triangle state now that real validation is possible
                 RED.editor.validateNode(node)
@@ -492,77 +492,77 @@ copies or substantial portions of the Software.
         oneditsave: function () {
             $('#node-input-condition').off()
             $('#node-input-timeZone').off()
-            $('#cronplus-filter-detail-btn').off()
-            if ($('#cronplus-filter-detail-dialog').length) { $('#cronplus-filter-detail-dialog').dialog('close') }
+            $('#cronplus-when-gate-detail-btn').off()
+            if ($('#cronplus-when-gate-detail-dialog').length) { $('#cronplus-when-gate-detail-dialog').dialog('close') }
         },
         oneditcancel: function () {
             $('#node-input-condition').off()
             $('#node-input-timeZone').off()
-            $('#cronplus-filter-detail-btn').off()
-            if ($('#cronplus-filter-detail-dialog').length) { $('#cronplus-filter-detail-dialog').dialog('close') }
+            $('#cronplus-when-gate-detail-btn').off()
+            if ($('#cronplus-when-gate-detail-dialog').length) { $('#cronplus-when-gate-detail-dialog').dialog('close') }
         }
     })
 })(jQuery)
 </script>
 
-<script type="text/html" data-template-name="cronplus-filter">
+<script type="text/html" data-template-name="cronplus-when-gate">
     <style>
-        .cronplus-filter-form-row > label {
+        .cronplus-when-gate-form-row > label {
             width: 120px !important;
         }
-        #cronplus-filter-tip {
+        #cronplus-when-gate-tip {
             margin: 2px 0 0 125px;
             font-size: 12px;
             min-height: 16px;
             white-space: pre-wrap;
         }
-        .cronplus-filter-tip-ok {
+        .cronplus-when-gate-tip-ok {
             color: var(--red-ui-text-color-success, #3a3);
         }
-        .cronplus-filter-tip-warn {
+        .cronplus-when-gate-tip-warn {
             color: var(--red-ui-text-color-warning, #a80);
         }
-        .cronplus-filter-tip-error {
+        .cronplus-when-gate-tip-error {
             color: var(--red-ui-text-color-error, #d33);
         }
-        #cronplus-filter-location-hint {
+        #cronplus-when-gate-location-hint {
             display: none;
             margin: 2px 0 0 125px;
             font-size: 12px;
             color: var(--red-ui-text-color-warning, #a80);
         }
     </style>
-    <div class="form-row cronplus-filter-form-row">
+    <div class="form-row cronplus-when-gate-form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
         <input type="text" id="node-input-name" style="width: calc(100% - 130px)" placeholder="Name">
     </div>
-    <div class="form-row cronplus-filter-form-row">
+    <div class="form-row cronplus-when-gate-form-row">
         <label for="node-input-condition"><i class="fa fa-filter"></i> Condition</label>
         <input type="text" id="node-input-condition" style="width: calc(100% - 130px)" placeholder='e.g. "weekdays between 9am and 5pm" or "when the moon is visible"'>
         <input type="hidden" id="node-input-conditionType">
-        <div id="cronplus-filter-tip"></div>
-        <div id="cronplus-filter-detail-row" style="display:none; margin: 2px 0 0 125px;">
-            <a href="#" id="cronplus-filter-detail-btn" style="font-size: 12px;"><i class="fa fa-calendar-check-o"></i> details &amp; upcoming matches&hellip;</a>
+        <div id="cronplus-when-gate-tip"></div>
+        <div id="cronplus-when-gate-detail-row" style="display:none; margin: 2px 0 0 125px;">
+            <a href="#" id="cronplus-when-gate-detail-btn" style="font-size: 12px;"><i class="fa fa-calendar-check-o"></i> details &amp; upcoming matches&hellip;</a>
         </div>
-        <div id="cronplus-filter-location-hint"><i class="fa fa-info-circle"></i> This condition needs a location. Set one below, or make sure incoming messages carry one (msg.location, or a cronplus solar/lunar schedule).</div>
+        <div id="cronplus-when-gate-location-hint"><i class="fa fa-info-circle"></i> This condition needs a location. Set one below, or make sure incoming messages carry one (msg.location, or a cronplus solar/lunar schedule).</div>
     </div>
-    <div class="form-row cronplus-filter-form-row">
+    <div class="form-row cronplus-when-gate-form-row">
         <label for="node-input-location"><i class="fa fa-globe"></i> Location</label>
         <input type="text" id="node-input-location" style="width: calc(100% - 130px)" placeholder="lat lon">
         <input type="hidden" id="node-input-locationType">
     </div>
-    <div class="form-row cronplus-filter-form-row">
+    <div class="form-row cronplus-when-gate-form-row">
         <label for="node-input-timeZone"><i class="fa fa-clock-o"></i> Timezone</label>
         <input type="text" id="node-input-timeZone" style="width: calc(100% - 130px)" placeholder="Leave empty for system timezone">
     </div>
 </script>
 
-<script type="text/html" data-help-name="cronplus-filter">
+<script type="text/html" data-help-name="cronplus-when-gate">
     <p>Allows or blocks messages based on a free-text temporal condition, such as
     <code>on saturdays</code>, <code>when the moon is visible</code> or
     <code>weekdays between 9am and 5pm</code>. Typically wired after a <b>cronplus</b>
     node to gate schedule events on conditions cron syntax cannot express, but any
-    message can be filtered.</p>
+    message can be gated.</p>
 
     <h3>Outputs</h3>
     <ol class="node-ports">
@@ -570,7 +570,7 @@ copies or substantial portions of the Software.
         <li>blocked - messages that do not match</li>
     </ol>
     <p>In both cases the original message is passed through untouched, with one
-    addition: <code>msg.filter</code> describes the decision:</p>
+    addition: <code>msg.whenGate</code> describes the decision:</p>
     <pre>{
   "pass": true,
   "condition": "on saturdays",
