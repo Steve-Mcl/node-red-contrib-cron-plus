@@ -55,7 +55,7 @@ FEATURES
 * Demo flows demonstrating many of the capabilities. Import via node-red menu > import > examples.
 * Optional time zone setting supporting UTC and Region/Area (e.g. Europe/London)
 * Daylight Saving Time transitions are handled following the same conventions as Debian cron (see below)
-* A companion **Cron Filter** node to gate messages on plain-English temporal conditions like "on saturdays", "is night" or "when the moon is visible" (see below)
+* A companion **when gate** node to gate messages on plain-English temporal conditions like "on saturdays", "is night" or "when the moon is visible" (see below)
 
 Lunar events
 ------------
@@ -84,10 +84,10 @@ A lunar schedule takes the same shape as a solar one, using `expressionType: "lu
 > [!TIP]
 > At high latitudes the moon can stay above or below the horizon for days at a time. During such periods `rise`/`set` events simply do not occur and the schedule waits for the next real occurrence.
 
-Cron Filter node
-----------------
+When gate node
+--------------
 
-The **Cron Filter** node (`cronplus-filter`) receives any message and routes it to output 1 (allowed) or output 2 (blocked) based on a free-text temporal condition. It is typically wired after a cronplus node to gate schedule events on conditions cron syntax cannot express - but it filters any message.
+The **when gate** node (`cronplus-when-gate`) receives any message and routes it to output 1 (allowed) or output 2 (blocked) based on a free-text temporal condition. It is typically wired after a cronplus node to gate schedule events on conditions cron syntax cannot express - but it gates any message.
 
 Type the condition in plain English; a live "understanding" line below the field shows exactly how it was interpreted (or suggests examples when it wasn't), and a "details & upcoming matches" popout breaks the condition down (days/dates/months/years/times per alternative) and previews the next periods when messages would be allowed. Parsing is pure logic - no AI involved. Examples:
 
@@ -106,11 +106,11 @@ Type the condition in plain English; a live "understanding" line below the field
 * combined: `on weekdays and during daylight`, `on weekends or after sunset`, `weekends or evenings except tuesday`
 * brackets group mixed and/or: `(last day of the month or wednesday) and after 10pm` - without brackets `and` binds tighter than `or`, and the understanding line always shows the grouping it settled on
 
-The evaluated moment is `msg.ts` if present, else the cronplus trigger timestamp (`msg.cronplus.triggerTimestamp`, also found in `msg.payload` when the schedule payload is "Default"), else the message arrival time. Sun/moon conditions need a location: `msg.location`, the cronplus schedule location (`msg.cronplus.config.location`), or the location configured on the filter node (with the same map picker as the cronplus node). Day/time clauses respect the node's optional timezone setting.
+The evaluated moment is `msg.ts` if present, else the cronplus trigger timestamp (`msg.cronplus.triggerTimestamp`, also found in `msg.payload` when the schedule payload is "Default"), else the message arrival time. Sun/moon conditions need a location: `msg.location`, the cronplus schedule location (`msg.cronplus.config.location`), or the location configured on the **when gate** node (with the same map picker as the cronplus node). Day/time clauses respect the node's optional timezone setting.
 
 The condition itself is a typed input: a fixed string (default), a message property (per-message conditions, e.g. `msg.condition`), or an environment variable. The node status always reflects *now* - the current decision and when it next changes, e.g. `allow until Sun 16:00` / `deny until 18:45` (plain `allow`/`deny` when no change is upcoming) - shown from the moment of deploy and self-updating at each flip, independent of message traffic or message timestamps.
 
-Whichever output the message takes, `msg.filter` is added describing the decision (`pass`, `condition`, `description`, `ts` and per-clause `reasons`). A sun/moon condition with no findable location raises a catchable error instead of guessing.
+Whichever output the message takes, `msg.whenGate` is added describing the decision (`pass`, `condition`, `description`, `ts` and per-clause `reasons`). A sun/moon condition with no findable location raises a catchable error instead of guessing.
 
 Daylight Saving Time (DST) handling
 -----------------------------------

@@ -1,12 +1,12 @@
 /// <reference types="should" />
-// Evaluator tests for lib/filter-eval.js at fixed instants/locations.
+// Evaluator tests for lib/when-gate-eval.js at fixed instants/locations.
 // Expected solar/lunar values are computed from require('suncalc') inside the
 // tests so expectations track the library (existing suite convention).
 const should = require('should')
 const { describe, it } = require('node:test')
 const SunCalc = require('suncalc')
-const lang = require('../resources/filter-lang.js')
-const evaluator = require('../lib/filter-eval.js')
+const lang = require('../resources/when-gate-lang.js')
+const evaluator = require('../lib/when-gate-eval.js')
 
 const LONDON = { lat: 51.5, lon: -0.13 }
 const POLAR = { lat: 89, lon: 0 }
@@ -17,7 +17,7 @@ function evalText (text, opts) {
     return evaluator.evaluate(parsed.ast, opts)
 }
 
-describe('filter-eval: calendar terms', function () {
+describe('when-gate-eval: calendar terms', function () {
     // 2026-06-21 is a Sunday
     const SUNDAY_NOON_UTC = Date.parse('2026-06-21T12:00:00Z')
 
@@ -56,7 +56,7 @@ describe('filter-eval: calendar terms', function () {
     })
 })
 
-describe('filter-eval: time ranges (Europe/London, GMT in January)', function () {
+describe('when-gate-eval: time ranges (Europe/London, GMT in January)', function () {
     const tz = 'Europe/London'
     const at = iso => Date.parse(iso)
 
@@ -83,7 +83,7 @@ describe('filter-eval: time ranges (Europe/London, GMT in January)', function ()
     })
 })
 
-describe('filter-eval: solar terms (London)', function () {
+describe('when-gate-eval: solar terms (London)', function () {
     const tz = 'Europe/London'
 
     it('is night at London 23:00Z mid-January, not at noon', function () {
@@ -147,7 +147,7 @@ describe('filter-eval: solar terms (London)', function () {
     })
 })
 
-describe('filter-eval: moon terms', function () {
+describe('when-gate-eval: moon terms', function () {
     it('moon visibility matches suncalc altitude sign', function () {
         const ts = Date.parse('2026-06-21T12:00:00Z')
         const alt = SunCalc.getMoonPosition(new Date(ts), LONDON.lat, LONDON.lon).altitude
@@ -182,7 +182,7 @@ describe('filter-eval: moon terms', function () {
     })
 })
 
-describe('filter-eval: ordinal days', function () {
+describe('when-gate-eval: ordinal days', function () {
     // June 2026: the 1st is a Monday; Tuesdays fall on 2/9/16/23/30; Fridays on 5/12/19/26
     const tz = 'UTC'
 
@@ -216,7 +216,7 @@ describe('filter-eval: ordinal days', function () {
     })
 })
 
-describe('filter-eval: date offsets', function () {
+describe('when-gate-eval: date offsets', function () {
     const tz = 'UTC'
 
     it('christmas eve / day before christmas is 24 December', function () {
@@ -256,7 +256,7 @@ describe('filter-eval: date offsets', function () {
     })
 })
 
-describe('filter-eval: solar event offsets (London, January - GMT)', function () {
+describe('when-gate-eval: solar event offsets (London, January - GMT)', function () {
     const tz = 'Europe/London'
 
     it('2 hours after sunset shifts the boundary later', function () {
@@ -275,7 +275,7 @@ describe('filter-eval: solar event offsets (London, January - GMT)', function ()
     })
 })
 
-describe('filter-eval: last-day-of-month combinations', function () {
+describe('when-gate-eval: last-day-of-month combinations', function () {
     const tz = 'UTC'
     // 2026: 30 Jun is a Tuesday; 31 Jul is a Friday; 30 Sep is a Wednesday
 
@@ -297,7 +297,7 @@ describe('filter-eval: last-day-of-month combinations', function () {
     })
 })
 
-describe('filter-eval: years', function () {
+describe('when-gate-eval: years', function () {
     const tz = 'UTC'
 
     it('january 2027 requires both month and year', function () {
@@ -400,7 +400,7 @@ describe('filter-eval: years', function () {
     })
 })
 
-describe('filter-eval: even/odd', function () {
+describe('when-gate-eval: even/odd', function () {
     const tz = 'UTC'
 
     it('day-of-month parity', function () {
@@ -419,7 +419,7 @@ describe('filter-eval: even/odd', function () {
     })
 })
 
-describe('filter-eval: sun/moon position', function () {
+describe('when-gate-eval: sun/moon position', function () {
     const tz = 'Europe/London'
     const midsummerNoon = Date.parse('2026-06-21T12:00:00Z') // sun ~62 degrees over London
 
@@ -446,7 +446,7 @@ describe('filter-eval: sun/moon position', function () {
     })
 })
 
-describe('filter-eval: minute of the hour', function () {
+describe('when-gate-eval: minute of the hour', function () {
     const tz = 'UTC'
 
     it('minute range passes inside and fails outside (end exclusive)', function () {
@@ -491,7 +491,7 @@ describe('filter-eval: minute of the hour', function () {
     })
 })
 
-describe('filter-eval: findWindows (upcoming-matches preview)', function () {
+describe('when-gate-eval: findWindows (upcoming-matches preview)', function () {
     it('finds office-hours windows from a Saturday start', function () {
         const parsed = lang.parse('weekdays between 9am and 5pm')
         const result = evaluator.findWindows(parsed.ast, { ts: Date.parse('2026-06-20T00:00:00Z'), tz: 'UTC', budgetMs: 5000 })
@@ -559,7 +559,7 @@ describe('filter-eval: findWindows (upcoming-matches preview)', function () {
     })
 })
 
-describe('filter-eval: parenthesized conditions', function () {
+describe('when-gate-eval: parenthesized conditions', function () {
     const tz = 'UTC'
     const cond = '(last day of the month or wednesday) and time is after 10pm'
 
@@ -582,7 +582,7 @@ describe('filter-eval: parenthesized conditions', function () {
     })
 })
 
-describe('filter-eval: blue moon', function () {
+describe('when-gate-eval: blue moon', function () {
     // full-moon peak instants in a range, by hourly scan of the phase
     function fullMoonPeaks (fromIso, toIso) {
         const peaks = []
@@ -653,7 +653,7 @@ describe('filter-eval: blue moon', function () {
     })
 })
 
-describe('filter-eval: combinators and reasons', function () {
+describe('when-gate-eval: combinators and reasons', function () {
     it('AND groups require all terms', function () {
         // 2026-06-21 is a Sunday; noon London is daylight
         const ts = Date.parse('2026-06-21T12:00:00Z')

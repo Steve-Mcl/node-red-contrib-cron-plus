@@ -1,11 +1,11 @@
 /// <reference types="should" />
-// Integration tests for the cronplus-filter node (node-red-node-test-helper).
+// Integration tests for the cronplus-when-gate node (node-red-node-test-helper).
 // Time-sensitive tests inject msg.ts explicitly so no fake timers are needed.
 const should = require('should')
 const sinon = require('sinon')
 const helper = require('node-red-node-test-helper')
 const SunCalc = require('suncalc')
-const filterNode = require('../cronplus-filter.js')
+const whenGateNode = require('../cronplus-when-gate.js')
 const cronplusNode = require('../cronplus.js')
 const { describe, it, beforeEach, afterEach, after } = require('node:test')
 
@@ -25,16 +25,16 @@ after(() => {
 const SATURDAY_NOON = Date.parse('2026-06-20T12:00:00Z')
 const WEDNESDAY_NOON = Date.parse('2026-06-24T12:00:00Z')
 
-function filterFlow (conditionOrProps) {
+function whenGateFlow (conditionOrProps) {
     const props = typeof conditionOrProps === 'string' ? { condition: conditionOrProps } : conditionOrProps
     return [
-        Object.assign({ id: 'f1', type: 'cronplus-filter', name: 'test filter', condition: '', location: '', locationType: 'none', timeZone: 'UTC', wires: [['h-pass'], ['h-block']] }, props),
+        Object.assign({ id: 'f1', type: 'cronplus-when-gate', name: 'test when gate', condition: '', location: '', locationType: 'none', timeZone: 'UTC', wires: [['h-pass'], ['h-block']] }, props),
         { id: 'h-pass', type: 'helper' },
         { id: 'h-block', type: 'helper' }
     ]
 }
 
-describe('cronplus-filter Node', function () {
+describe('cronplus-when-gate Node', function () {
     'use strict'
 
     beforeEach((t, done) => { helper.startServer(done) })
@@ -46,7 +46,7 @@ describe('cronplus-filter Node', function () {
     })
 
     it('loads with expected properties', function (t, done) {
-        helper.load(filterNode, filterFlow('on saturdays'), function () {
+        helper.load(whenGateNode, whenGateFlow('on saturdays'), function () {
             try {
                 const f1 = helper.getNode('f1')
                 should.exist(f1)
@@ -59,20 +59,20 @@ describe('cronplus-filter Node', function () {
         })
     })
 
-    it('routes a matching message to output 1 with msg.filter attached', function (t, done) {
-        helper.load(filterNode, filterFlow('on saturdays'), function () {
+    it('routes a matching message to output 1 with msg.whenGate attached', function (t, done) {
+        helper.load(whenGateNode, whenGateFlow('on saturdays'), function () {
             const f1 = helper.getNode('f1')
             const pass = helper.getNode('h-pass')
             const block = helper.getNode('h-block')
             block.on('input', function () { done(new Error('message must not arrive on the blocked output')) })
             pass.on('input', function (msg) {
                 try {
-                    msg.should.have.property('filter')
-                    msg.filter.pass.should.be.true()
-                    msg.filter.condition.should.equal('on saturdays')
-                    msg.filter.description.should.equal('day is Saturday')
-                    msg.filter.ts.should.equal(SATURDAY_NOON)
-                    msg.filter.reasons.should.be.an.Array()
+                    msg.should.have.property('whenGate')
+                    msg.whenGate.pass.should.be.true()
+                    msg.whenGate.condition.should.equal('on saturdays')
+                    msg.whenGate.description.should.equal('day is Saturday')
+                    msg.whenGate.ts.should.equal(SATURDAY_NOON)
+                    msg.whenGate.reasons.should.be.an.Array()
                     msg.payload.should.equal('hello') // original message untouched
                     done()
                 } catch (err) {
@@ -84,14 +84,14 @@ describe('cronplus-filter Node', function () {
     })
 
     it('routes a non-matching message to output 2 only', function (t, done) {
-        helper.load(filterNode, filterFlow('on saturdays'), function () {
+        helper.load(whenGateNode, whenGateFlow('on saturdays'), function () {
             const f1 = helper.getNode('f1')
             const pass = helper.getNode('h-pass')
             const block = helper.getNode('h-block')
             pass.on('input', function () { done(new Error('message must not arrive on the allowed output')) })
             block.on('input', function (msg) {
                 try {
-                    msg.filter.pass.should.be.false()
+                    msg.whenGate.pass.should.be.false()
                     done()
                 } catch (err) {
                     done(err)
@@ -102,11 +102,11 @@ describe('cronplus-filter Node', function () {
     })
 
     it('prefers msg.ts over msg.cronplus.triggerTimestamp', function (t, done) {
-        helper.load(filterNode, filterFlow('on saturdays'), function () {
+        helper.load(whenGateNode, whenGateFlow('on saturdays'), function () {
             const f1 = helper.getNode('f1')
             helper.getNode('h-pass').on('input', function (msg) {
                 try {
-                    msg.filter.ts.should.equal(SATURDAY_NOON)
+                    msg.whenGate.ts.should.equal(SATURDAY_NOON)
                     done()
                 } catch (err) {
                     done(err)
@@ -117,11 +117,11 @@ describe('cronplus-filter Node', function () {
     })
 
     it('finds cronplus data moved to msg.payload (payloadType "default" quirk)', function (t, done) {
-        helper.load(filterNode, filterFlow('on saturdays'), function () {
+        helper.load(whenGateNode, whenGateFlow('on saturdays'), function () {
             const f1 = helper.getNode('f1')
             helper.getNode('h-pass').on('input', function (msg) {
                 try {
-                    msg.filter.ts.should.equal(SATURDAY_NOON)
+                    msg.whenGate.ts.should.equal(SATURDAY_NOON)
                     done()
                 } catch (err) {
                     done(err)
@@ -132,13 +132,13 @@ describe('cronplus-filter Node', function () {
     })
 
     it('uses "now" when no timestamp is supplied', function (t, done) {
-        helper.load(filterNode, filterFlow('every day'), function () {
+        helper.load(whenGateNode, whenGateFlow('every day'), function () {
             const f1 = helper.getNode('f1')
             const before = Date.now()
             helper.getNode('h-pass').on('input', function (msg) {
                 try {
-                    msg.filter.ts.should.be.aboveOrEqual(before)
-                    msg.filter.ts.should.be.belowOrEqual(Date.now())
+                    msg.whenGate.ts.should.be.aboveOrEqual(before)
+                    msg.whenGate.ts.should.be.belowOrEqual(Date.now())
                     done()
                 } catch (err) {
                     done(err)
@@ -161,7 +161,7 @@ describe('cronplus-filter Node', function () {
 
         it('msg.location beats msg.cronplus.config.location', function (t, done) {
             should.exist(probeTs, 'no probe instant found')
-            helper.load(filterNode, filterFlow('when the moon is visible'), function () {
+            helper.load(whenGateNode, whenGateFlow('when the moon is visible'), function () {
                 const f1 = helper.getNode('f1')
                 helper.getNode('h-pass').on('input', function () { done() }) // London: visible
                 helper.getNode('h-block').on('input', function () { done(new Error('msg.location (London) should have won')) })
@@ -171,7 +171,7 @@ describe('cronplus-filter Node', function () {
 
         it('msg.cronplus.config.location beats the node fixed config', function (t, done) {
             should.exist(probeTs, 'no probe instant found')
-            helper.load(filterNode, filterFlow({ condition: 'when the moon is visible', locationType: 'fixed', location: '51.5,-0.13' }), function () {
+            helper.load(whenGateNode, whenGateFlow({ condition: 'when the moon is visible', locationType: 'fixed', location: '51.5,-0.13' }), function () {
                 const f1 = helper.getNode('f1')
                 helper.getNode('h-pass').on('input', function () { done(new Error('cronplus location (antipode) should have won')) })
                 helper.getNode('h-block').on('input', function () { done() }) // antipode: not visible
@@ -181,7 +181,7 @@ describe('cronplus-filter Node', function () {
 
         it('falls back to the node fixed config location', function (t, done) {
             should.exist(probeTs, 'no probe instant found')
-            helper.load(filterNode, filterFlow({ condition: 'when the moon is visible', locationType: 'fixed', location: '51.5,-0.13' }), function () {
+            helper.load(whenGateNode, whenGateFlow({ condition: 'when the moon is visible', locationType: 'fixed', location: '51.5,-0.13' }), function () {
                 const f1 = helper.getNode('f1')
                 helper.getNode('h-pass').on('input', function () { done() })
                 helper.getNode('h-block').on('input', function () { done(new Error('node config location (London) should apply')) })
@@ -191,10 +191,10 @@ describe('cronplus-filter Node', function () {
     })
 
     it('errors (catchable) when a sun/moon condition has no location; nothing forwarded', function (t, done) {
-        const flow = filterFlow('when the moon is visible')
+        const flow = whenGateFlow('when the moon is visible')
         flow.push({ id: 'c1', type: 'catch', scope: null, uncaught: false, wires: [['h-catch']] })
         flow.push({ id: 'h-catch', type: 'helper' })
-        helper.load(filterNode, flow, function () {
+        helper.load(whenGateNode, flow, function () {
             const f1 = helper.getNode('f1')
             helper.getNode('h-pass').on('input', function () { done(new Error('must not forward')) })
             helper.getNode('h-block').on('input', function () { done(new Error('must not forward')) })
@@ -211,10 +211,10 @@ describe('cronplus-filter Node', function () {
     })
 
     it('errors (catchable) when msg.ts is unparsable', function (t, done) {
-        const flow = filterFlow('every day')
+        const flow = whenGateFlow('every day')
         flow.push({ id: 'c1', type: 'catch', scope: null, uncaught: false, wires: [['h-catch']] })
         flow.push({ id: 'h-catch', type: 'helper' })
-        helper.load(filterNode, flow, function () {
+        helper.load(whenGateNode, flow, function () {
             const f1 = helper.getNode('f1')
             helper.getNode('h-catch').on('input', function (msg) {
                 try {
@@ -229,10 +229,10 @@ describe('cronplus-filter Node', function () {
     })
 
     it('reports an invalid stored condition at construction and rejects inputs', function (t, done) {
-        const flow = filterFlow('complete gibberish xyzzy')
+        const flow = whenGateFlow('complete gibberish xyzzy')
         flow.push({ id: 'c1', type: 'catch', scope: null, uncaught: false, wires: [['h-catch']] })
         flow.push({ id: 'h-catch', type: 'helper' })
-        helper.load(filterNode, flow, function () {
+        helper.load(whenGateNode, flow, function () {
             const f1 = helper.getNode('f1')
             helper.getNode('h-pass').on('input', function () { done(new Error('must not forward')) })
             helper.getNode('h-block').on('input', function () { done(new Error('must not forward')) })
@@ -250,13 +250,13 @@ describe('cronplus-filter Node', function () {
 
     describe('condition from msg / env', function () {
         it('reads the condition from a msg property per message', function (t, done) {
-            helper.load(filterNode, filterFlow({ condition: 'gate', conditionType: 'msg' }), function () {
+            helper.load(whenGateNode, whenGateFlow({ condition: 'gate', conditionType: 'msg' }), function () {
                 const f1 = helper.getNode('f1')
                 let passCount = 0
                 helper.getNode('h-pass').on('input', function (msg) {
                     try {
                         passCount++
-                        msg.filter.condition.should.equal('on saturdays')
+                        msg.whenGate.condition.should.equal('on saturdays')
                         // second message: same ts but a non-matching condition must block
                         f1.receive({ ts: SATURDAY_NOON, gate: 'on sundays' })
                     } catch (err) {
@@ -266,7 +266,7 @@ describe('cronplus-filter Node', function () {
                 helper.getNode('h-block').on('input', function (msg) {
                     try {
                         passCount.should.equal(1)
-                        msg.filter.condition.should.equal('on sundays')
+                        msg.whenGate.condition.should.equal('on sundays')
                         done()
                     } catch (err) {
                         done(err)
@@ -277,10 +277,10 @@ describe('cronplus-filter Node', function () {
         })
 
         it('errors (catchable) when the msg condition is not understood', function (t, done) {
-            const flow = filterFlow({ condition: 'gate', conditionType: 'msg' })
+            const flow = whenGateFlow({ condition: 'gate', conditionType: 'msg' })
             flow.push({ id: 'c1', type: 'catch', scope: null, uncaught: false, wires: [['h-catch']] })
             flow.push({ id: 'h-catch', type: 'helper' })
-            helper.load(filterNode, flow, function () {
+            helper.load(whenGateNode, flow, function () {
                 const f1 = helper.getNode('f1')
                 helper.getNode('h-catch').on('input', function (msg) {
                     try {
@@ -295,13 +295,13 @@ describe('cronplus-filter Node', function () {
         })
 
         it('reads the condition from an environment variable', function (t, done) {
-            process.env.TEST_FILTER_COND = 'on saturdays'
-            helper.load(filterNode, filterFlow({ condition: 'TEST_FILTER_COND', conditionType: 'env' }), function () {
+            process.env.TEST_WHEN_GATE_COND = 'on saturdays'
+            helper.load(whenGateNode, whenGateFlow({ condition: 'TEST_WHEN_GATE_COND', conditionType: 'env' }), function () {
                 const f1 = helper.getNode('f1')
                 helper.getNode('h-pass').on('input', function (msg) {
                     try {
-                        msg.filter.condition.should.equal('on saturdays')
-                        delete process.env.TEST_FILTER_COND
+                        msg.whenGate.condition.should.equal('on saturdays')
+                        delete process.env.TEST_WHEN_GATE_COND
                         done()
                     } catch (err) {
                         done(err)
@@ -333,7 +333,7 @@ describe('cronplus-filter Node', function () {
 
         it('shows the decision at deploy time, before any message arrives', function (t, done) {
             withFakeNow(WEDNESDAY_NOON, function (finish) {
-                helper.load(filterNode, filterFlow('weekdays between 9am and 5pm'), function () {
+                helper.load(whenGateNode, whenGateFlow('weekdays between 9am and 5pm'), function () {
                     const f1 = helper.getNode('f1')
                     setTimeout(function () { // init resolves the location asynchronously
                         try {
@@ -351,7 +351,7 @@ describe('cronplus-filter Node', function () {
 
         it('shows "deny until <next window>" when currently blocked', function (t, done) {
             withFakeNow(SATURDAY_NOON, function (finish) {
-                helper.load(filterNode, filterFlow('weekdays between 9am and 5pm'), function () {
+                helper.load(whenGateNode, whenGateFlow('weekdays between 9am and 5pm'), function () {
                     const f1 = helper.getNode('f1')
                     setTimeout(function () {
                         try {
@@ -369,11 +369,11 @@ describe('cronplus-filter Node', function () {
 
         it('status stays NOW-based even when a message carries an old ts', function (t, done) {
             withFakeNow(WEDNESDAY_NOON, function (finish) {
-                helper.load(filterNode, filterFlow('weekdays between 9am and 5pm'), function () {
+                helper.load(whenGateNode, whenGateFlow('weekdays between 9am and 5pm'), function () {
                     const f1 = helper.getNode('f1')
                     helper.getNode('h-block').on('input', function (msg) {
                         try {
-                            msg.filter.pass.should.be.false() // routed per its own Saturday ts
+                            msg.whenGate.pass.should.be.false() // routed per its own Saturday ts
                             lastStatusOf(f1).text.should.equal('allow until 17:00') // status per NOW
                             finish()
                         } catch (err) {
@@ -387,7 +387,7 @@ describe('cronplus-filter Node', function () {
 
         it('shows plain "allow" when the condition never flips', function (t, done) {
             withFakeNow(WEDNESDAY_NOON, function (finish) {
-                helper.load(filterNode, filterFlow('every day'), function () {
+                helper.load(whenGateNode, whenGateFlow('every day'), function () {
                     const f1 = helper.getNode('f1')
                     setTimeout(function () {
                         try {
@@ -402,7 +402,7 @@ describe('cronplus-filter Node', function () {
         })
 
         it('shows "waiting for message" for msg-type conditions', function (t, done) {
-            helper.load(filterNode, filterFlow({ condition: 'gate', conditionType: 'msg' }), function () {
+            helper.load(whenGateNode, whenGateFlow({ condition: 'gate', conditionType: 'msg' }), function () {
                 const f1 = helper.getNode('f1')
                 try {
                     lastStatusOf(f1).text.should.equal('waiting for message')
@@ -414,7 +414,7 @@ describe('cronplus-filter Node', function () {
         })
 
         it('shows "no location" for sun/moon conditions with no configured location', function (t, done) {
-            helper.load(filterNode, filterFlow('when the moon is visible'), function () {
+            helper.load(whenGateNode, whenGateFlow('when the moon is visible'), function () {
                 const f1 = helper.getNode('f1')
                 setTimeout(function () {
                     try {
@@ -430,9 +430,9 @@ describe('cronplus-filter Node', function () {
 
     describe('preview admin endpoint', function () {
         it('returns upcoming windows for a valid condition', function (t, done) {
-            helper.load(filterNode, filterFlow('weekdays between 9am and 5pm'), function () {
+            helper.load(whenGateNode, whenGateFlow('weekdays between 9am and 5pm'), function () {
                 helper.request()
-                    .post('/cronplus-filter/f1/preview')
+                    .post('/cronplus-when-gate/f1/preview')
                     .set('Content-Type', 'application/json')
                     .send({ condition: 'weekdays between 9am and 5pm', location: '', locationType: 'none', timeZone: 'UTC' })
                     .expect(200)
@@ -452,9 +452,9 @@ describe('cronplus-filter Node', function () {
         })
 
         it('reports location required for sun/moon conditions with no location', function (t, done) {
-            helper.load(filterNode, filterFlow('when the moon is visible'), function () {
+            helper.load(whenGateNode, whenGateFlow('when the moon is visible'), function () {
                 helper.request()
-                    .post('/cronplus-filter/f1/preview')
+                    .post('/cronplus-when-gate/f1/preview')
                     .set('Content-Type', 'application/json')
                     .send({ condition: 'when the moon is visible', location: '', locationType: 'none', timeZone: '' })
                     .expect(200)
@@ -471,9 +471,9 @@ describe('cronplus-filter Node', function () {
         })
 
         it('reports an invalid condition', function (t, done) {
-            helper.load(filterNode, filterFlow('every day'), function () {
+            helper.load(whenGateNode, whenGateFlow('every day'), function () {
                 helper.request()
-                    .post('/cronplus-filter/f1/preview')
+                    .post('/cronplus-when-gate/f1/preview')
                     .set('Content-Type', 'application/json')
                     .send({ condition: 'total flurble', location: '', locationType: 'none', timeZone: '' })
                     .expect(200)
@@ -493,19 +493,19 @@ describe('cronplus-filter Node', function () {
     it('gates a live cronplus schedule (payloadType default)', { timeout: 5000 }, async function () {
         const flow = [
             { id: 'cp1', type: 'cronplus', name: 'every second', outputField: 'payload', timeZone: '', commandResponseMsgOutput: 'output1', outputs: 1, options: [{ name: 'sched1', topic: 'sched1', payloadType: 'default', payload: '', expressionType: 'cron', expression: '* * * * * * *', location: '', offset: '0' }], wires: [['f1']] },
-            { id: 'f1', type: 'cronplus-filter', name: 'gate', condition: 'every day', location: '', locationType: 'none', timeZone: '', wires: [['h-pass'], ['h-block']] },
+            { id: 'f1', type: 'cronplus-when-gate', name: 'gate', condition: 'every day', location: '', locationType: 'none', timeZone: '', wires: [['h-pass'], ['h-block']] },
             { id: 'h-pass', type: 'helper' },
             { id: 'h-block', type: 'helper' }
         ]
         await alignToSecondBoundary()
-        await helper.load([cronplusNode, filterNode], flow)
+        await helper.load([cronplusNode, whenGateNode], flow)
         const received = []
         helper.getNode('h-pass').on('input', function (msg) { received.push(msg) })
         await sleep(2050)
         received.length.should.be.aboveOrEqual(1)
-        received[0].should.have.property('filter')
-        received[0].filter.pass.should.be.true()
+        received[0].should.have.property('whenGate')
+        received[0].whenGate.pass.should.be.true()
         received[0].payload.should.have.property('triggerTimestamp')
-        received[0].filter.ts.should.equal(received[0].payload.triggerTimestamp)
+        received[0].whenGate.ts.should.equal(received[0].payload.triggerTimestamp)
     })
 })

@@ -1,6 +1,6 @@
 /* Shared editor-side location (map) picker for node-red-contrib-cron-plus.
    Loaded on demand via $.getScript('resources/node-red-contrib-cron-plus/location-picker.js')
-   by cronplus.html and cronplus-filter.html, then used as:
+   by cronplus.html and cronplus-when-gate.html, then used as:
        window.cronplusLocationPicker.showMap($input)   // $input: plain input or typedInput
    The dialog markup is appended to document.body (not a node template) because node
    templates only exist in the DOM while that node's edit dialog is open, and the picker
