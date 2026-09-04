@@ -1,6 +1,6 @@
 node-red-contrib-cron-plus
 ============================
-_A flexible timer/scheduler (cron, solar events, simple dates) node for Node-RED with full dynamic control and time zone support_
+_A flexible timer/scheduler (cron, solar events, lunar events, simple dates) node for Node-RED with full dynamic control and time zone support_
 
 
 QUICK DEMO...
@@ -10,7 +10,7 @@ QUICK DEMO...
 
 FEATURES
 --------
-* Schedule by CRON, date sequences and solar events (with offset) 
+* Schedule by CRON, date sequences, solar events and lunar events (with offset) 
   * A human readable description of your expression is provided as you type.
   * ![cron-tt](https://user-images.githubusercontent.com/44235289/84030877-afe8b300-a98c-11ea-8a77-be84d840bf5d.gif)
   * An Easy Expression Builder to aid cron novices
@@ -55,6 +55,61 @@ FEATURES
 * Demo flows demonstrating many of the capabilities. Import via node-red menu > import > examples.
 * Optional time zone setting supporting UTC and Region/Area (e.g. Europe/London)
 * Daylight Saving Time transitions are handled following the same conventions as Debian cron (see below)
+* A companion **when gate** node to gate messages on plain-English temporal conditions like "on saturdays", "is night" or "when the moon is visible" (see below)
+   * <img width="665" height="592" alt="chrome_4uSXOX59at" src="https://github.com/user-attachments/assets/475b2a2a-55d9-4617-9410-eaef31f14bcc" />
+------------
+
+Schedules can fire on moon events at a location, alongside the existing solar events:
+
+| Event ID | Event | Information |
+|----------|-------|-------------|
+| `rise` | moon rise | the moon rises above the horizon |
+| `set` | moon set | the moon sets below the horizon |
+
+A lunar schedule takes the same shape as a solar one, using `expressionType: "lunar"` with `lunarType` (`"all"` or `"selected"`) and `lunarEvents` (a CSV or array of the event IDs above), plus the usual `location` and optional `offset` (minutes). For example, adding one dynamically:
+
+```json
+{
+    "command": "add",
+    "name": "moonwatch",
+    "topic": "moonwatch",
+    "expressionType": "lunar",
+    "lunarType": "selected",
+    "lunarEvents": "rise,set",
+    "location": "54.9992500,-1.4170300"
+}
+```
+
+> [!TIP]
+> At high latitudes the moon can stay above or below the horizon for days at a time. During such periods `rise`/`set` events simply do not occur and the schedule waits for the next real occurrence.
+
+When gate node
+--------------
+
+The **when gate** node (`cronplus-when-gate`) receives any message and routes it to output 1 (allowed) or output 2 (blocked) based on a free-text temporal condition. It is typically wired after a cronplus node to gate schedule events on conditions cron syntax cannot express - but it gates any message.
+
+Type the condition in plain English; a live "understanding" line below the field shows exactly how it was interpreted (or suggests examples when it wasn't), and a "details & upcoming matches" popout breaks the condition down (days/dates/months/years/times per alternative) and previews the next periods when messages would be allowed. Parsing is pure logic - no AI involved. Examples:
+
+* `on saturday only`, `weekdays`, `mon-wed`, `not on tuesday`
+* `first monday of the month`, `3rd tuesday of the month`, `last friday of the month`, `last day of the month`, `last day of the week` (weeks start Monday; the understanding line shows which day it resolved to)
+* `in december`, `june to august`, `on the 1st of the month`, `christmas day`
+* `january 2027`, `2027 to 2029`, `first monday of the year`, `2nd tuesday of 2028`, `first monday of january`
+* `when day is odd`, `on even months`, `on even years`
+* `christmas eve`, `day before christmas`, `4 days after christmas`, `1 month before christmas`, `within 2 days of christmas`
+* `between 9am and 5pm`, `before noon`, `between 10pm and 6am` (overnight)
+* `between 15 minutes and 30 minutes past the hour`, `quarter past`, `half past`, `ten past`, `5 to` (every hour; `quarter past five` is the clock time 05:15)
+* `is night`, `after dark`, `golden hour`, `sun rising`, `during daylight`
+* `after sunset`, `before sunrise`, `2 hours after sunset`, `within 30 minutes of sunrise`, `between sunset and sunrise`
+* `when the moon is visible`, `full moon`, `blue moon` (second full moon of a calendar month), `seasonal blue moon` (third full moon in a season of four), `moon more than 50% illuminated`, `moon is 90% illuminated` (bare percentages mean "at least")
+* `sun is between 10 and 12 degrees`, `sun above 30 degrees`, `sun is high`/`sun is low`, `moon is high`/`moon is low`
+* combined: `on weekdays and during daylight`, `on weekends or after sunset`, `weekends or evenings except tuesday`
+* brackets group mixed and/or: `(last day of the month or wednesday) and after 10pm` - without brackets `and` binds tighter than `or`, and the understanding line always shows the grouping it settled on
+
+The evaluated moment is `msg.ts` if present, else the cronplus trigger timestamp (`msg.cronplus.triggerTimestamp`, also found in `msg.payload` when the schedule payload is "Default"), else the message arrival time. Sun/moon conditions need a location: `msg.location`, the cronplus schedule location (`msg.cronplus.config.location`), or the location configured on the **when gate** node (with the same map picker as the cronplus node). Day/time clauses respect the node's optional timezone setting.
+
+The condition itself is a typed input: a fixed string (default), a message property (per-message conditions, e.g. `msg.condition`), or an environment variable. The node status always reflects *now* - the current decision and when it next changes, e.g. `allow until Sun 16:00` / `deny until 18:45` (plain `allow`/`deny` when no change is upcoming) - shown from the moment of deploy and self-updating at each flip, independent of message traffic or message timestamps.
+
+Whichever output the message takes, `msg.whenGate` is added describing the decision (`pass`, `condition`, `description`, `ts` and per-clause `reasons`). A sun/moon condition with no findable location raises a catchable error instead of guessing.
 
 Daylight Saving Time (DST) handling
 -----------------------------------
@@ -132,7 +187,7 @@ Dependencies
 * [cronosjs](https://github.com/jaclarke/cronosjs)
 * [cronstrue](https://github.com/bradymholt/cRonstrue) 
 * [pretty-ms](https://github.com/sindresorhus/pretty-ms)
-* [suncalc2](https://github.com/andiling/suncalc2)
+* [suncalc](https://github.com/mourner/suncalc)
 * [coord-parser](https://github.com/naturalatlas/coord-parser)
 
 Development

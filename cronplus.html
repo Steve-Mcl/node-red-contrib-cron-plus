@@ -17,7 +17,6 @@ copies or substantial portions of the Software.
 
 <script type="text/javascript">
 /* global RED, $, jQuery */
-/* global cartodb, L */
 
 (function ($) {
     'use strict'
@@ -350,9 +349,34 @@ copies or substantial portions of the Software.
 
     RED._cron_plus_debug = false // set true at runtime to enable debug output
     if (RED._cron_plus_debug) console.debug('Initializing cron-plus')
-    let map, mapPopup, selectedLocation, selectedLocationInput
-    const filesAdded = [] // list of files already added
     const cronTooltipClass = 'cron-plus-expression-tip form-tips ui-corner-all ui-widget-shadow'
+
+    // The map picker lives in resources/location-picker[.min].js (shared with the
+    // cronplus-when-gate node) and is fetched on first use. $.getScript is used (not a
+    // script tag) so the request carries admin auth when adminAuth is enabled. The
+    // published package ships only the minified build; dev checkouts have the source.
+    let locationPickerPromise = null
+    function showMap (srcInput) {
+        if (window.cronplusLocationPicker) { // may already be loaded (cronplus-when-gate.html loads it too)
+            window.cronplusLocationPicker.showMap(srcInput)
+            return
+        }
+        if (!locationPickerPromise) {
+            locationPickerPromise = $.getScript('resources/node-red-contrib-cron-plus/location-picker.min.js')
+                .catch(function () {
+                    return $.getScript('resources/node-red-contrib-cron-plus/location-picker.js')
+                })
+                .catch(function (err) {
+                    locationPickerPromise = null // allow retry on next click
+                    console.error('cron-plus: failed to load location picker', err)
+                })
+        }
+        locationPickerPromise.then(function () {
+            if (window.cronplusLocationPicker) {
+                window.cronplusLocationPicker.showMap(srcInput)
+            }
+        })
+    }
 
     function toggleFullscreen (selector, callback) {
         callback = callback || function () {}
@@ -377,51 +401,6 @@ copies or substantial portions of the Software.
                 callback()
             }
         }
-    }
-
-    function checkLoadJsCssFile (filename, filetype, callback) {
-        if (filesAdded.indexOf(filename) === -1) {
-            loadJsCssFile(filename, filetype, function () {
-                filesAdded.push(filename)
-                if (callback) callback()
-            })
-        } else {
-            if (callback) callback()
-        }
-    }
-
-    function loadJsCssFile (filename, filetype, callback) {
-        let fileRef
-        if (filetype === 'js') { // if filename is a external JavaScript file
-            fileRef = document.createElement('script')
-            fileRef.setAttribute('type', 'text/javascript')
-            fileRef.setAttribute('src', filename)
-        } else if (filetype === 'css') { // if filename is an external CSS file
-            fileRef = document.createElement('link')
-            fileRef.setAttribute('rel', 'stylesheet')
-            fileRef.setAttribute('type', 'text/css')
-            fileRef.setAttribute('href', filename)
-        }
-        if (typeof fileRef !== 'undefined') { document.getElementsByTagName('head')[0].appendChild(fileRef) }
-
-        fileRef.onload = function () {
-            if (callback) callback()
-        }
-    }
-
-    function safeFloat (value, def) {
-        if ((undefined === value) || (value === null)) {
-            return def || 0.0
-        }
-        try {
-            value = parseFloat(value)
-        } catch (_e) {
-            value = def || 0.0
-        }
-        if (isNaN(value)) {
-            return def || 0.0
-        }
-        return value
     }
 
     function isCronLike (expression) {
@@ -471,199 +450,9 @@ copies or substantial portions of the Software.
         $('#cron-plus-solar-events-info').get(0).scrollIntoView()
     }
 
-    const getIdealDialogHeight = function () {
-        return Math.min(800, ($(document).height() < 600) ? $(document).height() - 30 : $(document).height() - 100)
-    }
-
-    function initMap () {
-        // create map popup dialog
-        $('#cron-plus-map-dialog').dialog({
-            classes: {
-                'ui-dialog-content': 'cron-plus-map-dialog-content'
-            },
-            autoOpen: false,
-            height: getIdealDialogHeight(),
-            width: '75%',
-            minWidth: 300,
-            maxWidth: 1000,
-            modal: true,
-            buttons: {
-                Cancel: function () {
-                    $('#cron-plus-map-dialog').dialog('close')
-                },
-                OK: function () {
-                    $('#cron-plus-map-dialog').dialog('close')
-                    if (selectedLocation && selectedLocationInput) {
-                        if (selectedLocationInput.typedInput('instance')) {
-                            selectedLocationInput.typedInput('value', selectedLocation.lat + ' ' + selectedLocation.lng)
-                        } else {
-                            selectedLocationInput.val(selectedLocation.lat + ' ' + selectedLocation.lng)
-                        }
-                        selectedLocationInput.focus()
-                        // if selectedLocationInput is a typedInput, trigger focus on that
-                        if (selectedLocationInput.typedInput('instance')) {
-                            selectedLocationInput.typedInput('focus')
-                        }
-                        selectedLocationInput.change()
-                    }
-                }
-            },
-            show: {
-                effect: 'blind',
-                duration: 500
-            },
-            open: function (_event) {
-                $(this).css('padding', '0px 0px 0px 0px')
-                $('.ui-dialog-buttonpane').find('button:contains("OK")').addClass('primary')
-                $('#cron-plus-map-dialog').dialog('option', 'height', getIdealDialogHeight())
-                $('#cron-plus-dynamic-nodes-dialog').dialog('option', 'position', { my: 'center', at: 'center', of: window })
-            },
-            hide: {
-                effect: 'explode',
-                duration: 500
-            },
-            close: function (_event, _ui) {
-                if (RED._cron_plus_debug) console.debug('destroying map')
-                if (map) map.remove()
-            }
-        })
-    }
-
-    function createMap (srcInput) {
-        if (RED._cron_plus_debug) {
-            console.debug('createMap', srcInput)
-        }
-        $('.cron-plus-map-loading').hide()
-        if (!window.L || navigator.onLine === false) {
-            $('.cron-plus-map-not-loaded').show()
-            $('#cron-plus-map').hide()
-            return
-        }
-        $('#cron-plus-map').show()
-        $('.cron-plus-map-not-loaded').hide()
-        let lat, lon
-        selectedLocationInput = srcInput
-        function getInputValue () {
-            if (selectedLocationInput.typedInput('instance')) {
-                return selectedLocationInput.typedInput('value')
-            }
-            return selectedLocationInput.val()
-        }
-        const latlon = getInputValue()
-        if (latlon && typeof latlon === 'string') {
-            let splitChar = ' '
-            if (latlon.includes(',')) splitChar = ','
-            const arrLatlon = latlon.split(splitChar)
-            if (arrLatlon.length >= 2) {
-                lat = arrLatlon[0]
-                lon = arrLatlon[1]
-            }
-        }
-        if (RED._cron_plus_debug) console.debug('createMap', lat, lon)
-        let zoom = 3// by default, zoomed out
-        let showPopupOnOpen = false
-        if (lat && lon) {
-            showPopupOnOpen = true
-            zoom = 5// if location is set, zoom in a bit
-        }
-        lat = safeFloat(lat, 50.0)
-        lon = safeFloat(lon, 0.0)
-        if (RED._cron_plus_debug) console.debug('lat/lon', lat, lon)
-        selectedLocation = window.L.latLng(lat, lon)
-        if (RED._cron_plus_debug) console.debug('selectedLocation', selectedLocation.lat, selectedLocation.lng)
-
-        // create leaflet map
-        map = window.L.map('cron-plus-map', {
-            zoomControl: true,
-            center: selectedLocation, // [selectedLocation.lat,selectedLocation.lng],
-            zoom
-        })
-        mapPopup = window.L.popup()
-
-        map.on('click', function (e) {
-            if (RED._cron_plus_debug) console.debug(e)
-            const normaliseLat = function (x) {
-                while (x > 90.0 || x < -90.0) {
-                    if (x > 90.0) { x = -(90.0 - (x - 90)) }
-                    if (x < -90.0) { x = (90.0 - ((-x) - 90)) }
-                }
-                return x
-            }
-            const normaliseLng = function (x) {
-                while (x > 180.0 || x < -180.0) {
-                    if (x > 180.0) { x = -(180.0 - (x - 180)) }
-                    if (x < -180.0) { x = (180.0 - ((-x) - 180)) }
-                }
-                return x
-            }
-            selectedLocation = {}
-            selectedLocation.lat = normaliseLat(e.latlng.lat)
-            selectedLocation.lng = normaliseLng(e.latlng.lng)
-            const content =
-            '<div><span>Lat:</span> <span>' + selectedLocation.lat + '</span></div>' +
-                '<div><span>Lon:</span> <span>' + selectedLocation.lng + '</span></div>'
-            showMapPopup(content, e.latlng.lat, e.latlng.lng, map)
-        })
-
-        function showMapPopup (content, lat, lon, map) {
-            mapPopup
-                .setLatLng([lat, lon])
-                .setContent(content)
-                .openOn(map)
-        }
-
-        // add a base layer
-        const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-        const layer = L.tileLayer(tileUrl, {})
-        layer.addTo(map)
-        // add cartodb layer with one sublayer
-        cartodb.createLayer(map, {
-            user_name: 'node-red',
-            type: 'namedmap',
-            options: {
-                named_map: {
-                    name: 'node-red@cronplus',
-                    params: {
-                        color: '#5CA2D1'
-                    },
-                    layers: [{}]
-                }
-            }
-        })
-            .addTo(map)
-            .done(function (layer) {
-                layer.setInteraction(true)
-                if (showPopupOnOpen) {
-                    const content =
-                        '<div><span>Lat:</span> <span>' + selectedLocation.lat + '</span></div>' +
-                        '<div><span>Lon:</span> <span>' + selectedLocation.lng + '</span></div>'
-                    showMapPopup(content, selectedLocation.lat, selectedLocation.lng, map)
-                }
-
-                layer.on('featureClick', function (e, latlng, pos, data, _layer) {
-                    if (RED._cron_plus_debug) console.debug('click', latlng, data)
-                })
-                $('#cron-plus-map-dialog').dialog('option', 'position', { my: 'center', at: 'center', of: window })
-            })
-    }
-
-    function showMap (srcInput) {
-        $('#cron-plus-map-dialog').dialog('open')
-        if (navigator.onLine === true) {
-            $('.cron-plus-map-not-loaded').show()
-            $('.cron-plus-map-loading').hide()
-            $('#cron-plus-map').hide()
-            const proto = window.location.protocol === 'https:' ? 'https:' : 'http:'
-            checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.15/themes/css/cartodb.css', 'css', function () {
-                checkLoadJsCssFile(proto + '//libs.cartocdn.com/cartodb.js/v3/3.15/cartodb.uncompressed.js', 'js', function () {
-                    createMap(srcInput)
-                })
-            })
-        } else {
-            $('.cron-plus-map-not-loaded').show()
-            $('.cron-plus-map-loading').hide()
-            $('#cron-plus-map').hide()
-        }
+    function showLunarHelp () {
+        showSidebarHelpPanel()
+        $('#cron-plus-lunar-events-info').get(0).scrollIntoView()
     }
 
     function updateEditorLayout () {
@@ -976,6 +765,15 @@ copies or substantial portions of the Software.
                                     console.warn('cron-plus: validation error - solarEvents missing')
                                     return false
                                 }
+                            } else if (value[i].expressionType === 'lunar') {
+                                if (value[i].lunarType !== 'all' && value[i].lunarType !== 'selected') {
+                                    console.warn("cron-plus: validation error - lunarType is not 'all' or 'selected'")
+                                    return false
+                                }
+                                if (value[i].lunarType === 'selected' && !value[i].lunarEvents) {
+                                    console.warn('cron-plus: validation error - lunarEvents missing')
+                                    return false
+                                }
                             }
                         }
                     }
@@ -1012,8 +810,6 @@ copies or substantial portions of the Software.
             const dupCheck = {}
 
             node.commandResponseMsgOutput = ['output1', 'output2', 'fanOut'].indexOf(node.commandResponseMsgOutput) >= 0 ? node.commandResponseMsgOutput : 'output1'
-
-            initMap()
 
             // inherit/upgrade deprecated properties from config
             const hasStoreNameProperty = Object.prototype.hasOwnProperty.call(node, 'storeName') && typeof node.storeName === 'string'
@@ -1512,6 +1308,10 @@ copies or substantial portions of the Software.
                 makeSolarChoice('nightStart', 'astronomical dusk / night start', 'astronomical twilight ends, night starts (-18°)'), // needed? same as astronomicalDusk
                 makeSolarChoice('nadir', 'solar midnight', 'when the sun is closest to nadir and the night is equidistant from dusk and dawn')
             ]
+            const lunarChoices = [
+                makeSolarChoice('rise', 'moon rise', 'the moon rises above the horizon'),
+                makeSolarChoice('set', 'moon set', 'the moon sets below the horizon')
+            ]
 
             function isObject (o) {
                 return (typeof o === 'object' && o !== null)
@@ -1527,7 +1327,7 @@ copies or substantial portions of the Software.
                     return// no point in continuing
                 }
                 optionIndex = optionIndex == null ? 0 : optionIndex
-                if (['cron', 'dates', 'solar'].indexOf(option.expressionType) < 0) {
+                if (['cron', 'dates', 'solar', 'lunar'].indexOf(option.expressionType) < 0) {
                     // if expressionType is not cron or solar - it may be sunrise or sunset
                     if (option.expressionType === 'sunrise') {
                         option.solarEvents = option.solarEvents || 'sunrise'
@@ -1556,6 +1356,8 @@ copies or substantial portions of the Software.
                 if (option.expressionType === 'cron' && !option.expression) option.expression = '0 * * * * * *'
                 if (!option.solarType) option.solarType = option.solarEvents ? 'selected' : 'all'
                 if (!option.solarEvents) option.solarEvents = 'sunrise,sunset'
+                if (!option.lunarType) option.lunarType = option.lunarEvents ? 'selected' : 'all'
+                if (!option.lunarEvents) option.lunarEvents = 'rise,set'
                 if (!option.location) option.location = ''
                 // option.version = 1;
             }
@@ -1569,8 +1371,9 @@ copies or substantial portions of the Software.
                 if (RED._cron_plus_debug) { console.debug('generating option', optionIndex, option) }
                 applyOptionDefaults(optionIndex, option)
                 function buildExpressionTip (title, desc, text, type) {
-                    const helpFunc = type === 'solar' ? 'showSolarHelp();' : 'showCronHelp();'
-                    const helpFuncPopOut = type === 'solar' ? "_popoutCronPlusHelp('cron-plus-solar-events-info');" : "_popoutCronPlusHelp('cron-plus-expression-info');"
+                    const helpFunc = type === 'solar' ? 'showSolarHelp();' : (type === 'lunar' ? 'showLunarHelp();' : 'showCronHelp();')
+                    const helpAnchor = type === 'solar' ? 'cron-plus-solar-events-info' : (type === 'lunar' ? 'cron-plus-lunar-events-info' : 'cron-plus-expression-info')
+                    const helpFuncPopOut = "_popoutCronPlusHelp('" + helpAnchor + "');"
                     const helpFuncHtml = '<span style="float: right">' +
                         '<button id="cron-plus-tt-help-button" class="cron-plus-link-button" onclick="' + helpFunc + '">help </button>&nbsp;' +
                         '<button class="cron-plus-link-button" onclick="' + helpFuncPopOut + '"> <i class="fa fa-external-link"></i></button></span>'
@@ -1608,7 +1411,7 @@ copies or substantial portions of the Software.
                         if (RED._cron_plus_debug) console.debug('initTooltip-->on-blur.  relatedTarget:', e.relatedTarget)
                         if (e.relatedTarget && e.relatedTarget.id === 'cron-plus-tt-help-button') {
                             if (RED._cron_plus_debug) console.debug('blur-->e.relatedTarget.relatedTarget.className == "cron-plus-link-button"')
-                            if (type === 'cron') { showCronHelp() } else if (type === 'solar') { showSolarHelp() }
+                            if (type === 'cron') { showCronHelp() } else if (type === 'solar') { showSolarHelp() } else if (type === 'lunar') { showLunarHelp() }
                             $(this).focus()
                             return false
                         }
@@ -1623,7 +1426,7 @@ copies or substantial portions of the Software.
                         const $location = $this.closest('li').find('.node-input-option-location')
                         const $expression = $this.closest('li').find('.node-input-option-expression')
                         let expression
-                        if (expressionType === 'solar') {
+                        if (expressionType === 'solar' || expressionType === 'lunar') {
                             const defLocation = $('#node-input-defaultLocation').typedInput('value')
                             const defLocationType = $('#node-input-defaultLocation').typedInput('type')
                             if (defLocationType === 'env' || defLocationType === 'fixed') {
@@ -1640,6 +1443,7 @@ copies or substantial portions of the Software.
                         }
                         const $offset = $this.closest('li').find('.node-input-option-offset')
                         const $solarEvents = $this.closest('li').find('.node-input-option-solarEvents')
+                        const $lunarEvents = $this.closest('li').find('.node-input-option-lunarEvents')
                         $this.tooltip('enable').tooltip('open')
                         $this.tooltip('option', 'position', pos)
                         $this.tooltip({
@@ -1659,9 +1463,9 @@ copies or substantial portions of the Software.
                                 let titleHtml
                                 const e = { expressionType }
                                 if (timeZone) e.timeZone = timeZone
-                                if (expressionType === 'solar') {
+                                if (expressionType === 'solar' || expressionType === 'lunar') {
                                     titleHtml = (expr) => {
-                                        const title = '<b>solar events</b> at <span class="cron-plus-expression">' + expr.slice(0, 100) + (expr.length > 100 ? '...' : '') + '</span>'
+                                        const title = '<b>' + expressionType + ' events</b> at <span class="cron-plus-expression">' + expr.slice(0, 100) + (expr.length > 100 ? '...' : '') + '</span>'
 
                                         if (offset != null && offset !== '0' && offset !== 0) {
                                             titleHtml += '<b>'
@@ -1675,8 +1479,13 @@ copies or substantial portions of the Software.
                                     }
                                     e.offset = offset
                                     e.location = expression
-                                    e.solarType = solarType
-                                    e.solarEvents = solarEvents
+                                    if (expressionType === 'solar') {
+                                        e.solarType = solarType
+                                        e.solarEvents = solarEvents
+                                    } else {
+                                        e.lunarType = $lunarEvents.typedInput('type')
+                                        e.lunarEvents = $lunarEvents.typedInput('value')
+                                    }
                                     e.defaultLocationType = $('#node-input-defaultLocation').typedInput('type')
                                     e.defaultLocation = $('#node-input-defaultLocation').typedInput('value')
                                     e.flowId = node.z
@@ -1742,7 +1551,7 @@ copies or substantial portions of the Software.
                                                 $this.tooltip('enable').tooltip('open')
                                                 $this.tooltip('option', 'position', pos)
                                             }, 200)
-                                            const expr = data.expressionType === 'solar' ? data.location : data.expression
+                                            const expr = (data.expressionType === 'solar' || data.expressionType === 'lunar') ? data.location : data.expression
                                             return buildExpressionTip(titleHtml(expr), desc, nextInfo, expressionType)
                                         }
                                         callback(okContent)
@@ -1820,6 +1629,7 @@ copies or substantial portions of the Software.
                 $('<option />', { value: 'cron', text: 'cron' }).appendTo(scheduleTypeField)
                 $('<option />', { value: 'dates', text: 'date sequence' }).appendTo(scheduleTypeField)
                 $('<option />', { value: 'solar', text: 'solar events' }).appendTo(scheduleTypeField)
+                $('<option />', { value: 'lunar', text: 'lunar events' }).appendTo(scheduleTypeField)
                 scheduleTypeField.val(scheduleType)
                 scheduleTypeField.prop('title', 'Expression Type')
 
@@ -1910,6 +1720,35 @@ copies or substantial portions of the Software.
                 solarEventsField.typedInput('type', option.solarType || 'all')
                 solarEventsField.typedInput('value', option.solarEvents || '')// added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
 
+                // generate the lunar events field (occupies the same slot as solar events - visibility is switched by schedule type)
+                const lunarEventsDiv = $('<div/>', { style: solarEventsStyle }).appendTo(cell2Solar)
+                const lunarEventsField = $('<input/>', { class: 'node-input-option-lunarEvents', type: 'text', style: 'width: 100%', placeholder: 'select lunar events', value: option.lunarEvents || '' }).appendTo(lunarEventsDiv)
+                lunarEventsField.typedInput({
+                    default: 'all',
+                    types: [
+                        {
+                            value: 'selected',
+                            label: 'Selected Lunar Events',
+                            title: 'Selected Lunar Events',
+                            icon: 'fa fa-list',
+                            showLabel: false,
+                            multiple: true,
+                            options: lunarChoices,
+                            default: ['rise', 'set']
+                        },
+                        {
+                            value: 'all',
+                            label: 'All Lunar Events',
+                            title: 'All Lunar Events',
+                            icon: 'fa fa-moon-o',
+                            hasValue: false,
+                            showLabel: true
+                        }
+                    ]
+                })
+                lunarEventsField.typedInput('type', option.lunarType || 'all')
+                lunarEventsField.typedInput('value', option.lunarEvents || '')
+
                 // generate location
                 const locationFieldDiv = $('<div/>', { class: 'cron-node-input-option-location-div', style: locationStyle }).appendTo(cell2Solar)
                 const locationField = $('<input/>', { class: 'node-input-option-location', type: 'text', style: 'width: 100%', placeholder: 'lat lng', value: option.location || '' }).appendTo(locationFieldDiv)
@@ -1968,6 +1807,14 @@ copies or substantial portions of the Software.
                         case 'solar':
                             cell2Cron.hide()
                             cell2Solar.show()
+                            solarEventsDiv.show()
+                            lunarEventsDiv.hide()
+                            break
+                        case 'lunar':
+                            cell2Cron.hide()
+                            cell2Solar.show()
+                            solarEventsDiv.hide()
+                            lunarEventsDiv.show()
                             break
                         case 'dates':
                             cell2Cron.show()
@@ -2080,7 +1927,9 @@ copies or substantial portions of the Software.
                     location: option.find('.node-input-option-location').typedInput('value'),
                     offset: option.find('.node-input-option-offset').val(),
                     solarType: option.find('.node-input-option-solarEvents').typedInput('type') || 'all',
-                    solarEvents: option.find('.node-input-option-solarEvents').typedInput('value')
+                    solarEvents: option.find('.node-input-option-solarEvents').typedInput('value'),
+                    lunarType: option.find('.node-input-option-lunarEvents').typedInput('type') || 'all',
+                    lunarEvents: option.find('.node-input-option-lunarEvents').typedInput('value')
                 }
                 if (option.find('.node-input-option-value').typedInput('type') === 'num') {
                     o.payload = Number(o.value)
@@ -2273,17 +2122,6 @@ function onSchedulesExpandCompress () {
 
 <script type="text/html" data-template-name="cronplus">
     <style>
-        #cron-plus-map > div.leaflet-map-pane > div.leaflet-objects-pane > div.leaflet-popup-pane > div > div.leaflet-popup-content-wrapper,
-        #cron-plus-map > div.leaflet-map-pane > div.leaflet-objects-pane > div.leaflet-popup-pane > div > div.leaflet-popup-tip-container > div {
-            background-color: var(--red-ui-primary-background);
-            color: var(--red-ui-primary-text-color);
-        }
-        #cron-plus-map > div.leaflet-control-container > div.leaflet-top.leaflet-left > div > a.leaflet-control-zoom-in,
-        #cron-plus-map > div.leaflet-control-container > div.leaflet-top.leaflet-left > div > a.leaflet-control-zoom-out {
-            background-color: var(--red-ui-primary-background);
-            color: var(--red-ui-primary-text-color);
-        }
-
         .cron-select-period {
             padding: 5px 5px 0px 5px;
         }
@@ -2374,11 +2212,6 @@ function onSchedulesExpandCompress () {
             vertical-align: middle;
             border-bottom: 1px solid var(--red-ui-primary-text-color)
         }
-        #cron-plus-map {
-            height: 100%;
-            padding: 0;
-            margin: 0;
-        }
         .cron-plus-hide-per-location {
             display: none !important;
             visibility: hidden;
@@ -2409,15 +2242,6 @@ function onSchedulesExpandCompress () {
         .cron-plus-vanish-element {
             display: none !important;
             visibility: hidden !important;
-        }
-        .cron-plus-map-dialog-content {
-            padding: 0px 0px 0px 0px;
-        }
-        .cron-plus-map-not-loaded {
-            padding: 2px 10px 2px 10px;
-        }
-        .cron-plus-map-loading {
-            padding: 2px 10px 2px 10px;
         }
         .cron-plus-link-button {
             background: none!important;
@@ -2451,50 +2275,6 @@ function onSchedulesExpandCompress () {
             border-radius: 4px;
         }
     </style>
-
-    <div id="cron-plus-map-dialog" style="display: none;" title="Choose location...">
-        <div class="cron-plus-map-loading" >
-            <h3>Attempting to load map... <i class="fa fa-spinner fa-spin" style="font-size:24px"></i></h3>
-            <p>The interactive Map is loaded via CDN at client side (to minimise installation size) and therefore requires an internet connection. Please wait 1 moment.</p>
-            <h4>Alternative ways to get coordinates...</h4>
-            <ul>
-                <li>Visit <a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer">www.latlong.net</a> (on another device if required) then copy the "Lat Long" value provided into the cron-plus coordinates box</li>
-                <li>Visit google maps, MSN maps, almost any other maps website on another device to get GPS or longitude latitude value</li>
-                <li>Try one of the many longitude latitude apps available in the app store on your mobile phone</li>
-                <li>Check your satnav device - it may show coordinates</li>
-                <li>Use a topographic map</li>
-                <li>Ask a friend</li>
-            </ul>
-            <h4>Accepted formats...</h4>
-            <ul>
-                <li>Decimal Degrees E.g: <code>54.9992500,-1.4170300</code> or <code>54.9992500° N 1.4170300° W</code></li>
-                <li>Degrees Minutes Seconds E.g: <code>54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
-                <li>Decimal Minutes E.g: <code>54° 59.955' , -1° 25.0218'</code></li>
-                <li>GPS E.g: <code>N54°59'57.3, W1°25'1.308"</code>, <code>54°59'57.3"N, 1°25'1.308"W</code>, <code>54d 59' 57" N 1d 25' 1" W</code> or <code>54:59:57.3N 1:25:1.308W</code></li>
-            </ul>
-        </div>
-        <div class="cron-plus-map-not-loaded"  style="display:hidden" >
-            <h3>No internet on this device?</h3>
-            <p>The interactive Map is loaded via CDN at client side (to minimise installation size) and therefore requires an internet connection. As you are seeing this message, it is likely this device does not have access to the internet.</p>
-            <h4>Alternative ways to get coordinates...</h4>
-            <ul>
-                <li>Visit <a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer">www.latlong.net</a> (on another device if required) then copy the "Lat Long" value provided into the cron-plus coordinates box</li>
-                <li>Visit google maps, MSN maps, almost any other maps website on another device to get GPS or longitude latitude value</li>
-                <li>Try one of the many longitude latitude apps available in the app store on your mobile phone</li>
-                <li>Check your satnav device - it may show coordinates</li>
-                <li>Use a topographic map</li>
-                <li>Ask a friend</li>
-            </ul>
-            <h4>Accepted formats...</h4>
-            <ul>
-                <li>Decimal Degrees E.g: <code>54.9992500,-1.4170300</code> or <code>54.9992500° N 1.4170300° W</code></li>
-                <li>Degrees Minutes Seconds E.g: <code>54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
-                <li>Decimal Minutes E.g: <code>54° 59.955' , -1° 25.0218'</code></li>
-                <li>GPS E.g: <code>N54°59'57.3, W1°25'1.308"</code>, <code>54°59'57.3"N, 1°25'1.308"W</code>, <code>54d 59' 57" N 1d 25' 1" W</code> or <code>54:59:57.3N 1:25:1.308W</code></li>
-            </ul>
-        </div>
-        <div id="cron-plus-map"></div>
-    </div>
 
     <div id="cron-plus-dynamic-nodes-dialog" style="display: none;" title="Dynamic schedules...">
         <div id="cron-plus-dynamic-nodes-table-placeholder"  style="display: flex;align-items: center;/*justify-content: center;*/">
@@ -2659,7 +2439,7 @@ function onSchedulesExpandCompress () {
         </div>
         <h4>Schedules - Type</h4>
         <div style="padding-left: 15px">
-            The type determines what type of schedule. Options are <code>cron</code>, <code>dates sequence</code> or <code>solar events</code>
+            The type determines what type of schedule. Options are <code>cron</code>, <code>dates sequence</code>, <code>solar events</code> or <code>lunar events</code>
         </div>
         <h4 id="cron-plus-expression-info">Schedules - Expression</h4>
         <div style="padding-left: 15px">
@@ -2735,10 +2515,22 @@ function onSchedulesExpandCompress () {
                 <tr><td>nadir</td><td>solar midnight</td><td>when the sun is closest to nadir and the night is equidistant from dusk and dawn</td></tr>
             </table>
         </div>
+        <h4 id="cron-plus-lunar-events-info">Schedules - Lunar Events</h4>
+        <div style="padding-left: 15px">
+            <i>NOTE: Only displayed when the type is set to <b>lunar events</b></i><br>
+            Lunar event schedules fire on moon events at the specified location.<br>
+            Lunar Events...
+            <table class="cron-plus-solar-events-table">
+                <tr><th>Event ID</th><th>Event</th><th>Information</th></tr>
+                <tr><td>rise</td><td>moon rise</td><td>the moon rises above the horizon</td></tr>
+                <tr><td>set</td><td>moon set</td><td>the moon sets below the horizon</td></tr>
+            </table>
+            <i>NOTE: at high latitudes the moon can stay above or below the horizon for days at a time - during such periods rise/set events do not occur and the schedule simply waits for the next occurrence</i>
+        </div>
         <h4>Schedules - Location</h4>
         <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
-            The location field is expected to contain longitude and latitude coordinates for the calculation of solar events.<br>
+            <i>NOTE: Only displayed when the type is set to <b>solar events</b> or <b>lunar events</b></i><br>
+            The location field is expected to contain longitude and latitude coordinates for the calculation of solar and lunar events.<br>
             Accepted formats...
             <ul>
                 <li>Decimal Degrees E.g: <code>54.9992500,-1.4170300</code> or <code>54.9992500° N 1.4170300° W</code></li>
@@ -2853,6 +2645,21 @@ function onSchedulesExpandCompress () {
                         <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected". Accepted values are listed under <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">see above</a> </li>
                         <li>location: (string|required) longitude latitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
                         <li>offset: (number|optional) number of minutes to offset a sunrise or sunset</li>
+                        <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
+                        <li>payload: (any|optional) What to send when schedule triggers</li>
+                        <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
+                    </ul><br>
+                    Adding a lunar event schedule
+                    <ul>
+                        <li>Multiple schedules can be added if the payload is an array of objects</li>
+                        <li>command: (string|required) The operation to perform - in this case "add"</li>
+                        <li>name: (string|required) This will identify schedule</li>
+                        <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
+                        <li>expressionType: (string|required) specify the schedule type. Set to "lunar" for lunar events</li>
+                        <li>lunarType: (string|required) specify the events to fire.  Accepted values are "all" or "selected"</li>
+                        <li>lunarEvents: (string|optional) specify the events to fire. Only required when lunarType == "selected". Accepted values are listed under <b>Schedules - Lunar Events</b> <a href="#cron-plus-lunar-events-info">see above</a> </li>
+                        <li>location: (string|required) longitude latitude, DNS, DMM or GPS coordinates for the moon event calculation</li>
+                        <li>offset: (number|optional) number of minutes to offset a lunar event</li>
                         <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
                         <li>payload: (any|optional) What to send when schedule triggers</li>
                         <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
