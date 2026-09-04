@@ -56,8 +56,7 @@ FEATURES
 * Optional time zone setting supporting UTC and Region/Area (e.g. Europe/London)
 * Daylight Saving Time transitions are handled following the same conventions as Debian cron (see below)
 * A companion **when gate** node to gate messages on plain-English temporal conditions like "on saturdays", "is night" or "when the moon is visible" (see below)
-
-Lunar events
+   * <img width="665" height="592" alt="chrome_4uSXOX59at" src="https://github.com/user-attachments/assets/475b2a2a-55d9-4617-9410-eaef31f14bcc" />
 ------------
 
 Schedules can fire on moon events at a location, alongside the existing solar events:
