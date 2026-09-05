@@ -432,6 +432,20 @@ copies or substantial portions of the Software.
         }
     }
 
+    // Custom solar-angle schedules (solarType 'customRising'/'customSetting') hold their angle,
+    // in degrees, as the typedInput's own value for those two types - no CSV, no encoded string,
+    // just a plain number, validated with typedInput's own validate hook (see solarEventsField
+    // below) so a bad value turns the box red as you type instead of failing silently on save.
+    const CUSTOM_ANGLE_VALUE_REGEX = /^-?\d+(?:\.\d+)?$/
+    function validateCustomAngleValue (value, _opt) {
+        const v = String(value == null ? '' : value).trim()
+        if (v === '') return 'Enter a number of degrees (-90 to 90)'
+        if (!CUSTOM_ANGLE_VALUE_REGEX.test(v)) return 'Enter a number of degrees (-90 to 90)'
+        const n = parseFloat(v)
+        if (n < -90 || n > 90) return 'Must be between -90 and 90 degrees'
+        return true
+    }
+
     function showSidebarHelpPanel () {
         if (RED.sidebar.help) {
             RED.sidebar.help.show()//  >= V1.1.0
@@ -756,13 +770,18 @@ copies or substantial portions of the Software.
                                     return false
                                 }
                             } else if (value[i].expressionType === 'solar') {
-                                if (value[i].solarType !== 'all' && value[i].solarType !== 'selected') {
-                                    console.warn("cron-plus: validation error - solarType is not 'all' or 'selected'")
+                                if (!['all', 'selected', 'customRising', 'customSetting'].includes(value[i].solarType)) {
+                                    console.warn("cron-plus: validation error - solarType is not 'all', 'selected', 'customRising' or 'customSetting'")
                                     // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-solarType").addClass("input-error");
                                     return false
                                 }
                                 if (value[i].solarType === 'selected' && !value[i].solarEvents) {
                                     console.warn('cron-plus: validation error - solarEvents missing')
+                                    return false
+                                }
+                                if ((value[i].solarType === 'customRising' || value[i].solarType === 'customSetting') &&
+                                    validateCustomAngleValue(value[i].solarEvents) !== true) {
+                                    console.warn('cron-plus: validation error - solarEvents is not a valid custom angle (-90 to 90)')
                                     return false
                                 }
                             } else if (value[i].expressionType === 'lunar') {
@@ -1714,11 +1733,46 @@ copies or substantial portions of the Software.
                             icon: 'fa fa-sun-o',
                             hasValue: false,
                             showLabel: true
+                        },
+                        {
+                            value: 'customRising',
+                            label: 'Custom Rising Angle',
+                            title: 'Custom Rising Angle',
+                            icon: 'fa fa-arrow-circle-o-up',
+                            showLabel: true,
+                            hasValue: true,
+                            validate: validateCustomAngleValue
+                        },
+                        {
+                            value: 'customSetting',
+                            label: 'Custom Setting Angle',
+                            title: 'Custom Setting Angle',
+                            icon: 'fa fa-arrow-circle-o-down',
+                            showLabel: true,
+                            hasValue: true,
+                            validate: validateCustomAngleValue
                         }
                     ]
                 })
                 solarEventsField.typedInput('type', option.solarType || 'all')
                 solarEventsField.typedInput('value', option.solarEvents || '')// added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
+                // the two custom-angle types share hasValue's free-text box with every other
+                // type, so switching in leaves whatever was typed/selected before (e.g. a
+                // "sunrise,sunset" CSV from "Selected Solar Events"). Clear it out unless it's
+                // already a usable angle, and swap the placeholder so it doesn't still read
+                // "select solar events" while degrees are expected.
+                solarEventsField.on('typedinputtypechange', function () {
+                    const currentType = solarEventsField.typedInput('type')
+                    const $visibleInput = solarEventsDiv.find('.red-ui-typedInput-input')
+                    if (currentType === 'customRising' || currentType === 'customSetting') {
+                        $visibleInput.attr('placeholder', 'degrees, -90 to 90')
+                        if (!CUSTOM_ANGLE_VALUE_REGEX.test(String(solarEventsField.typedInput('value') || '').trim())) {
+                            solarEventsField.typedInput('value', '')
+                        }
+                    } else {
+                        $visibleInput.attr('placeholder', 'select solar events')
+                    }
+                })
 
                 // generate the lunar events field (occupies the same slot as solar events - visibility is switched by schedule type)
                 const lunarEventsDiv = $('<div/>', { style: solarEventsStyle }).appendTo(cell2Solar)
@@ -2514,6 +2568,14 @@ function onSchedulesExpandCompress () {
                 <tr><td>nightStart</td><td>astronomical dusk / night start</td><td>astronomical twilight ends, night starts (-18°)</td></tr>
                 <tr><td>nadir</td><td>solar midnight</td><td>when the sun is closest to nadir and the night is equidistant from dusk and dawn</td></tr>
             </table>
+            <p>
+                <b>Custom sun angle</b> - if none of the presets above are the angle you need, select
+                <i>Custom Rising Angle</i> or <i>Custom Setting Angle</i> from the type dropdown
+                instead of <i>Selected Solar Events</i>, then enter the angle (in degrees, -90 to 90,
+                above (+) or below (-) the horizon) directly into the box. Choosing the type already
+                tells cron-plus which direction you mean, so the angle itself is all that's needed;
+                a bad value turns the box red as you type.
+            </p>
         </div>
         <h4 id="cron-plus-lunar-events-info">Schedules - Lunar Events</h4>
         <div style="padding-left: 15px">
@@ -2641,8 +2703,8 @@ function onSchedulesExpandCompress () {
                         <li>name: (string|required) This will identify schedule</li>
                         <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
                         <li>expressionType: (string|required) specify the schedule type. Set to "solar" for solar events</li>
-                        <li>solarType: (string|required) specify the events to fire.  Accepted values are "all" or "selected"</li>
-                        <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected". Accepted values are listed under <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">see above</a> </li>
+                        <li>solarType: (string|required) specify the events to fire.  Accepted values are "all", "selected", "customRising" or "customSetting"</li>
+                        <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected" (a CSV of event names, see <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">above</a>) or solarType == "customRising"/"customSetting" (a single number of degrees, -90 to 90, above (+) or below (-) the horizon)</li>
                         <li>location: (string|required) longitude latitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
                         <li>offset: (number|optional) number of minutes to offset a sunrise or sunset</li>
                         <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
@@ -2770,6 +2832,15 @@ msg.payload = "name"; //  name of the schedule</code></pre>
   "location": "54.9992500,-1.4170300",
   "solarType": "selected",
   "solarEvents": "civilDawn,sunrise,sunset,civilDusk",
+  "timeZone": "Europe/London"
+}</code></pre>
+                Example : cmd payload to describe a custom sun angle (fires as the sun rises through 4° below the horizon)...<br>
+    <pre class="cron-plus-code"><code>{
+  "command": "describe",
+  "expressionType": "solar",
+  "location": "54.9992500,-1.4170300",
+  "solarType": "customRising",
+  "solarEvents": "-4",
   "timeZone": "Europe/London"
 }</code></pre>
                 <p><i>Details...</i><br>
