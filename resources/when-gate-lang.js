@@ -24,7 +24,7 @@
     const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
     // Term kinds that cannot be computed without a latitude/longitude
-    const LOCATION_KINDS = ['solarState', 'sunDirection', 'sunAltitude', 'solarEvent', 'solarBetween', 'moonAltitude']
+    const LOCATION_KINDS = ['solarState', 'sunDirection', 'sunAltitude', 'sunAzimuth', 'solarEvent', 'solarBetween', 'moonAltitude', 'moonAzimuth']
 
     // ------------------------------------------------------------------
     // Vocabulary (data driven - new phrases are one-line additions)
@@ -154,6 +154,8 @@
         { words: ['deg'], sym: { type: 'DEG' } },
         { words: ['above'], sym: { type: 'ABOVE' } },
         { words: ['below'], sym: { type: 'BELOW' } },
+        // celestial azimuth: "sun azimuth is between 134 and 138 degrees"
+        { words: ['azimuth'], sym: { type: 'AZIMUTH' } },
         { words: ['sun', 'high'], sym: { type: 'TERM', term: { kind: 'sunAltitude', op: 'above', degrees: 45, label: 'high' } } },
         { words: ['sun', 'low'], sym: { type: 'TERM', term: { kind: 'sunAltitude', op: 'between', low: 0, high: 15, label: 'low' } } },
         { words: ['moon', 'high'], sym: { type: 'TERM', term: { kind: 'moonAltitude', op: 'above', degrees: 45, label: 'high' } } },
@@ -269,7 +271,7 @@
     // Words carrying no meaning of their own. Stripped before phrase matching.
     // 'is' is included, so "moon is visible" matches the ['moon','visible'] phrase.
     // 'at' is included: "at 9am" parses as a bare time, "at night" as the night state.
-    const NOISE_WORDS = ['only', 'just', 'when', 'whenever', 'if', 'the', 'on', 'in', 'is', 'it', 'its', 'was', 'are', 'be', 'during', 'a', 'an', 'at', 'whilst', 'while', 'time', 'times', 'every', 'each', 'them', 'those', 'their']
+    const NOISE_WORDS = ['only', 'just', 'when', 'whenever', 'if', 'the', 'on', 'in', 'is', 'it', 'its', 'was', 'are', 'be', 'during', 'a', 'an', 'at', 'whilst', 'while', 'time', 'times', 'every', 'each', 'them', 'those', 'their', 'altitude']
 
     // Single-word vocabulary for distance-1 fuzzy fallback (typo tolerance)
     const FUZZY_VOCAB = (function () {
@@ -538,7 +540,8 @@
     }
 
     // bare "sun" is Sunday only when it sits in a day list or range; it stays
-    // SUN_WORD before an altitude comparison ("sun is between 10 and 12 degrees")
+    // SUN_WORD before an altitude or azimuth comparison ("sun is between 10 and
+    // 12 degrees", "sun azimuth is between 134 and 138")
     function promoteSunWords (symbols, unmatched) {
         for (let i = 0; i < symbols.length; i++) {
             if (symbols[i].type !== 'SUN_WORD') { continue }
@@ -551,9 +554,9 @@
                 return s && (s.type === 'AND' || s.type === 'OR' || s.type === 'COMMA') && dayish(s2)
             }
             const altitudeish = function (s) {
-                return s && ['BETWEEN', 'ABOVE', 'BELOW', 'MORE', 'LESS'].indexOf(s.type) >= 0
+                return s && ['BETWEEN', 'ABOVE', 'BELOW', 'MORE', 'LESS', 'AZIMUTH'].indexOf(s.type) >= 0
             }
-            if (altitudeish(next)) { continue } // handled by parseCelestialAltitude
+            if (altitudeish(next)) { continue } // handled by parseCelestialAltitude/parseCelestialAzimuth
             if (dayish(prev) || dayish(next) || listish(prev, symbols[i - 2]) || listish(next, symbols[i + 2])) {
                 symbols[i] = { type: 'DAY', day: 0, raw: symbols[i].raw }
             } else {
@@ -835,6 +838,9 @@
             case 'MOON_WORD':
                 return parseMoonCondition(state)
             case 'SUN_WORD':
+                if (peek(state, 1) && peek(state, 1).type === 'AZIMUTH') {
+                    return parseCelestialAzimuth(state, 'sunAzimuth')
+                }
                 return parseCelestialAltitude(state, 'sunAltitude')
             default:
                 return null
@@ -883,6 +889,38 @@
             return null
         }
         state.unmatched.push(word.raw)
+        return null
+    }
+
+    function normalizeDeg (d) {
+        return ((d % 360) + 360) % 360
+    }
+
+    // "sun/moon azimuth [is] between 134 and 138 [degrees]". The leading
+    // SUN_WORD/MOON_WORD and the AZIMUTH symbol are both at the current position.
+    // Azimuth is a compass bearing (0-360, from North), so unlike altitude it
+    // wraps: "between 350 and 10" spans north through 360/0 (see evalTerm). Only
+    // "between" is supported - a bearing has no natural "above/below" the way
+    // altitude has a horizon.
+    function parseCelestialAzimuth (state, kind) {
+        const word = peek(state)
+        const azWord = peek(state, 1)
+        state.pos += 2
+        const bodyText = (kind === 'sunAzimuth' ? 'sun' : 'moon') + ' azimuth'
+        const cmp = peek(state)
+        if (cmp && cmp.type === 'BETWEEN') {
+            state.pos++
+            const low = parseDegreeValue(state)
+            if (peek(state) && (peek(state).type === 'AND' || peek(state).type === 'TO')) { state.pos++ }
+            const high = parseDegreeValue(state)
+            if (peek(state) && peek(state).type === 'DEG') { state.pos++ }
+            if (low !== null && high !== null) {
+                return { kind, op: 'between', low: normalizeDeg(low), high: normalizeDeg(high), source: bodyText + ' between ' + low + ' and ' + high + ' degrees' }
+            }
+            state.unmatched.push(word.raw + ' ' + azWord.raw + ' between')
+            return null
+        }
+        state.unmatched.push(word.raw + ' ' + azWord.raw)
         return null
     }
 
@@ -1626,6 +1664,10 @@
     function parseMoonCondition (state) {
         const start = peek(state)
         const cmp = peek(state, 1)
+        // azimuth: "moon azimuth is between 60 and 90 degrees"
+        if (cmp && cmp.type === 'AZIMUTH') {
+            return parseCelestialAzimuth(state, 'moonAzimuth')
+        }
         // illumination: "moon more than 50% illuminated"
         if (cmp && (cmp.type === 'MORE' || cmp.type === 'LESS')) {
             const pct = peek(state, 2)
@@ -1993,6 +2035,9 @@
                     text = 'sun altitude is ' + term.op + ' ' + term.degrees + ' degrees'
                 }
                 break
+            case 'sunAzimuth':
+                text = 'sun azimuth is between ' + term.low + ' and ' + term.high + ' degrees'
+                break
             case 'solarEvent': {
                 const label = EVENT_LABELS[term.event] || term.event
                 if (term.op === 'within') {
@@ -2020,6 +2065,9 @@
                 } else {
                     text = 'moon altitude is ' + term.op + ' ' + term.degrees + ' degrees'
                 }
+                break
+            case 'moonAzimuth':
+                text = 'moon azimuth is between ' + term.low + ' and ' + term.high + ' degrees'
                 break
             case 'moonPhase': {
                 if (term.offsetDays) { // "day before blue moon", "2 days after a full moon"
@@ -2149,9 +2197,11 @@
         solarState: 'Sun',
         sunDirection: 'Sun',
         sunAltitude: 'Sun',
+        sunAzimuth: 'Sun',
         solarEvent: 'Sun',
         solarBetween: 'Sun',
         moonAltitude: 'Moon',
+        moonAzimuth: 'Moon',
         moonPhase: 'Moon',
         moonIllumination: 'Moon'
     }
@@ -2203,9 +2253,11 @@
         'is night', 'during daylight', 'after dark', 'golden hour', 'sun rising', 'after sunset',
         'before sunrise', '2 hours after sunset', 'within 30 minutes of sunrise', 'between sunset and sunrise',
         'sun above 30 degrees', 'sun is between 10 and 12 degrees', 'sun is high',
+        'sun azimuth is between 134 and 138 degrees',
         // moon
         'when the moon is visible', 'full moon', 'blue moon', 'seasonal blue moon', 'day before blue moon',
         'moon is high', 'moon is 90% illuminated', 'moon more than 50% illuminated', 'new moon',
+        'moon azimuth is between 60 and 90 degrees',
         // combinations
         'on weekdays and during daylight', 'on weekends or after sunset', 'weekends or evenings except tuesday',
         '(last day of the month or wednesday) and after 10pm', 'every day'

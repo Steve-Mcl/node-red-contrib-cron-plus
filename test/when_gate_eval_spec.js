@@ -444,6 +444,46 @@ describe('when-gate-eval: sun/moon position', function () {
         r.pass.should.be.false()
         r.reasons[0].detail.should.match(/location/)
     })
+
+    it('azimuth ranges track suncalc (Newgrange midwinter sunrise, real-world regression)', function () {
+        // Newgrange, Ireland: the passage aligns with sunrise for a few mornings around
+        // the winter solstice, when azimuth is ~127-142 degrees and the sun has just
+        // cleared the horizon. This is the exact condition a user asked to express.
+        const NEWGRANGE = { lat: 53.6944, lon: -6.4756 }
+        const cond = 'sun azimuth is between 134 and 138 and sun altitude is above 0.5'
+        let aligned = null
+        for (let m = 0; m < 40 && !aligned; m++) {
+            const ts = Date.parse('2026-12-21T08:35:00Z') + m * 60000
+            const pos = SunCalc.getPosition(new Date(ts), NEWGRANGE.lat, NEWGRANGE.lon)
+            if (pos.azimuth >= 134 && pos.azimuth <= 138 && pos.altitude > 0.5) { aligned = ts }
+        }
+        should.exist(aligned, 'no aligned minute found in the scanned window')
+        evalText(cond, { ts: aligned, tz: 'UTC', ...NEWGRANGE }).pass.should.be.true()
+        evalText(cond, { ts: Date.parse('2026-12-21T12:00:00Z'), tz: 'UTC', ...NEWGRANGE }).pass.should.be.false() // solar noon: well past the alignment
+    })
+
+    it('moon azimuth ranges track suncalc', function () {
+        const ts = Date.parse('2026-01-15T22:00:00Z')
+        const az = SunCalc.getMoonPosition(new Date(ts), LONDON.lat, LONDON.lon).azimuth
+        evalText(`moon azimuth is between ${Math.floor(az) - 1} and ${Math.ceil(az) + 1} degrees`, { ts, tz, ...LONDON }).pass.should.be.true()
+        evalText('moon azimuth is between 0 and 1 degrees', { ts, tz, ...LONDON }).pass.should.equal(az <= 1)
+    })
+
+    it('azimuth "between" wraps through north (real high-latitude near-summer-solstice case)', function () {
+        // 65N, midsummer: pre-dawn sun azimuth swings into single digits (measured from
+        // north), the case a plain low<=az<=high check gets backwards
+        const ts = Date.parse('2026-06-21T00:30:00Z')
+        const pos = SunCalc.getPosition(new Date(ts), 65, 0)
+        pos.azimuth.should.be.below(20) // sanity check on the fixture itself
+        evalText('sun azimuth between 350 and 20', { ts, tz: 'UTC', lat: 65, lon: 0 }).pass.should.be.true()
+        evalText('sun azimuth between 20 and 350', { ts, tz: 'UTC', lat: 65, lon: 0 }).pass.should.be.false() // same bounds, not wrapping
+    })
+
+    it('azimuth conditions require a location', function () {
+        const r = evalText('sun azimuth is between 0 and 360', { ts: midsummerNoon, tz })
+        r.pass.should.be.false()
+        r.reasons[0].detail.should.match(/location/)
+    })
 })
 
 describe('when-gate-eval: minute of the hour', function () {

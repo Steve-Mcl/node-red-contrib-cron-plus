@@ -658,6 +658,38 @@ describe('when-gate-lang parse: sun/moon position', function () {
         onlyTerm('sat and sun').days.should.eql([0, 6])
         onlyTerm('sun above horizon').kind.should.equal('sunAltitude') // phrase unchanged
     })
+
+    it('parses "sun azimuth is between 134 and 138 degrees"', function () {
+        const term = onlyTerm('sun azimuth is between 134 and 138 degrees')
+        term.should.have.properties({ kind: 'sunAzimuth', op: 'between', low: 134, high: 138 })
+        lang.parse('sun azimuth is between 134 and 138 degrees').description.should.equal('sun azimuth is between 134 and 138 degrees')
+    })
+
+    it('parses "moon azimuth between 60 and 90" without "is"', function () {
+        onlyTerm('moon azimuth between 60 and 90').should.have.properties({ kind: 'moonAzimuth', op: 'between', low: 60, high: 90 })
+    })
+
+    it('negative and out-of-range azimuth values normalise into 0-360', function () {
+        onlyTerm('sun azimuth between -10 and 10').should.have.properties({ low: 350, high: 10 })
+        onlyTerm('sun azimuth is between 400 and 410').should.have.properties({ low: 40, high: 50 })
+    })
+
+    it('azimuth combines with altitude and other clauses via "and"', function () {
+        const terms = onlyGroupTerms('sun azimuth is between 134 and 138 and sun altitude is above 0.5')
+        terms.should.have.length(2)
+        terms[0].kind.should.equal('sunAzimuth')
+        terms[1].should.have.properties({ kind: 'sunAltitude', op: 'above', degrees: 0.5 })
+    })
+
+    it('bare "sun azimuth" or an unsupported "above/below" form fails to parse (only "between" is supported)', function () {
+        lang.parse('sun azimuth').ok.should.be.false()
+        lang.parse('sun azimuth above 30 degrees').ok.should.be.false()
+    })
+
+    it('bare "sun"/"moon" before azimuth are not mistaken for Sunday or moon phase', function () {
+        onlyTerm('sun azimuth is between 1 and 2 degrees').kind.should.equal('sunAzimuth')
+        onlyTerm('moon azimuth is between 1 and 2 degrees').kind.should.equal('moonAzimuth')
+    })
 })
 
 describe('when-gate-lang parse: minute of the hour', function () {

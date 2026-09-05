@@ -641,6 +641,10 @@ copies or substantial portions of the Software.
             <code>sun is high</code> / <code>moon is high</code> (above 45&deg;),
             <code>sun is low</code> / <code>moon is low</code> (up, between 0&deg; and 15&deg;) -
             the understanding line always shows the exact thresholds</li>
+        <li><b>Sun/moon azimuth:</b> <code>sun azimuth is between 134 and 138 degrees</code>,
+            <code>moon azimuth between 60 and 90</code> - a compass bearing from North
+            (0-360&deg;); only <code>between</code> is supported, and a range wraps through
+            north when the first number is bigger, e.g. <code>between 350 and 10</code></li>
         <li><b>Combining:</b> <code>on weekdays and during daylight</code>,
             <code>on weekends or after sunset</code>,
             <code>weekends or evenings except tuesday</code> (an <code>except</code> clause
