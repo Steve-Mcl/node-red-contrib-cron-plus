@@ -1830,6 +1830,16 @@ module.exports = function (RED) {
                 }
                 opt.payloadType = opt.payloadType || 'default'
                 delete opt.type
+                // a dynamically added/updated schedule doesn't know about the node's own
+                // "Default Location" setting (fixed/env, applying to every solar/lunar schedule
+                // on this node) unless we tell it - without this, validateOpt() would reject a
+                // solar/lunar schedule that omits `location` even though the node-level default
+                // would have supplied it (see createTask(), which does the same via
+                // applyOptionDefaults() for static schedules)
+                if ((opt.expressionType === 'solar' || opt.expressionType === 'lunar') &&
+                    (node.defaultLocationType === 'env' || node.defaultLocationType === 'fixed')) {
+                    opt.locationType = node.defaultLocationType
+                }
                 try {
                     validateOpt(opt)
                 } catch (error) {

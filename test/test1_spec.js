@@ -1310,4 +1310,119 @@ describe('cron-plus Node', function () {
             result.should.have.property('topic', 'trigger')
         })
     })
+
+    describe('dynamic schedules and the node-level default location', function () {
+        // Bug: a dynamic solar/lunar schedule added/updated via msg is validated *before* the
+        // node's own "Default Location" (fixed/env) setting is applied to it - that only
+        // happened for static schedules, via createTask() -> applyOptionDefaults(). A dynamic
+        // schedule that omits `location` - expecting the node-level default to supply it, exactly
+        // as static schedules already do - was incorrectly rejected with
+        // "location property missing", even though the node has a perfectly valid default
+        // location configured. Fixed in updateTask() by applying the same node-level
+        // defaultLocationType check before validateOpt() runs.
+        //
+        // Uses its own isolated flow (rather than the large shared flow used by 'extended tests')
+        // so each node config here is deliberately minimal and the location behaviour under test
+        // isn't obscured by unrelated schedules.
+        const makeNode = (id, defaultLocationType, defaultLocation) => ([
+            { id: id + 'Cmd', type: 'helper' },
+            {
+                id,
+                type: 'cronplus',
+                name: 'default-location-test',
+                outputField: 'payload',
+                timeZone: '',
+                defaultLocationType,
+                defaultLocation,
+                persistDynamic: false,
+                commandResponseMsgOutput: 'output1',
+                outputs: 1,
+                options: [],
+                wires: [[id + 'Cmd']]
+            }
+        ])
+
+        it("accepts a dynamic solar schedule with no location when the node's default location is 'fixed'", async function () {
+            await helper.load(cronplusNode, makeNode('defLocFixed', 'fixed', '54.9992500,-1.4170300'))
+            const node = helper.getNode('defLocFixed')
+            const helperCmd = helper.getNode('defLocFixedCmd')
+
+            node.receive({
+                payload: {
+                    command: 'add',
+                    name: 'testAlarm',
+                    topic: 'testAlarm',
+                    expressionType: 'solar',
+                    solarType: 'selected',
+                    solarEvents: 'sunrise,sunset',
+                    offset: 0,
+                    payloadType: 'default'
+                    // no `location` - the node-level default must supply it
+                }
+            })
+            await sleep(50)
+
+            const locationWarnings = node.warn.getCalls().filter(c => c.args[0] && String(c.args[0].message || c.args[0]).includes('location property missing'))
+            locationWarnings.should.have.length(0)
+
+            const resultPromise = new Promise(resolve => helperCmd.once('input', resolve))
+            node.receive({ payload: { command: 'list', name: 'testAlarm' } })
+            const result = await resultPromise
+            result.payload.result.should.have.property('config').which.is.an.Object()
+            result.payload.result.config.should.have.property('location', '54.9992500,-1.4170300')
+            result.payload.result.config.should.have.property('solarEvents', 'sunrise,sunset')
+        })
+
+        it("accepts a dynamic lunar schedule with no location when the node's default location is 'fixed'", async function () {
+            await helper.load(cronplusNode, makeNode('defLocFixedLunar', 'fixed', '54.9992500,-1.4170300'))
+            const node = helper.getNode('defLocFixedLunar')
+            const helperCmd = helper.getNode('defLocFixedLunarCmd')
+
+            node.receive({
+                payload: {
+                    command: 'add',
+                    name: 'testMoon',
+                    topic: 'testMoon',
+                    expressionType: 'lunar',
+                    lunarType: 'all',
+                    offset: 0,
+                    payloadType: 'default'
+                    // no `location` - the node-level default must supply it
+                }
+            })
+            await sleep(50)
+
+            const locationWarnings = node.warn.getCalls().filter(c => c.args[0] && String(c.args[0].message || c.args[0]).includes('location property missing'))
+            locationWarnings.should.have.length(0)
+
+            const resultPromise = new Promise(resolve => helperCmd.once('input', resolve))
+            node.receive({ payload: { command: 'list', name: 'testMoon' } })
+            const result = await resultPromise
+            result.payload.result.should.have.property('config').which.is.an.Object()
+            result.payload.result.config.should.have.property('location', '54.9992500,-1.4170300')
+        })
+
+        it("still requires a location on a dynamic schedule when the node's default location is 'per schedule'", async function () {
+            // sanity check the fix doesn't over-relax validation for the normal case
+            await helper.load(cronplusNode, makeNode('defLocPerSchedule', 'default', ''))
+            const node = helper.getNode('defLocPerSchedule')
+
+            node.receive({
+                payload: {
+                    command: 'add',
+                    name: 'noLocation',
+                    topic: 'noLocation',
+                    expressionType: 'solar',
+                    solarType: 'all',
+                    offset: 0,
+                    payloadType: 'default'
+                    // no `location`, and no node-level default either - this must still fail
+                }
+            })
+            await sleep(50)
+
+            const locationWarnings = node.warn.getCalls().filter(c => c.args[0] && String(c.args[0].message || c.args[0]).includes('location property missing'))
+            locationWarnings.should.have.length(1)
+        })
+    })
 })
