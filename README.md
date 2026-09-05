@@ -103,6 +103,7 @@ Type the condition in plain English; a live "understanding" line below the field
 * `when the moon is visible`, `full moon`, `blue moon` (second full moon of a calendar month), `seasonal blue moon` (third full moon in a season of four), `moon more than 50% illuminated`, `moon is 90% illuminated` (bare percentages mean "at least")
 * `sun is between 10 and 12 degrees`, `sun above 30 degrees`, `sun is high`/`sun is low`, `moon is high`/`moon is low`
 * `sun azimuth is between 134 and 138 degrees`, `moon azimuth between 60 and 90` (compass bearing from North, 0-360; wraps through north, e.g. `between 350 and 10`)
+* `>` and `<` work as symbols wherever "above"/"below"/"more than"/"less than" already do, e.g. `sun > 30 degrees`, `moon < 50% illuminated`
 * combined: `on weekdays and during daylight`, `on weekends or after sunset`, `weekends or evenings except tuesday`
 * brackets group mixed and/or: `(last day of the month or wednesday) and after 10pm` - without brackets `and` binds tighter than `or`, and the understanding line always shows the grouping it settled on
 

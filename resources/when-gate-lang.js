@@ -294,7 +294,7 @@
         const tokens = []
         const src = String(text || '').toLowerCase().replace(/[’‘`']/g, '')
         // longest alternatives first: time with am/pm or colon, percent, ordinal/number, word
-        const re = /(\d{1,2}):(\d{2})\s*(am|pm)?|(\d{1,2})(?:\.(\d{2}))?\s*(am|pm)|(\d+(?:\.\d+)?)\s*%|(\d+(?:\.\d+)?)(st|nd|rd|th)?|([a-z]+)|(,)|(-)|(\()|(\))/g
+        const re = /(\d{1,2}):(\d{2})\s*(am|pm)?|(\d{1,2})(?:\.(\d{2}))?\s*(am|pm)|(\d+(?:\.\d+)?)\s*%|(\d+(?:\.\d+)?)(st|nd|rd|th)?|([a-z]+)|(,)|(-)|(\()|(\))|(>)|(<)/g
         let m
         while ((m = re.exec(src)) !== null) {
             const raw = m[0].trim()
@@ -316,6 +316,10 @@
                 tokens.push({ type: 'lparen', raw })
             } else if (m[14] !== undefined) {
                 tokens.push({ type: 'rparen', raw })
+            } else if (m[15] !== undefined) {
+                tokens.push({ type: 'gt', raw })
+            } else if (m[16] !== undefined) {
+                tokens.push({ type: 'lt', raw })
             }
         }
         return tokens
@@ -403,6 +407,12 @@
             if (tok.type === 'dash') { symbols.push({ type: 'DASH', raw: tok.raw }); i++; continue }
             if (tok.type === 'lparen') { symbols.push({ type: 'LPAREN', raw: tok.raw }); i++; continue }
             if (tok.type === 'rparen') { symbols.push({ type: 'RPAREN', raw: tok.raw }); i++; continue }
+            // ">" / "<" are plain synonyms for "more than"/"less than", so they
+            // reuse the MORE/LESS symbol - every existing consumer that accepts
+            // ABOVE/BELOW (altitude, illumination) already accepts MORE/LESS
+            // too, so no other code needs to change for these to work
+            if (tok.type === 'gt') { symbols.push({ type: 'MORE', raw: tok.raw }); i++; continue }
+            if (tok.type === 'lt') { symbols.push({ type: 'LESS', raw: tok.raw }); i++; continue }
             if (tok.type === 'time') {
                 if (tok.minutes === null) { unmatched.push(tok.raw); i++; continue }
                 symbols.push({ type: 'TIME', minutes: tok.minutes, raw: tok.raw })

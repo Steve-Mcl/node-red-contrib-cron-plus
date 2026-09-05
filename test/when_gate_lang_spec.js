@@ -634,6 +634,24 @@ describe('when-gate-lang parse: sun/moon position', function () {
         onlyTerm('moon below -5 degrees').should.have.properties({ kind: 'moonAltitude', op: 'below', degrees: -5 })
     })
 
+    it('">" and "<" are accepted as symbols for "above"/"below" wherever they already work', function () {
+        onlyTerm('sun > 30 degrees').should.have.properties({ kind: 'sunAltitude', op: 'above', degrees: 30 })
+        onlyTerm('moon < -5 degrees').should.have.properties({ kind: 'moonAltitude', op: 'below', degrees: -5 })
+        onlyTerm('moon > 50% illuminated').should.have.properties({ kind: 'moonIllumination', op: 'gt', fraction: 0.5 })
+        lang.parse('sun > 30 degrees').description.should.equal(lang.parse('sun above 30 degrees').description)
+    })
+
+    it('"greater than"/"less than" already worked as above/below synonyms before ">"/"<" existed', function () {
+        onlyTerm('sun greater than 30 degrees').should.have.properties({ kind: 'sunAltitude', op: 'above', degrees: 30 })
+        onlyTerm('sun less than 30 degrees').should.have.properties({ kind: 'sunAltitude', op: 'below', degrees: 30 })
+    })
+
+    it('">" is not a silent no-op when the surrounding phrase does not support it (azimuth: only "between")', function () {
+        const r = lang.parse('sun azimuth > 30 degrees')
+        r.ok.should.be.false()
+        r.unmatched.should.containEql('>')
+    })
+
     it('parses negative between range "sun is between -6 and 0 degrees"', function () {
         const term = onlyTerm('sun is between -6 and 0 degrees')
         term.low.should.equal(-6)
