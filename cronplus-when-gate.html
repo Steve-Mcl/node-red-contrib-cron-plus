@@ -594,10 +594,13 @@ copies or substantial portions of the Software.
             Monday and the last is Sunday - the understanding line always shows which day it resolved to)</li>
         <li><b>Months and dates:</b> <code>in december</code>, <code>june to august</code>,
             <code>on the 1st of the month</code>, <code>christmas day</code>, <code>halloween</code>,
-            <code>new years day</code></li>
+            <code>new years day</code>, <code>after march</code> / <code>before march</code>
+            (excludes march itself either way; <code>before january</code>/<code>after december</code>
+            have no month left to name, so they're rejected rather than always false)</li>
         <li><b>Years:</b> <code>in 2027</code>, <code>2027 to 2029</code>, <code>january 2027</code>,
             <code>first monday of the year</code>, <code>2nd tuesday of 2028</code>,
-            <code>first monday of january</code>, <code>first/last day of the year</code></li>
+            <code>first monday of january</code>, <code>first/last day of the year</code>,
+            <code>after 2027</code> / <code>before 2027</code> (unbounded, unlike months)</li>
         <li><b>Even/odd:</b> <code>when day is odd</code> (the day of the month),
             <code>odd days</code>, <code>on even months</code>, <code>on even years</code>,
             <code>month is even</code></li>
@@ -646,8 +649,9 @@ copies or substantial portions of the Software.
             (0-360&deg;); only <code>between</code> is supported, and a range wraps through
             north when the first number is bigger, e.g. <code>between 350 and 10</code></li>
         <li><b>Comparison symbols:</b> <code>&gt;</code> and <code>&lt;</code> work as symbols
-            wherever "above"/"below"/"more than"/"less than" already do, e.g.
-            <code>sun &gt; 30 degrees</code>, <code>moon &lt; 50% illuminated</code></li>
+            for "above"/"below"/"more than"/"less than", e.g.
+            <code>sun &gt; 30 degrees</code>, <code>moon &lt; 50% illuminated</code>,
+            <code>&gt; 4pm</code> (same as <code>after 4pm</code>), <code>at least 4pm</code></li>
         <li><b>Combining:</b> <code>on weekdays and during daylight</code>,
             <code>on weekends or after sunset</code>,
             <code>weekends or evenings except tuesday</code> (an <code>except</code> clause

@@ -182,6 +182,65 @@ describe('when-gate-lang parse: time ranges', function () {
         term.startMin.should.equal(1320)
     })
 
+    it('regression: "greater than"/">"/"at least"/"over" no longer silently collapse a time into an exact minute', function () {
+        // this used to drop the comparison as unmatched and parse the bare time
+        // as an exact-minute match instead - "any time after 4pm" silently became
+        // "only during the single minute of 4:00pm", with a much less visible warning
+        const afterFour = { kind: 'timeRange', style: 'after', startMin: 960, endMin: 1440 }
+        onlyTerm('greater than 4pm').should.have.properties(afterFour)
+        onlyTerm('> 4pm').should.have.properties(afterFour)
+        onlyTerm('at least 4pm').should.have.properties(afterFour)
+        onlyTerm('over 4pm').should.have.properties(afterFour)
+        const beforeNine = { kind: 'timeRange', style: 'before', startMin: 0, endMin: 540 }
+        onlyTerm('less than 9am').should.have.properties(beforeNine)
+        onlyTerm('< 9am').should.have.properties(beforeNine)
+        onlyTerm('at most 9am').should.have.properties(beforeNine)
+        onlyTerm('under 9am').should.have.properties(beforeNine)
+        lang.parse('greater than 4pm').unmatched.should.be.empty()
+        // symbol and word forms must be indistinguishable downstream (same AST, same description)
+        lang.parse('> 4pm').description.should.equal(lang.parse('after 4pm').description)
+        lang.parse('< 9am').description.should.equal(lang.parse('before 9am').description)
+    })
+
+    it('"more than"/"less than"/">"/"<" also read as after/before for a solar event or minute-of-hour target', function () {
+        onlyTerm('more than sunset').should.have.properties({ kind: 'solarEvent', event: 'sunset', op: 'after' })
+        onlyTerm('> sunset').should.have.properties({ kind: 'solarEvent', event: 'sunset', op: 'after' })
+        onlyTerm('less than sunrise').should.have.properties({ kind: 'solarEvent', event: 'sunrise', op: 'before' })
+        onlyTerm('< sunrise').should.have.properties({ kind: 'solarEvent', event: 'sunrise', op: 'before' })
+        onlyTerm('less than quarter past five').should.have.properties({ kind: 'timeRange', style: 'before', endMin: 315 })
+        onlyTerm('> 20 past').should.have.properties({ kind: 'minuteOfHour', style: 'after', startMin: 20 })
+        onlyTerm('< quarter to').should.have.properties({ kind: 'minuteOfHour', style: 'before', startMin: 45 })
+    })
+
+    it('">"/"before"/"after" work for months, excluding the named month either way', function () {
+        onlyTerm('> march').should.have.properties({ kind: 'month', months: [4, 5, 6, 7, 8, 9, 10, 11, 12] })
+        onlyTerm('after march').should.have.properties({ kind: 'month', months: [4, 5, 6, 7, 8, 9, 10, 11, 12] })
+        onlyTerm('< march').should.have.properties({ kind: 'month', months: [1, 2] })
+        onlyTerm('before march').should.have.properties({ kind: 'month', months: [1, 2] })
+        lang.parse('> march').description.should.equal(lang.parse('after march').description)
+        // no month is left to name before january / after december - reject, don't guess
+        lang.parse('before january').ok.should.be.false()
+        lang.parse('after december').ok.should.be.false()
+        // negation composes for free - it's a plain month term under the hood
+        onlyTerm('not after march').should.have.properties({ kind: 'month', months: [4, 5, 6, 7, 8, 9, 10, 11, 12], negate: true })
+    })
+
+    it('">"/"before"/"after" work for years, which (unlike months) are unbounded', function () {
+        onlyTerm('> 2027').should.have.properties({ kind: 'year', op: 'after', boundary: 2027 })
+        onlyTerm('after 2027').should.have.properties({ kind: 'year', op: 'after', boundary: 2027 })
+        onlyTerm('< 2027').should.have.properties({ kind: 'year', op: 'before', boundary: 2027 })
+        onlyTerm('before 2027').should.have.properties({ kind: 'year', op: 'before', boundary: 2027 })
+        lang.parse('> 2027').description.should.equal(lang.parse('after 2027').description)
+    })
+
+    it('day-of-month still has no ">"/"before"/"after" concept - the comparison is honestly reported as unmatched, not silently dropped', function () {
+        // unlike the time-of-day bug, this was never silently misleading: the
+        // comparison word has always shown up in `unmatched` rather than vanishing
+        const r = lang.parse('> the 15th')
+        r.description.should.equal('day of the month is 15')
+        r.unmatched.should.containEql('>')
+    })
+
     it('parses "from 09:00 to 17:30"', function () {
         const term = onlyTerm('from 09:00 to 17:30')
         term.startMin.should.equal(540)

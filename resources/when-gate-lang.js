@@ -818,8 +818,14 @@
             case 'TO': // a LEADING range-word reads as "before": "until 6pm", "till sunset"
                 state.symbols[state.pos] = { type: 'BEFORE', raw: sym.raw }
                 return parseBeforeAfter(state)
+            // MORE/LESS as a LEADING symbol (not already consumed as a lookahead
+            // inside sun/moon altitude or moon illumination) are before/after for
+            // a time-ish target: "greater than 4pm" = after 4pm, not "ignore the
+            // comparison and match the exact minute 16:00"
             case 'BEFORE':
             case 'AFTER':
+            case 'MORE':
+            case 'LESS':
                 return parseBeforeAfter(state)
             case 'WITHIN':
                 return parseWithin(state)
@@ -1591,7 +1597,7 @@
 
     function parseBeforeAfter (state) {
         const opSym = peek(state)
-        const op = opSym.type === 'BEFORE' ? 'before' : 'after'
+        const op = (opSym.type === 'BEFORE' || opSym.type === 'LESS') ? 'before' : 'after'
         state.pos++
         const target = peek(state)
         if (target && (target.type === 'TIME' || target.type === 'TIMEWORD')) {
@@ -1615,6 +1621,27 @@
             const term = clone(target.term)
             term.source = opSym.raw + ' ' + target.raw
             return term
+        }
+        // "before march"/"after march": a plain month-list term excluding march
+        // itself either way, same shape "june to august" already produces so it
+        // combines/coalesces the same way. "before january"/"after december" has
+        // no month left to name - reject rather than emit an always-false term
+        if (target && target.type === 'MONTH') {
+            state.pos++
+            const months = op === 'before'
+                ? Array.from({ length: target.month - 1 }, function (_, i) { return i + 1 })
+                : Array.from({ length: 12 - target.month }, function (_, i) { return target.month + 1 + i })
+            if (!months.length) {
+                state.unmatched.push(opSym.raw + ' ' + target.raw)
+                return null
+            }
+            return { kind: 'month', months, source: opSym.raw + ' ' + target.raw }
+        }
+        // "before 2027"/"after 2027": years are unbounded, so (unlike months) this
+        // needs an open-ended form alongside the plain "years" list - see evalTerm
+        if (target && target.type === 'NUM' && !target.ordinal && isYearNumber(target.value)) {
+            state.pos++
+            return { kind: 'year', op, boundary: target.value, source: opSym.raw + ' ' + target.raw }
         }
         // minute-of-hour and anchored-time sub-conditions: "before quarter to
         // [the hour]", "after 20 past", "before quarter past five" (= before 05:15)
@@ -1724,7 +1751,7 @@
     // must never set-union with plain terms
     function coalescable (term) {
         return MUTUALLY_EXCLUSIVE[term.kind] && !term.negate && !term.last && !term.weekOrdinal &&
-            !term.month && !term.year && !term.firstCount && !term.lastCount && !term.scope
+            !term.month && !term.year && !term.firstCount && !term.lastCount && !term.scope && !term.op
     }
 
     // Within an AND group, positive same-kind day/month terms union together:
@@ -1903,6 +1930,10 @@
                 break
             }
             case 'year': {
+                if (term.op) {
+                    text = 'year is ' + term.op + ' ' + term.boundary
+                    break
+                }
                 const years = term.years
                 const contiguous = years.length > 2 && years[years.length - 1] - years[0] === years.length - 1
                 if (contiguous) {

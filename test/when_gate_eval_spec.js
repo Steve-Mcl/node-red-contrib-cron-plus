@@ -45,6 +45,14 @@ describe('when-gate-eval: calendar terms', function () {
         evalText('on the 21st of the month', { ts: SUNDAY_NOON_UTC, tz: 'UTC' }).pass.should.be.true()
     })
 
+    it('"after march"/"before march" exclude march itself either way', function () {
+        evalText('after march', { ts: Date.parse('2026-04-01T00:00:00Z'), tz: 'UTC' }).pass.should.be.true()
+        evalText('after march', { ts: Date.parse('2026-03-31T23:59:59Z'), tz: 'UTC' }).pass.should.be.false()
+        evalText('before march', { ts: Date.parse('2026-02-28T00:00:00Z'), tz: 'UTC' }).pass.should.be.true()
+        evalText('before march', { ts: Date.parse('2026-03-01T00:00:00Z'), tz: 'UTC' }).pass.should.be.false()
+        evalText('> march', { ts: SUNDAY_NOON_UTC, tz: 'UTC' }).pass.should.be.true() // June
+    })
+
     it('"every day" always passes', function () {
         evalText('every day', { ts: SUNDAY_NOON_UTC }).pass.should.be.true()
     })
@@ -309,6 +317,15 @@ describe('when-gate-eval: years', function () {
     it('year ranges', function () {
         evalText('2027 to 2029', { ts: Date.parse('2028-06-15T12:00:00Z'), tz }).pass.should.be.true()
         evalText('2027 to 2029', { ts: Date.parse('2026-06-15T12:00:00Z'), tz }).pass.should.be.false()
+    })
+
+    it('"after 2027"/"before 2027" exclude 2027 itself either way (unbounded)', function () {
+        evalText('after 2027', { ts: Date.parse('2028-01-01T00:00:00Z'), tz }).pass.should.be.true()
+        evalText('after 2027', { ts: Date.parse('2027-12-31T23:59:59Z'), tz }).pass.should.be.false()
+        evalText('> 2027', { ts: Date.parse('2100-01-01T00:00:00Z'), tz }).pass.should.be.true() // genuinely unbounded
+        evalText('before 2027', { ts: Date.parse('2026-12-31T23:59:59Z'), tz }).pass.should.be.true()
+        evalText('before 2027', { ts: Date.parse('2027-01-01T00:00:00Z'), tz }).pass.should.be.false()
+        evalText('< 2027', { ts: Date.parse('1970-01-01T00:00:00Z'), tz }).pass.should.be.true()
     })
 
     it('1st monday of the year (Jan 1 2026 is a Thursday, so 5 Jan)', function () {

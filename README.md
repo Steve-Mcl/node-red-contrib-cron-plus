@@ -92,8 +92,8 @@ Type the condition in plain English; a live "understanding" line below the field
 
 * `on saturday only`, `weekdays`, `mon-wed`, `not on tuesday`
 * `first monday of the month`, `3rd tuesday of the month`, `last friday of the month`, `last day of the month`, `last day of the week` (weeks start Monday; the understanding line shows which day it resolved to)
-* `in december`, `june to august`, `on the 1st of the month`, `christmas day`
-* `january 2027`, `2027 to 2029`, `first monday of the year`, `2nd tuesday of 2028`, `first monday of january`
+* `in december`, `june to august`, `on the 1st of the month`, `christmas day`, `after march`/`before march` (excludes march itself either way)
+* `january 2027`, `2027 to 2029`, `first monday of the year`, `2nd tuesday of 2028`, `first monday of january`, `after 2027`/`before 2027` (unbounded, unlike months)
 * `when day is odd`, `on even months`, `on even years`
 * `christmas eve`, `day before christmas`, `4 days after christmas`, `1 month before christmas`, `within 2 days of christmas`
 * `between 9am and 5pm`, `before noon`, `between 10pm and 6am` (overnight)
@@ -103,7 +103,7 @@ Type the condition in plain English; a live "understanding" line below the field
 * `when the moon is visible`, `full moon`, `blue moon` (second full moon of a calendar month), `seasonal blue moon` (third full moon in a season of four), `moon more than 50% illuminated`, `moon is 90% illuminated` (bare percentages mean "at least")
 * `sun is between 10 and 12 degrees`, `sun above 30 degrees`, `sun is high`/`sun is low`, `moon is high`/`moon is low`
 * `sun azimuth is between 134 and 138 degrees`, `moon azimuth between 60 and 90` (compass bearing from North, 0-360; wraps through north, e.g. `between 350 and 10`)
-* `>` and `<` work as symbols wherever "above"/"below"/"more than"/"less than" already do, e.g. `sun > 30 degrees`, `moon < 50% illuminated`
+* `>` and `<` work as symbols for "above"/"below"/"more than"/"less than", e.g. `sun > 30 degrees`, `moon < 50% illuminated`, `> 4pm` (same as `after 4pm`), `at least 4pm`
 * combined: `on weekdays and during daylight`, `on weekends or after sunset`, `weekends or evenings except tuesday`
 * brackets group mixed and/or: `(last day of the month or wednesday) and after 10pm` - without brackets `and` binds tighter than `or`, and the understanding line always shows the grouping it settled on
 
