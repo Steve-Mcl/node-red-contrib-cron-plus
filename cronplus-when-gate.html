@@ -594,7 +594,10 @@ copies or substantial portions of the Software.
             Monday and the last is Sunday - the understanding line always shows which day it resolved to)</li>
         <li><b>Months and dates:</b> <code>in december</code>, <code>june to august</code>,
             <code>on the 1st of the month</code>, <code>christmas day</code>, <code>halloween</code>,
-            <code>new years day</code>, <code>after march</code> / <code>before march</code>
+            <code>new years day</code>, <code>valentines day</code>, <code>groundhog day</code>,
+            <code>st patricks day</code>, <code>april fools day</code>, <code>earth day</code>,
+            <code>may day</code>, <code>boxing day</code> (all fixed, same everywhere - no moveable
+            feasts or country-varying rules), <code>after march</code> / <code>before march</code>
             (excludes march itself either way; <code>before january</code>/<code>after december</code>
             have no month left to name, so they're rejected rather than always false)</li>
         <li><b>Years:</b> <code>in 2027</code>, <code>2027 to 2029</code>, <code>january 2027</code>,
@@ -613,6 +616,10 @@ copies or substantial portions of the Software.
         <li><b>Clock time:</b> <code>between 9am and 5pm</code>, <code>from 09:00 to 17:30</code>,
             <code>before noon</code>, <code>after 10pm</code>, <code>between 10pm and 6am</code>
             (ranges that end at or before their start cross midnight; the end is exclusive)</li>
+        <li><b>Day parts:</b> <code>morning</code> (00:00-12:00), <code>afternoon</code> (12:00-18:00),
+            <code>evening</code> (18:00-24:00) - fixed clock hours, not solar; the understanding
+            line names the sun-relative equivalent instead (<code>dawn</code>/<code>sunrise</code>,
+            <code>afternoon sun</code>/<code>golden hour</code>, <code>dusk</code>/<code>twilight</code>)</li>
         <li><b>Minute of the hour:</b> <code>between 15 minutes and 30 minutes past the hour</code>,
             <code>from 0 minutes to 10 minutes</code>, <code>quarter past</code>, <code>half past</code>,
             <code>quarter to</code>, <code>ten past</code>, <code>5 to</code> (every hour).

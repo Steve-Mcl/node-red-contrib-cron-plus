@@ -103,6 +103,31 @@
     // sym types produced: TERM (a ready term), SOLAR_AMBIG (state or event by
     // context, e.g. dawn/dusk), EVENT (solar event name), and keyword symbols.
     const PHRASES = [
+        // additional named dates (christmas/halloween/new year live in NAMED_DATES
+        // instead, being single bare words). Fixed month/day, same wherever
+        // observed - no moveable feasts (easter) or country-varying rules
+        // (thanksgiving, independence/labor day) belong here
+        { words: ['valentines', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 2, day: 14, name: 'valentines day' } } },
+        { words: ['valentines'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 2, day: 14, name: 'valentines day' } } },
+        { words: ['groundhog', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 2, day: 2, name: 'groundhog day' } } },
+        { words: ['groundhog'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 2, day: 2, name: 'groundhog day' } } },
+        // "patrick"/"fool" (dropped possessive) are listed explicitly rather than
+        // left to typo-correction: that only retries the word where phrase
+        // matching STARTS, so a typo further into a 3-word phrase strands the
+        // trailing word(s) to be misread on their own ("day" as daylight, "april"
+        // as the month) instead of being recovered
+        { words: ['st', 'patricks', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 3, day: 17, name: 'st patricks day' } } },
+        { words: ['st', 'patrick', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 3, day: 17, name: 'st patricks day' } } },
+        { words: ['saint', 'patricks', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 3, day: 17, name: 'st patricks day' } } },
+        { words: ['saint', 'patrick', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 3, day: 17, name: 'st patricks day' } } },
+        { words: ['april', 'fools', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 4, day: 1, name: 'april fools day' } } },
+        { words: ['april', 'fools'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 4, day: 1, name: 'april fools day' } } },
+        { words: ['april', 'fool', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 4, day: 1, name: 'april fools day' } } },
+        { words: ['april', 'fool'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 4, day: 1, name: 'april fools day' } } },
+        { words: ['earth', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 4, day: 22, name: 'earth day' } } },
+        { words: ['may', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 5, day: 1, name: 'may day' } } },
+        { words: ['boxing', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 12, day: 26, name: 'boxing day' } } },
+
         // combinators / operators
         { words: ['but', 'not'], sym: { type: 'EXCEPT' } },
         { words: ['except'], sym: { type: 'EXCEPT' } },
@@ -238,10 +263,11 @@
         { words: ['midday'], sym: { type: 'TIMEWORD', minutes: 720 } },
         { words: ['midnight'], sym: { type: 'TIMEWORD', minutes: 0 } },
 
-        // clock-based day parts
-        { words: ['morning'], sym: { type: 'TERM', term: { kind: 'timeRange', style: 'before', startMin: 0, endMin: 720 } } },
-        { words: ['afternoon'], sym: { type: 'TERM', term: { kind: 'timeRange', style: 'between', startMin: 720, endMin: 1080 } } },
-        { words: ['evening'], sym: { type: 'TERM', term: { kind: 'solarEvent', event: 'sunset', op: 'after' } } },
+        // clock-based day parts (fixed hours, not solar - the understanding line
+        // points to the solar-relative words instead of guessing which one meant)
+        { words: ['morning'], sym: { type: 'TERM', term: { kind: 'timeRange', style: 'before', startMin: 0, endMin: 720, label: 'morning' } } },
+        { words: ['afternoon'], sym: { type: 'TERM', term: { kind: 'timeRange', style: 'between', startMin: 720, endMin: 1080, label: 'afternoon' } } },
+        { words: ['evening'], sym: { type: 'TERM', term: { kind: 'timeRange', style: 'between', startMin: 1080, endMin: 1440, label: 'evening' } } },
 
         // moon
         { words: ['moon', 'visible'], sym: { type: 'TERM', term: { kind: 'moonAltitude', op: 'above', degrees: 0 } } },
@@ -1482,6 +1508,15 @@
             state.pos += 2
             return { kind: 'solarBetween', from: eventName, to: endEv, source: raw + ' to ' + endSym.raw }
         }
+        // "to"/"until" was there, but the target is a duration (e.g. "golden
+        // hour", "twilight"), not an instant, so there is no usable endpoint -
+        // consume both sides and report the whole attempted range as unmatched,
+        // rather than silently falling back to the bare leading event and
+        // letting the endpoint drift off to be misread as its own clause
+        if (endSym) {
+            state.pos += 2
+            state.unmatched.push(raw + ' ' + joiner.raw + ' ' + endSym.raw)
+        }
         return null
     }
 
@@ -1550,14 +1585,17 @@
             state.unmatched.push(start.raw + ' ' + a.raw + ' minutes')
             return null
         }
-        // time range: between TIME and TIME
-        if (a && (a.type === 'TIME' || a.type === 'TIMEWORD' || (a.type === 'NUM' && !a.ordinal && a.value <= 23))) {
+        // time range: between TIME and TIME. A bare NUM only counts as an hour
+        // when it's a whole number (matches clockMinutesFromSym/consumeHourAnchor
+        // below) - a decimal like 2.2 is not a clock hour and must not silently
+        // become 132 minutes (02:12) via value * 60
+        if (a && (a.type === 'TIME' || a.type === 'TIMEWORD' || (a.type === 'NUM' && !a.ordinal && Number.isInteger(a.value) && a.value <= 23))) {
             const startMin = a.type === 'NUM' ? a.value * 60 : a.minutes
             state.pos++
             const joiner = peek(state)
             if (joiner && (joiner.type === 'AND' || joiner.type === 'TO' || joiner.type === 'DASH')) { state.pos++ }
             const b = peek(state)
-            if (b && (b.type === 'TIME' || b.type === 'TIMEWORD' || (b.type === 'NUM' && !b.ordinal && b.value <= 23))) {
+            if (b && (b.type === 'TIME' || b.type === 'TIMEWORD' || (b.type === 'NUM' && !b.ordinal && Number.isInteger(b.value) && b.value <= 23))) {
                 const endMin = b.type === 'NUM' ? b.value * 60 : b.minutes
                 state.pos++
                 return { kind: 'timeRange', style: 'between', startMin, endMin, source: start.raw + ' ' + a.raw + ' and ' + b.raw }
@@ -2040,6 +2078,12 @@
                     text = 'time is between ' + fmtMinutes(term.startMin) + ' and ' + fmtMinutes(term.endMin)
                     if (term.endMin <= term.startMin) { text += ' (overnight)' }
                 }
+                if (term.label) {
+                    // fixed clock hours, not solar - point at the sun-relative
+                    // words instead of guessing which one was meant
+                    const solarHints = { morning: 'dawn/sunrise', afternoon: 'afternoon sun/golden hour', evening: 'dusk/twilight' }
+                    text += ' (' + term.label + '; for sun-relative timing try ' + solarHints[term.label] + ')'
+                }
                 break
             case 'solarState': {
                 const labels = {
@@ -2286,7 +2330,8 @@
         'on the 1st of the month',
         // dates
         'christmas day', 'christmas eve', 'day before christmas', '4 days after christmas',
-        'within 2 days of christmas', 'new years day',
+        'within 2 days of christmas', 'new years day', 'valentines day', 'st patricks day',
+        'april fools day', 'earth day', 'may day', 'boxing day', 'groundhog day',
         // clock times
         'between 9am and 5pm', '10pm to 6am', 'before noon', 'after 10pm', 'until 6pm',
         'quarter past five', 'ten past', 'between 15 minutes and 30 minutes past the hour', '2 hours before noon',

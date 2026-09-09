@@ -96,13 +96,16 @@ Type the condition in plain English; a live "understanding" line below the field
 * `january 2027`, `2027 to 2029`, `first monday of the year`, `2nd tuesday of 2028`, `first monday of january`, `after 2027`/`before 2027` (unbounded, unlike months)
 * `when day is odd`, `on even months`, `on even years`
 * `christmas eve`, `day before christmas`, `4 days after christmas`, `1 month before christmas`, `within 2 days of christmas`
+* other fixed dates (same everywhere, no moveable feasts or country-varying rules): `valentines day`, `groundhog day`, `st patricks day`, `april fools day`, `earth day`, `may day`, `boxing day` (each also works with `eve`, `day before`, etc.)
 * `between 9am and 5pm`, `before noon`, `between 10pm and 6am` (overnight)
+* `morning` (00:00-12:00), `afternoon` (12:00-18:00), `evening` (18:00-24:00) - fixed clock hours, not solar; the understanding line points to the sun-relative equivalent (`dawn`/`sunrise`, `afternoon sun`/`golden hour`, `dusk`/`twilight`)
 * `between 15 minutes and 30 minutes past the hour`, `quarter past`, `half past`, `ten past`, `5 to` (every hour; `quarter past five` is the clock time 05:15)
 * `is night`, `after dark`, `golden hour`, `sun rising`, `during daylight`
 * `after sunset`, `before sunrise`, `2 hours after sunset`, `within 30 minutes of sunrise`, `between sunset and sunrise`
 * `when the moon is visible`, `full moon`, `blue moon` (second full moon of a calendar month), `seasonal blue moon` (third full moon in a season of four), `moon more than 50% illuminated`, `moon is 90% illuminated` (bare percentages mean "at least")
 * `sun is between 10 and 12 degrees`, `sun above 30 degrees`, `sun is high`/`sun is low`, `moon is high`/`moon is low`
-* `sun azimuth is between 134 and 138 degrees`, `moon azimuth between 60 and 90` (compass bearing from North, 0-360; wraps through north, e.g. `between 350 and 10`)
+* `sun azimuth is between 134 and 138 degrees`, `moon azimuth between 60 and 90` (compass bearing from North, 0-360; wraps through north, e.g. `sun azimuth between 350 and 10`)
+* combining altitude and azimuth: `sun azimuth is between 134 and 138 and sun altitude is between 0.9 and 2.2` (Newgrange's midwinter sunrise alignment) - `sun` must be named on both clauses, "...and its altitude..." has no sun/moon context of its own
 * `>` and `<` work as symbols for "above"/"below"/"more than"/"less than", e.g. `sun > 30 degrees`, `moon < 50% illuminated`, `> 4pm` (same as `after 4pm`), `at least 4pm`
 * combined: `on weekdays and during daylight`, `on weekends or after sunset`, `weekends or evenings except tuesday`
 * brackets group mixed and/or: `(last day of the month or wednesday) and after 10pm` - without brackets `and` binds tighter than `or`, and the understanding line always shows the grouping it settled on

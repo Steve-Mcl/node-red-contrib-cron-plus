@@ -45,6 +45,13 @@ describe('when-gate-eval: calendar terms', function () {
         evalText('on the 21st of the month', { ts: SUNDAY_NOON_UTC, tz: 'UTC' }).pass.should.be.true()
     })
 
+    it('matches the other fixed named dates', function () {
+        evalText('valentines day', { ts: Date.parse('2027-02-14T09:00:00Z'), tz: 'UTC' }).pass.should.be.true()
+        evalText('may day', { ts: Date.parse('2027-05-01T09:00:00Z'), tz: 'UTC' }).pass.should.be.true()
+        evalText('boxing day', { ts: Date.parse('2026-12-26T09:00:00Z'), tz: 'UTC' }).pass.should.be.true()
+        evalText('boxing day', { ts: Date.parse('2026-12-25T09:00:00Z'), tz: 'UTC' }).pass.should.be.false()
+    })
+
     it('"after march"/"before march" exclude march itself either way', function () {
         evalText('after march', { ts: Date.parse('2026-04-01T00:00:00Z'), tz: 'UTC' }).pass.should.be.true()
         evalText('after march', { ts: Date.parse('2026-03-31T23:59:59Z'), tz: 'UTC' }).pass.should.be.false()
@@ -88,6 +95,21 @@ describe('when-gate-eval: time ranges (Europe/London, GMT in January)', function
     it('respects DST local clock (2026-06-21T11:30Z is 12:30 BST)', function () {
         evalText('before noon', { ts: at('2026-06-21T11:30:00Z'), tz }).pass.should.be.false()
         evalText('before noon', { ts: at('2026-06-21T10:30:00Z'), tz }).pass.should.be.true()
+    })
+
+    it('evening is fixed clock hours (18:00-24:00), not tied to real sunset - and no longer needs a location', function () {
+        evalText('evening', { ts: at('2026-06-21T18:00:00Z'), tz: 'UTC' }).pass.should.be.true()
+        evalText('evening', { ts: at('2026-06-21T23:59:00Z'), tz: 'UTC' }).pass.should.be.true()
+        evalText('evening', { ts: at('2026-06-22T00:00:00Z'), tz: 'UTC' }).pass.should.be.false()
+        evalText('evening', { ts: at('2026-06-21T17:59:00Z'), tz: 'UTC' }).pass.should.be.false()
+        // no lat/lon supplied at all - would have errored under the old solar-based definition
+        should.exist(evalText('evening', { ts: at('2026-06-21T19:00:00Z'), tz: 'UTC' }).pass)
+    })
+
+    it('"daylight and sun setting" is the closest solar equivalent of "afternoon" - "sun setting" alone runs past sunset into the night', function () {
+        evalText('sun setting', { ts: at('2026-06-21T23:00:00Z'), tz: 'UTC', ...LONDON }).pass.should.be.true() // well after sunset, still "setting"
+        evalText('daylight and sun setting', { ts: at('2026-06-21T15:00:00Z'), tz: 'UTC', ...LONDON }).pass.should.be.true() // solar afternoon
+        evalText('daylight and sun setting', { ts: at('2026-06-21T23:00:00Z'), tz: 'UTC', ...LONDON }).pass.should.be.false() // night now, not afternoon
     })
 })
 
@@ -462,17 +484,20 @@ describe('when-gate-eval: sun/moon position', function () {
         r.reasons[0].detail.should.match(/location/)
     })
 
-    it('azimuth ranges track suncalc (Newgrange midwinter sunrise, real-world regression)', function () {
+    it('azimuth+altitude ranges track suncalc (Newgrange midwinter sunrise, real-world regression)', function () {
         // Newgrange, Ireland: the passage aligns with sunrise for a few mornings around
-        // the winter solstice, when azimuth is ~127-142 degrees and the sun has just
-        // cleared the horizon. This is the exact condition a user asked to express.
+        // the winter solstice, when azimuth is 134-138 degrees and altitude is
+        // 0.9-2.2 degrees (just clear of the horizon). This is the exact condition
+        // a user asked to express, and must be written with "sun" on both clauses -
+        // "and its altitude..." has no sun/moon context of its own (see the
+        // when-gate-lang "between" regression test).
         const NEWGRANGE = { lat: 53.6944, lon: -6.4756 }
-        const cond = 'sun azimuth is between 134 and 138 and sun altitude is above 0.5'
+        const cond = 'sun azimuth is between 134 and 138 and sun altitude is between 0.9 and 2.2'
         let aligned = null
         for (let m = 0; m < 40 && !aligned; m++) {
             const ts = Date.parse('2026-12-21T08:35:00Z') + m * 60000
             const pos = SunCalc.getPosition(new Date(ts), NEWGRANGE.lat, NEWGRANGE.lon)
-            if (pos.azimuth >= 134 && pos.azimuth <= 138 && pos.altitude > 0.5) { aligned = ts }
+            if (pos.azimuth >= 134 && pos.azimuth <= 138 && pos.altitude >= 0.9 && pos.altitude <= 2.2) { aligned = ts }
         }
         should.exist(aligned, 'no aligned minute found in the scanned window')
         evalText(cond, { ts: aligned, tz: 'UTC', ...NEWGRANGE }).pass.should.be.true()

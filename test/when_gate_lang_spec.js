@@ -148,9 +148,63 @@ describe('when-gate-lang parse: months and dates', function () {
         term.month.should.equal(1)
         term.day.should.equal(1)
     })
+
+    it('parses the other fixed, unambiguous named dates', function () {
+        onlyTerm("valentine's day").should.have.properties({ kind: 'namedDate', month: 2, day: 14 })
+        onlyTerm('valentines').should.have.properties({ kind: 'namedDate', month: 2, day: 14 })
+        onlyTerm('groundhog day').should.have.properties({ kind: 'namedDate', month: 2, day: 2 })
+        onlyTerm("st patrick's day").should.have.properties({ kind: 'namedDate', month: 3, day: 17 })
+        onlyTerm('saint patricks day').should.have.properties({ kind: 'namedDate', month: 3, day: 17 })
+        onlyTerm('april fools day').should.have.properties({ kind: 'namedDate', month: 4, day: 1 })
+        onlyTerm('earth day').should.have.properties({ kind: 'namedDate', month: 4, day: 22 })
+        onlyTerm('may day').should.have.properties({ kind: 'namedDate', month: 5, day: 1 })
+        onlyTerm('boxing day').should.have.properties({ kind: 'namedDate', month: 12, day: 26 })
+    })
+
+    it('"may day" does not steal bare "may" from the month grammar', function () {
+        onlyTerm('in may').should.have.properties({ kind: 'month', months: [5] })
+        onlyTerm('may').should.have.properties({ kind: 'month', months: [5] })
+    })
+
+    it('a holiday name needing "day" to mean anything does not match on its own (e.g. "boxing")', function () {
+        lang.parse('boxing').ok.should.be.false()
+    })
+
+    it('the generic "eve" mechanism applies to the new named dates too', function () {
+        lang.parse('valentines day eve').description.should.equal('date is 13 February (valentines eve)')
+        lang.parse('boxing day eve').description.should.equal('date is 25 December (boxing eve)')
+    })
+
+    it('regression: a dropped possessive mid-phrase used to strand the trailing word to be misread on its own', function () {
+        // "st patrick day" (missing the 's') used to: fuzzy-correct 'patrick' to
+        // 'patricks' (a real, accurate hint) but too late to help, since retry only
+        // checks the corrected word as its OWN phrase start - stranding 'day' to
+        // separately match the unrelated single-word "daylight" phrase, and for
+        // "april fool day" stranding 'april' to match the month on its own
+        onlyTerm('st patrick day').should.have.properties({ kind: 'namedDate', month: 3, day: 17 })
+        onlyTerm('saint patrick day').should.have.properties({ kind: 'namedDate', month: 3, day: 17 })
+        onlyTerm('april fool day').should.have.properties({ kind: 'namedDate', month: 4, day: 1 })
+        onlyTerm('april fool').should.have.properties({ kind: 'namedDate', month: 4, day: 1 })
+        lang.parse('st patrick day').warnings.should.be.empty()
+        lang.parse('st patrick day').unmatched.should.be.empty()
+    })
 })
 
 describe('when-gate-lang parse: time ranges', function () {
+    it('morning/afternoon/evening are all fixed clock hours, not solar', function () {
+        onlyTerm('morning').should.have.properties({ kind: 'timeRange', style: 'before', startMin: 0, endMin: 720 })
+        onlyTerm('afternoon').should.have.properties({ kind: 'timeRange', style: 'between', startMin: 720, endMin: 1080 })
+        onlyTerm('evening').should.have.properties({ kind: 'timeRange', style: 'between', startMin: 1080, endMin: 1440 })
+        // none of the three need a location any more (evening used to, tied to real sunset)
+        lang.requiresLocation(lang.parse('evening').ast).should.be.false()
+    })
+
+    it('the understanding line points morning/afternoon/evening at their solar-relative equivalents', function () {
+        lang.parse('morning').description.should.match(/for sun-relative timing try dawn\/sunrise/)
+        lang.parse('afternoon').description.should.match(/for sun-relative timing try afternoon sun\/golden hour/)
+        lang.parse('evening').description.should.match(/for sun-relative timing try dusk\/twilight/)
+    })
+
     it('parses "weekdays between 9am and 5pm"', function () {
         const terms = onlyGroupTerms('weekdays between 9am and 5pm')
         terms.should.have.length(2)
@@ -245,6 +299,19 @@ describe('when-gate-lang parse: time ranges', function () {
         const term = onlyTerm('from 09:00 to 17:30')
         term.startMin.should.equal(540)
         term.endMin.should.equal(1050)
+    })
+
+    it('regression: a bare decimal in "between X and Y" is not silently mistaken for an hour count', function () {
+        // "between 0.9 and 2.2" used to slip past the bare-hour branch (which only
+        // meant to accept whole hours like "between 9 and 17") and multiply the
+        // decimal by 60 as if it were a fractional hour - 2.2 became 132 minutes
+        // (02:12). A degree/percent/any-other-decimal range with no sun/moon
+        // context to claim it should fail to parse, not silently become a time.
+        const r = lang.parse('between 0.9 and 2.2')
+        r.ok.should.be.false()
+        r.unmatched.should.containEql('0.9')
+        // whole-hour bare numbers must still work exactly as before
+        onlyTerm('between 9 and 17').should.have.properties({ kind: 'timeRange', style: 'between', startMin: 540, endMin: 1020 })
     })
 
     it('parses "at 9.30pm" (dot separator) as an exact-minute condition', function () {
@@ -363,6 +430,23 @@ describe('when-gate-lang parse: solar', function () {
         lang.parse('10pm to sunrise').unmatched.should.have.length(0)
         lang.parse('sunrise until 6pm').unmatched.should.have.length(0)
         onlyTerm('sunrise').op.should.equal('within') // standalone event unchanged
+    })
+
+    it('regression: "X until <duration>" reports the whole range as unmatched instead of silently splitting into an unrelated "and"', function () {
+        // "golden hour"/"twilight"/"night" are durations (an altitude band), not
+        // an instant, so they can't be a range endpoint - this used to drop
+        // "until" and let the duration word drift off to be misread as its own,
+        // unrelated clause ("it is dawn AND it is golden hour")
+        for (const phrase of ['dawn until golden hour', 'dawn until civil twilight', 'dawn until twilight', 'dawn until night']) {
+            const r = lang.parse(phrase)
+            r.ok.should.be.true()
+            r.description.should.equal('it is dawn (twilight, sun rising)')
+            r.unmatched.should.eql([phrase])
+        }
+        // a typo on "until" doesn't change the outcome - the target is the real problem
+        lang.parse('dawn untill golden hour').unmatched.should.eql(['dawn untill golden hour'])
+        // valid ranges (an instant on both sides) are unaffected
+        lang.parse('dawn until noon').unmatched.should.be.empty()
     })
 })
 
