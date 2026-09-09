@@ -148,9 +148,63 @@ describe('when-gate-lang parse: months and dates', function () {
         term.month.should.equal(1)
         term.day.should.equal(1)
     })
+
+    it('parses the other fixed, unambiguous named dates', function () {
+        onlyTerm("valentine's day").should.have.properties({ kind: 'namedDate', month: 2, day: 14 })
+        onlyTerm('valentines').should.have.properties({ kind: 'namedDate', month: 2, day: 14 })
+        onlyTerm('groundhog day').should.have.properties({ kind: 'namedDate', month: 2, day: 2 })
+        onlyTerm("st patrick's day").should.have.properties({ kind: 'namedDate', month: 3, day: 17 })
+        onlyTerm('saint patricks day').should.have.properties({ kind: 'namedDate', month: 3, day: 17 })
+        onlyTerm('april fools day').should.have.properties({ kind: 'namedDate', month: 4, day: 1 })
+        onlyTerm('earth day').should.have.properties({ kind: 'namedDate', month: 4, day: 22 })
+        onlyTerm('may day').should.have.properties({ kind: 'namedDate', month: 5, day: 1 })
+        onlyTerm('boxing day').should.have.properties({ kind: 'namedDate', month: 12, day: 26 })
+    })
+
+    it('"may day" does not steal bare "may" from the month grammar', function () {
+        onlyTerm('in may').should.have.properties({ kind: 'month', months: [5] })
+        onlyTerm('may').should.have.properties({ kind: 'month', months: [5] })
+    })
+
+    it('a holiday name needing "day" to mean anything does not match on its own (e.g. "boxing")', function () {
+        lang.parse('boxing').ok.should.be.false()
+    })
+
+    it('the generic "eve" mechanism applies to the new named dates too', function () {
+        lang.parse('valentines day eve').description.should.equal('date is 13 February (valentines eve)')
+        lang.parse('boxing day eve').description.should.equal('date is 25 December (boxing eve)')
+    })
+
+    it('regression: a dropped possessive mid-phrase used to strand the trailing word to be misread on its own', function () {
+        // "st patrick day" (missing the 's') used to: fuzzy-correct 'patrick' to
+        // 'patricks' (a real, accurate hint) but too late to help, since retry only
+        // checks the corrected word as its OWN phrase start - stranding 'day' to
+        // separately match the unrelated single-word "daylight" phrase, and for
+        // "april fool day" stranding 'april' to match the month on its own
+        onlyTerm('st patrick day').should.have.properties({ kind: 'namedDate', month: 3, day: 17 })
+        onlyTerm('saint patrick day').should.have.properties({ kind: 'namedDate', month: 3, day: 17 })
+        onlyTerm('april fool day').should.have.properties({ kind: 'namedDate', month: 4, day: 1 })
+        onlyTerm('april fool').should.have.properties({ kind: 'namedDate', month: 4, day: 1 })
+        lang.parse('st patrick day').warnings.should.be.empty()
+        lang.parse('st patrick day').unmatched.should.be.empty()
+    })
 })
 
 describe('when-gate-lang parse: time ranges', function () {
+    it('morning/afternoon/evening are all fixed clock hours, not solar', function () {
+        onlyTerm('morning').should.have.properties({ kind: 'timeRange', style: 'before', startMin: 0, endMin: 720 })
+        onlyTerm('afternoon').should.have.properties({ kind: 'timeRange', style: 'between', startMin: 720, endMin: 1080 })
+        onlyTerm('evening').should.have.properties({ kind: 'timeRange', style: 'between', startMin: 1080, endMin: 1440 })
+        // none of the three need a location any more (evening used to, tied to real sunset)
+        lang.requiresLocation(lang.parse('evening').ast).should.be.false()
+    })
+
+    it('the understanding line points morning/afternoon/evening at their solar-relative equivalents', function () {
+        lang.parse('morning').description.should.match(/for sun-relative timing try dawn\/sunrise/)
+        lang.parse('afternoon').description.should.match(/for sun-relative timing try afternoon sun\/golden hour/)
+        lang.parse('evening').description.should.match(/for sun-relative timing try dusk\/twilight/)
+    })
+
     it('parses "weekdays between 9am and 5pm"', function () {
         const terms = onlyGroupTerms('weekdays between 9am and 5pm')
         terms.should.have.length(2)
@@ -182,10 +236,82 @@ describe('when-gate-lang parse: time ranges', function () {
         term.startMin.should.equal(1320)
     })
 
+    it('regression: "greater than"/">"/"at least"/"over" no longer silently collapse a time into an exact minute', function () {
+        // this used to drop the comparison as unmatched and parse the bare time
+        // as an exact-minute match instead - "any time after 4pm" silently became
+        // "only during the single minute of 4:00pm", with a much less visible warning
+        const afterFour = { kind: 'timeRange', style: 'after', startMin: 960, endMin: 1440 }
+        onlyTerm('greater than 4pm').should.have.properties(afterFour)
+        onlyTerm('> 4pm').should.have.properties(afterFour)
+        onlyTerm('at least 4pm').should.have.properties(afterFour)
+        onlyTerm('over 4pm').should.have.properties(afterFour)
+        const beforeNine = { kind: 'timeRange', style: 'before', startMin: 0, endMin: 540 }
+        onlyTerm('less than 9am').should.have.properties(beforeNine)
+        onlyTerm('< 9am').should.have.properties(beforeNine)
+        onlyTerm('at most 9am').should.have.properties(beforeNine)
+        onlyTerm('under 9am').should.have.properties(beforeNine)
+        lang.parse('greater than 4pm').unmatched.should.be.empty()
+        // symbol and word forms must be indistinguishable downstream (same AST, same description)
+        lang.parse('> 4pm').description.should.equal(lang.parse('after 4pm').description)
+        lang.parse('< 9am').description.should.equal(lang.parse('before 9am').description)
+    })
+
+    it('"more than"/"less than"/">"/"<" also read as after/before for a solar event or minute-of-hour target', function () {
+        onlyTerm('more than sunset').should.have.properties({ kind: 'solarEvent', event: 'sunset', op: 'after' })
+        onlyTerm('> sunset').should.have.properties({ kind: 'solarEvent', event: 'sunset', op: 'after' })
+        onlyTerm('less than sunrise').should.have.properties({ kind: 'solarEvent', event: 'sunrise', op: 'before' })
+        onlyTerm('< sunrise').should.have.properties({ kind: 'solarEvent', event: 'sunrise', op: 'before' })
+        onlyTerm('less than quarter past five').should.have.properties({ kind: 'timeRange', style: 'before', endMin: 315 })
+        onlyTerm('> 20 past').should.have.properties({ kind: 'minuteOfHour', style: 'after', startMin: 20 })
+        onlyTerm('< quarter to').should.have.properties({ kind: 'minuteOfHour', style: 'before', startMin: 45 })
+    })
+
+    it('">"/"before"/"after" work for months, excluding the named month either way', function () {
+        onlyTerm('> march').should.have.properties({ kind: 'month', months: [4, 5, 6, 7, 8, 9, 10, 11, 12] })
+        onlyTerm('after march').should.have.properties({ kind: 'month', months: [4, 5, 6, 7, 8, 9, 10, 11, 12] })
+        onlyTerm('< march').should.have.properties({ kind: 'month', months: [1, 2] })
+        onlyTerm('before march').should.have.properties({ kind: 'month', months: [1, 2] })
+        lang.parse('> march').description.should.equal(lang.parse('after march').description)
+        // no month is left to name before january / after december - reject, don't guess
+        lang.parse('before january').ok.should.be.false()
+        lang.parse('after december').ok.should.be.false()
+        // negation composes for free - it's a plain month term under the hood
+        onlyTerm('not after march').should.have.properties({ kind: 'month', months: [4, 5, 6, 7, 8, 9, 10, 11, 12], negate: true })
+    })
+
+    it('">"/"before"/"after" work for years, which (unlike months) are unbounded', function () {
+        onlyTerm('> 2027').should.have.properties({ kind: 'year', op: 'after', boundary: 2027 })
+        onlyTerm('after 2027').should.have.properties({ kind: 'year', op: 'after', boundary: 2027 })
+        onlyTerm('< 2027').should.have.properties({ kind: 'year', op: 'before', boundary: 2027 })
+        onlyTerm('before 2027').should.have.properties({ kind: 'year', op: 'before', boundary: 2027 })
+        lang.parse('> 2027').description.should.equal(lang.parse('after 2027').description)
+    })
+
+    it('day-of-month still has no ">"/"before"/"after" concept - the comparison is honestly reported as unmatched, not silently dropped', function () {
+        // unlike the time-of-day bug, this was never silently misleading: the
+        // comparison word has always shown up in `unmatched` rather than vanishing
+        const r = lang.parse('> the 15th')
+        r.description.should.equal('day of the month is 15')
+        r.unmatched.should.containEql('>')
+    })
+
     it('parses "from 09:00 to 17:30"', function () {
         const term = onlyTerm('from 09:00 to 17:30')
         term.startMin.should.equal(540)
         term.endMin.should.equal(1050)
+    })
+
+    it('regression: a bare decimal in "between X and Y" is not silently mistaken for an hour count', function () {
+        // "between 0.9 and 2.2" used to slip past the bare-hour branch (which only
+        // meant to accept whole hours like "between 9 and 17") and multiply the
+        // decimal by 60 as if it were a fractional hour - 2.2 became 132 minutes
+        // (02:12). A degree/percent/any-other-decimal range with no sun/moon
+        // context to claim it should fail to parse, not silently become a time.
+        const r = lang.parse('between 0.9 and 2.2')
+        r.ok.should.be.false()
+        r.unmatched.should.containEql('0.9')
+        // whole-hour bare numbers must still work exactly as before
+        onlyTerm('between 9 and 17').should.have.properties({ kind: 'timeRange', style: 'between', startMin: 540, endMin: 1020 })
     })
 
     it('parses "at 9.30pm" (dot separator) as an exact-minute condition', function () {
@@ -304,6 +430,23 @@ describe('when-gate-lang parse: solar', function () {
         lang.parse('10pm to sunrise').unmatched.should.have.length(0)
         lang.parse('sunrise until 6pm').unmatched.should.have.length(0)
         onlyTerm('sunrise').op.should.equal('within') // standalone event unchanged
+    })
+
+    it('regression: "X until <duration>" reports the whole range as unmatched instead of silently splitting into an unrelated "and"', function () {
+        // "golden hour"/"twilight"/"night" are durations (an altitude band), not
+        // an instant, so they can't be a range endpoint - this used to drop
+        // "until" and let the duration word drift off to be misread as its own,
+        // unrelated clause ("it is dawn AND it is golden hour")
+        for (const phrase of ['dawn until golden hour', 'dawn until civil twilight', 'dawn until twilight', 'dawn until night']) {
+            const r = lang.parse(phrase)
+            r.ok.should.be.true()
+            r.description.should.equal('it is dawn (twilight, sun rising)')
+            r.unmatched.should.eql([phrase])
+        }
+        // a typo on "until" doesn't change the outcome - the target is the real problem
+        lang.parse('dawn untill golden hour').unmatched.should.eql(['dawn untill golden hour'])
+        // valid ranges (an instant on both sides) are unaffected
+        lang.parse('dawn until noon').unmatched.should.be.empty()
     })
 })
 
@@ -634,6 +777,24 @@ describe('when-gate-lang parse: sun/moon position', function () {
         onlyTerm('moon below -5 degrees').should.have.properties({ kind: 'moonAltitude', op: 'below', degrees: -5 })
     })
 
+    it('">" and "<" are accepted as symbols for "above"/"below" wherever they already work', function () {
+        onlyTerm('sun > 30 degrees').should.have.properties({ kind: 'sunAltitude', op: 'above', degrees: 30 })
+        onlyTerm('moon < -5 degrees').should.have.properties({ kind: 'moonAltitude', op: 'below', degrees: -5 })
+        onlyTerm('moon > 50% illuminated').should.have.properties({ kind: 'moonIllumination', op: 'gt', fraction: 0.5 })
+        lang.parse('sun > 30 degrees').description.should.equal(lang.parse('sun above 30 degrees').description)
+    })
+
+    it('"greater than"/"less than" already worked as above/below synonyms before ">"/"<" existed', function () {
+        onlyTerm('sun greater than 30 degrees').should.have.properties({ kind: 'sunAltitude', op: 'above', degrees: 30 })
+        onlyTerm('sun less than 30 degrees').should.have.properties({ kind: 'sunAltitude', op: 'below', degrees: 30 })
+    })
+
+    it('">" is not a silent no-op when the surrounding phrase does not support it (azimuth: only "between")', function () {
+        const r = lang.parse('sun azimuth > 30 degrees')
+        r.ok.should.be.false()
+        r.unmatched.should.containEql('>')
+    })
+
     it('parses negative between range "sun is between -6 and 0 degrees"', function () {
         const term = onlyTerm('sun is between -6 and 0 degrees')
         term.low.should.equal(-6)
@@ -657,6 +818,38 @@ describe('when-gate-lang parse: sun/moon position', function () {
     it('bare "sun" in day context is still Sunday', function () {
         onlyTerm('sat and sun').days.should.eql([0, 6])
         onlyTerm('sun above horizon').kind.should.equal('sunAltitude') // phrase unchanged
+    })
+
+    it('parses "sun azimuth is between 134 and 138 degrees"', function () {
+        const term = onlyTerm('sun azimuth is between 134 and 138 degrees')
+        term.should.have.properties({ kind: 'sunAzimuth', op: 'between', low: 134, high: 138 })
+        lang.parse('sun azimuth is between 134 and 138 degrees').description.should.equal('sun azimuth is between 134 and 138 degrees')
+    })
+
+    it('parses "moon azimuth between 60 and 90" without "is"', function () {
+        onlyTerm('moon azimuth between 60 and 90').should.have.properties({ kind: 'moonAzimuth', op: 'between', low: 60, high: 90 })
+    })
+
+    it('negative and out-of-range azimuth values normalise into 0-360', function () {
+        onlyTerm('sun azimuth between -10 and 10').should.have.properties({ low: 350, high: 10 })
+        onlyTerm('sun azimuth is between 400 and 410').should.have.properties({ low: 40, high: 50 })
+    })
+
+    it('azimuth combines with altitude and other clauses via "and"', function () {
+        const terms = onlyGroupTerms('sun azimuth is between 134 and 138 and sun altitude is above 0.5')
+        terms.should.have.length(2)
+        terms[0].kind.should.equal('sunAzimuth')
+        terms[1].should.have.properties({ kind: 'sunAltitude', op: 'above', degrees: 0.5 })
+    })
+
+    it('bare "sun azimuth" or an unsupported "above/below" form fails to parse (only "between" is supported)', function () {
+        lang.parse('sun azimuth').ok.should.be.false()
+        lang.parse('sun azimuth above 30 degrees').ok.should.be.false()
+    })
+
+    it('bare "sun"/"moon" before azimuth are not mistaken for Sunday or moon phase', function () {
+        onlyTerm('sun azimuth is between 1 and 2 degrees').kind.should.equal('sunAzimuth')
+        onlyTerm('moon azimuth is between 1 and 2 degrees').kind.should.equal('moonAzimuth')
     })
 })
 

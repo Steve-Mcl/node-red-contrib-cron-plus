@@ -594,10 +594,16 @@ copies or substantial portions of the Software.
             Monday and the last is Sunday - the understanding line always shows which day it resolved to)</li>
         <li><b>Months and dates:</b> <code>in december</code>, <code>june to august</code>,
             <code>on the 1st of the month</code>, <code>christmas day</code>, <code>halloween</code>,
-            <code>new years day</code></li>
+            <code>new years day</code>, <code>valentines day</code>, <code>groundhog day</code>,
+            <code>st patricks day</code>, <code>april fools day</code>, <code>earth day</code>,
+            <code>may day</code>, <code>boxing day</code> (all fixed, same everywhere - no moveable
+            feasts or country-varying rules), <code>after march</code> / <code>before march</code>
+            (excludes march itself either way; <code>before january</code>/<code>after december</code>
+            have no month left to name, so they're rejected rather than always false)</li>
         <li><b>Years:</b> <code>in 2027</code>, <code>2027 to 2029</code>, <code>january 2027</code>,
             <code>first monday of the year</code>, <code>2nd tuesday of 2028</code>,
-            <code>first monday of january</code>, <code>first/last day of the year</code></li>
+            <code>first monday of january</code>, <code>first/last day of the year</code>,
+            <code>after 2027</code> / <code>before 2027</code> (unbounded, unlike months)</li>
         <li><b>Even/odd:</b> <code>when day is odd</code> (the day of the month),
             <code>odd days</code>, <code>on even months</code>, <code>on even years</code>,
             <code>month is even</code></li>
@@ -610,6 +616,10 @@ copies or substantial portions of the Software.
         <li><b>Clock time:</b> <code>between 9am and 5pm</code>, <code>from 09:00 to 17:30</code>,
             <code>before noon</code>, <code>after 10pm</code>, <code>between 10pm and 6am</code>
             (ranges that end at or before their start cross midnight; the end is exclusive)</li>
+        <li><b>Day parts:</b> <code>morning</code> (00:00-12:00), <code>afternoon</code> (12:00-18:00),
+            <code>evening</code> (18:00-24:00) - fixed clock hours, not solar; the understanding
+            line names the sun-relative equivalent instead (<code>dawn</code>/<code>sunrise</code>,
+            <code>afternoon sun</code>/<code>golden hour</code>, <code>dusk</code>/<code>twilight</code>)</li>
         <li><b>Minute of the hour:</b> <code>between 15 minutes and 30 minutes past the hour</code>,
             <code>from 0 minutes to 10 minutes</code>, <code>quarter past</code>, <code>half past</code>,
             <code>quarter to</code>, <code>ten past</code>, <code>5 to</code> (every hour).
@@ -641,6 +651,14 @@ copies or substantial portions of the Software.
             <code>sun is high</code> / <code>moon is high</code> (above 45&deg;),
             <code>sun is low</code> / <code>moon is low</code> (up, between 0&deg; and 15&deg;) -
             the understanding line always shows the exact thresholds</li>
+        <li><b>Sun/moon azimuth:</b> <code>sun azimuth is between 134 and 138 degrees</code>,
+            <code>moon azimuth between 60 and 90</code> - a compass bearing from North
+            (0-360&deg;); only <code>between</code> is supported, and a range wraps through
+            north when the first number is bigger, e.g. <code>between 350 and 10</code></li>
+        <li><b>Comparison symbols:</b> <code>&gt;</code> and <code>&lt;</code> work as symbols
+            for "above"/"below"/"more than"/"less than", e.g.
+            <code>sun &gt; 30 degrees</code>, <code>moon &lt; 50% illuminated</code>,
+            <code>&gt; 4pm</code> (same as <code>after 4pm</code>), <code>at least 4pm</code></li>
         <li><b>Combining:</b> <code>on weekdays and during daylight</code>,
             <code>on weekends or after sunset</code>,
             <code>weekends or evenings except tuesday</code> (an <code>except</code> clause

@@ -24,7 +24,7 @@
     const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
     // Term kinds that cannot be computed without a latitude/longitude
-    const LOCATION_KINDS = ['solarState', 'sunDirection', 'sunAltitude', 'solarEvent', 'solarBetween', 'moonAltitude']
+    const LOCATION_KINDS = ['solarState', 'sunDirection', 'sunAltitude', 'sunAzimuth', 'solarEvent', 'solarBetween', 'moonAltitude', 'moonAzimuth']
 
     // ------------------------------------------------------------------
     // Vocabulary (data driven - new phrases are one-line additions)
@@ -103,6 +103,31 @@
     // sym types produced: TERM (a ready term), SOLAR_AMBIG (state or event by
     // context, e.g. dawn/dusk), EVENT (solar event name), and keyword symbols.
     const PHRASES = [
+        // additional named dates (christmas/halloween/new year live in NAMED_DATES
+        // instead, being single bare words). Fixed month/day, same wherever
+        // observed - no moveable feasts (easter) or country-varying rules
+        // (thanksgiving, independence/labor day) belong here
+        { words: ['valentines', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 2, day: 14, name: 'valentines day' } } },
+        { words: ['valentines'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 2, day: 14, name: 'valentines day' } } },
+        { words: ['groundhog', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 2, day: 2, name: 'groundhog day' } } },
+        { words: ['groundhog'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 2, day: 2, name: 'groundhog day' } } },
+        // "patrick"/"fool" (dropped possessive) are listed explicitly rather than
+        // left to typo-correction: that only retries the word where phrase
+        // matching STARTS, so a typo further into a 3-word phrase strands the
+        // trailing word(s) to be misread on their own ("day" as daylight, "april"
+        // as the month) instead of being recovered
+        { words: ['st', 'patricks', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 3, day: 17, name: 'st patricks day' } } },
+        { words: ['st', 'patrick', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 3, day: 17, name: 'st patricks day' } } },
+        { words: ['saint', 'patricks', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 3, day: 17, name: 'st patricks day' } } },
+        { words: ['saint', 'patrick', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 3, day: 17, name: 'st patricks day' } } },
+        { words: ['april', 'fools', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 4, day: 1, name: 'april fools day' } } },
+        { words: ['april', 'fools'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 4, day: 1, name: 'april fools day' } } },
+        { words: ['april', 'fool', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 4, day: 1, name: 'april fools day' } } },
+        { words: ['april', 'fool'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 4, day: 1, name: 'april fools day' } } },
+        { words: ['earth', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 4, day: 22, name: 'earth day' } } },
+        { words: ['may', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 5, day: 1, name: 'may day' } } },
+        { words: ['boxing', 'day'], sym: { type: 'TERM', term: { kind: 'namedDate', month: 12, day: 26, name: 'boxing day' } } },
+
         // combinators / operators
         { words: ['but', 'not'], sym: { type: 'EXCEPT' } },
         { words: ['except'], sym: { type: 'EXCEPT' } },
@@ -154,6 +179,8 @@
         { words: ['deg'], sym: { type: 'DEG' } },
         { words: ['above'], sym: { type: 'ABOVE' } },
         { words: ['below'], sym: { type: 'BELOW' } },
+        // celestial azimuth: "sun azimuth is between 134 and 138 degrees"
+        { words: ['azimuth'], sym: { type: 'AZIMUTH' } },
         { words: ['sun', 'high'], sym: { type: 'TERM', term: { kind: 'sunAltitude', op: 'above', degrees: 45, label: 'high' } } },
         { words: ['sun', 'low'], sym: { type: 'TERM', term: { kind: 'sunAltitude', op: 'between', low: 0, high: 15, label: 'low' } } },
         { words: ['moon', 'high'], sym: { type: 'TERM', term: { kind: 'moonAltitude', op: 'above', degrees: 45, label: 'high' } } },
@@ -236,10 +263,11 @@
         { words: ['midday'], sym: { type: 'TIMEWORD', minutes: 720 } },
         { words: ['midnight'], sym: { type: 'TIMEWORD', minutes: 0 } },
 
-        // clock-based day parts
-        { words: ['morning'], sym: { type: 'TERM', term: { kind: 'timeRange', style: 'before', startMin: 0, endMin: 720 } } },
-        { words: ['afternoon'], sym: { type: 'TERM', term: { kind: 'timeRange', style: 'between', startMin: 720, endMin: 1080 } } },
-        { words: ['evening'], sym: { type: 'TERM', term: { kind: 'solarEvent', event: 'sunset', op: 'after' } } },
+        // clock-based day parts (fixed hours, not solar - the understanding line
+        // points to the solar-relative words instead of guessing which one meant)
+        { words: ['morning'], sym: { type: 'TERM', term: { kind: 'timeRange', style: 'before', startMin: 0, endMin: 720, label: 'morning' } } },
+        { words: ['afternoon'], sym: { type: 'TERM', term: { kind: 'timeRange', style: 'between', startMin: 720, endMin: 1080, label: 'afternoon' } } },
+        { words: ['evening'], sym: { type: 'TERM', term: { kind: 'timeRange', style: 'between', startMin: 1080, endMin: 1440, label: 'evening' } } },
 
         // moon
         { words: ['moon', 'visible'], sym: { type: 'TERM', term: { kind: 'moonAltitude', op: 'above', degrees: 0 } } },
@@ -269,7 +297,7 @@
     // Words carrying no meaning of their own. Stripped before phrase matching.
     // 'is' is included, so "moon is visible" matches the ['moon','visible'] phrase.
     // 'at' is included: "at 9am" parses as a bare time, "at night" as the night state.
-    const NOISE_WORDS = ['only', 'just', 'when', 'whenever', 'if', 'the', 'on', 'in', 'is', 'it', 'its', 'was', 'are', 'be', 'during', 'a', 'an', 'at', 'whilst', 'while', 'time', 'times', 'every', 'each', 'them', 'those', 'their']
+    const NOISE_WORDS = ['only', 'just', 'when', 'whenever', 'if', 'the', 'on', 'in', 'is', 'it', 'its', 'was', 'are', 'be', 'during', 'a', 'an', 'at', 'whilst', 'while', 'time', 'times', 'every', 'each', 'them', 'those', 'their', 'altitude']
 
     // Single-word vocabulary for distance-1 fuzzy fallback (typo tolerance)
     const FUZZY_VOCAB = (function () {
@@ -292,7 +320,7 @@
         const tokens = []
         const src = String(text || '').toLowerCase().replace(/[’‘`']/g, '')
         // longest alternatives first: time with am/pm or colon, percent, ordinal/number, word
-        const re = /(\d{1,2}):(\d{2})\s*(am|pm)?|(\d{1,2})(?:\.(\d{2}))?\s*(am|pm)|(\d+(?:\.\d+)?)\s*%|(\d+(?:\.\d+)?)(st|nd|rd|th)?|([a-z]+)|(,)|(-)|(\()|(\))/g
+        const re = /(\d{1,2}):(\d{2})\s*(am|pm)?|(\d{1,2})(?:\.(\d{2}))?\s*(am|pm)|(\d+(?:\.\d+)?)\s*%|(\d+(?:\.\d+)?)(st|nd|rd|th)?|([a-z]+)|(,)|(-)|(\()|(\))|(>)|(<)/g
         let m
         while ((m = re.exec(src)) !== null) {
             const raw = m[0].trim()
@@ -314,6 +342,10 @@
                 tokens.push({ type: 'lparen', raw })
             } else if (m[14] !== undefined) {
                 tokens.push({ type: 'rparen', raw })
+            } else if (m[15] !== undefined) {
+                tokens.push({ type: 'gt', raw })
+            } else if (m[16] !== undefined) {
+                tokens.push({ type: 'lt', raw })
             }
         }
         return tokens
@@ -401,6 +433,12 @@
             if (tok.type === 'dash') { symbols.push({ type: 'DASH', raw: tok.raw }); i++; continue }
             if (tok.type === 'lparen') { symbols.push({ type: 'LPAREN', raw: tok.raw }); i++; continue }
             if (tok.type === 'rparen') { symbols.push({ type: 'RPAREN', raw: tok.raw }); i++; continue }
+            // ">" / "<" are plain synonyms for "more than"/"less than", so they
+            // reuse the MORE/LESS symbol - every existing consumer that accepts
+            // ABOVE/BELOW (altitude, illumination) already accepts MORE/LESS
+            // too, so no other code needs to change for these to work
+            if (tok.type === 'gt') { symbols.push({ type: 'MORE', raw: tok.raw }); i++; continue }
+            if (tok.type === 'lt') { symbols.push({ type: 'LESS', raw: tok.raw }); i++; continue }
             if (tok.type === 'time') {
                 if (tok.minutes === null) { unmatched.push(tok.raw); i++; continue }
                 symbols.push({ type: 'TIME', minutes: tok.minutes, raw: tok.raw })
@@ -538,7 +576,8 @@
     }
 
     // bare "sun" is Sunday only when it sits in a day list or range; it stays
-    // SUN_WORD before an altitude comparison ("sun is between 10 and 12 degrees")
+    // SUN_WORD before an altitude or azimuth comparison ("sun is between 10 and
+    // 12 degrees", "sun azimuth is between 134 and 138")
     function promoteSunWords (symbols, unmatched) {
         for (let i = 0; i < symbols.length; i++) {
             if (symbols[i].type !== 'SUN_WORD') { continue }
@@ -551,9 +590,9 @@
                 return s && (s.type === 'AND' || s.type === 'OR' || s.type === 'COMMA') && dayish(s2)
             }
             const altitudeish = function (s) {
-                return s && ['BETWEEN', 'ABOVE', 'BELOW', 'MORE', 'LESS'].indexOf(s.type) >= 0
+                return s && ['BETWEEN', 'ABOVE', 'BELOW', 'MORE', 'LESS', 'AZIMUTH'].indexOf(s.type) >= 0
             }
-            if (altitudeish(next)) { continue } // handled by parseCelestialAltitude
+            if (altitudeish(next)) { continue } // handled by parseCelestialAltitude/parseCelestialAzimuth
             if (dayish(prev) || dayish(next) || listish(prev, symbols[i - 2]) || listish(next, symbols[i + 2])) {
                 symbols[i] = { type: 'DAY', day: 0, raw: symbols[i].raw }
             } else {
@@ -805,8 +844,14 @@
             case 'TO': // a LEADING range-word reads as "before": "until 6pm", "till sunset"
                 state.symbols[state.pos] = { type: 'BEFORE', raw: sym.raw }
                 return parseBeforeAfter(state)
+            // MORE/LESS as a LEADING symbol (not already consumed as a lookahead
+            // inside sun/moon altitude or moon illumination) are before/after for
+            // a time-ish target: "greater than 4pm" = after 4pm, not "ignore the
+            // comparison and match the exact minute 16:00"
             case 'BEFORE':
             case 'AFTER':
+            case 'MORE':
+            case 'LESS':
                 return parseBeforeAfter(state)
             case 'WITHIN':
                 return parseWithin(state)
@@ -835,6 +880,9 @@
             case 'MOON_WORD':
                 return parseMoonCondition(state)
             case 'SUN_WORD':
+                if (peek(state, 1) && peek(state, 1).type === 'AZIMUTH') {
+                    return parseCelestialAzimuth(state, 'sunAzimuth')
+                }
                 return parseCelestialAltitude(state, 'sunAltitude')
             default:
                 return null
@@ -883,6 +931,38 @@
             return null
         }
         state.unmatched.push(word.raw)
+        return null
+    }
+
+    function normalizeDeg (d) {
+        return ((d % 360) + 360) % 360
+    }
+
+    // "sun/moon azimuth [is] between 134 and 138 [degrees]". The leading
+    // SUN_WORD/MOON_WORD and the AZIMUTH symbol are both at the current position.
+    // Azimuth is a compass bearing (0-360, from North), so unlike altitude it
+    // wraps: "between 350 and 10" spans north through 360/0 (see evalTerm). Only
+    // "between" is supported - a bearing has no natural "above/below" the way
+    // altitude has a horizon.
+    function parseCelestialAzimuth (state, kind) {
+        const word = peek(state)
+        const azWord = peek(state, 1)
+        state.pos += 2
+        const bodyText = (kind === 'sunAzimuth' ? 'sun' : 'moon') + ' azimuth'
+        const cmp = peek(state)
+        if (cmp && cmp.type === 'BETWEEN') {
+            state.pos++
+            const low = parseDegreeValue(state)
+            if (peek(state) && (peek(state).type === 'AND' || peek(state).type === 'TO')) { state.pos++ }
+            const high = parseDegreeValue(state)
+            if (peek(state) && peek(state).type === 'DEG') { state.pos++ }
+            if (low !== null && high !== null) {
+                return { kind, op: 'between', low: normalizeDeg(low), high: normalizeDeg(high), source: bodyText + ' between ' + low + ' and ' + high + ' degrees' }
+            }
+            state.unmatched.push(word.raw + ' ' + azWord.raw + ' between')
+            return null
+        }
+        state.unmatched.push(word.raw + ' ' + azWord.raw)
         return null
     }
 
@@ -1428,6 +1508,15 @@
             state.pos += 2
             return { kind: 'solarBetween', from: eventName, to: endEv, source: raw + ' to ' + endSym.raw }
         }
+        // "to"/"until" was there, but the target is a duration (e.g. "golden
+        // hour", "twilight"), not an instant, so there is no usable endpoint -
+        // consume both sides and report the whole attempted range as unmatched,
+        // rather than silently falling back to the bare leading event and
+        // letting the endpoint drift off to be misread as its own clause
+        if (endSym) {
+            state.pos += 2
+            state.unmatched.push(raw + ' ' + joiner.raw + ' ' + endSym.raw)
+        }
         return null
     }
 
@@ -1496,14 +1585,17 @@
             state.unmatched.push(start.raw + ' ' + a.raw + ' minutes')
             return null
         }
-        // time range: between TIME and TIME
-        if (a && (a.type === 'TIME' || a.type === 'TIMEWORD' || (a.type === 'NUM' && !a.ordinal && a.value <= 23))) {
+        // time range: between TIME and TIME. A bare NUM only counts as an hour
+        // when it's a whole number (matches clockMinutesFromSym/consumeHourAnchor
+        // below) - a decimal like 2.2 is not a clock hour and must not silently
+        // become 132 minutes (02:12) via value * 60
+        if (a && (a.type === 'TIME' || a.type === 'TIMEWORD' || (a.type === 'NUM' && !a.ordinal && Number.isInteger(a.value) && a.value <= 23))) {
             const startMin = a.type === 'NUM' ? a.value * 60 : a.minutes
             state.pos++
             const joiner = peek(state)
             if (joiner && (joiner.type === 'AND' || joiner.type === 'TO' || joiner.type === 'DASH')) { state.pos++ }
             const b = peek(state)
-            if (b && (b.type === 'TIME' || b.type === 'TIMEWORD' || (b.type === 'NUM' && !b.ordinal && b.value <= 23))) {
+            if (b && (b.type === 'TIME' || b.type === 'TIMEWORD' || (b.type === 'NUM' && !b.ordinal && Number.isInteger(b.value) && b.value <= 23))) {
                 const endMin = b.type === 'NUM' ? b.value * 60 : b.minutes
                 state.pos++
                 return { kind: 'timeRange', style: 'between', startMin, endMin, source: start.raw + ' ' + a.raw + ' and ' + b.raw }
@@ -1543,7 +1635,7 @@
 
     function parseBeforeAfter (state) {
         const opSym = peek(state)
-        const op = opSym.type === 'BEFORE' ? 'before' : 'after'
+        const op = (opSym.type === 'BEFORE' || opSym.type === 'LESS') ? 'before' : 'after'
         state.pos++
         const target = peek(state)
         if (target && (target.type === 'TIME' || target.type === 'TIMEWORD')) {
@@ -1567,6 +1659,27 @@
             const term = clone(target.term)
             term.source = opSym.raw + ' ' + target.raw
             return term
+        }
+        // "before march"/"after march": a plain month-list term excluding march
+        // itself either way, same shape "june to august" already produces so it
+        // combines/coalesces the same way. "before january"/"after december" has
+        // no month left to name - reject rather than emit an always-false term
+        if (target && target.type === 'MONTH') {
+            state.pos++
+            const months = op === 'before'
+                ? Array.from({ length: target.month - 1 }, function (_, i) { return i + 1 })
+                : Array.from({ length: 12 - target.month }, function (_, i) { return target.month + 1 + i })
+            if (!months.length) {
+                state.unmatched.push(opSym.raw + ' ' + target.raw)
+                return null
+            }
+            return { kind: 'month', months, source: opSym.raw + ' ' + target.raw }
+        }
+        // "before 2027"/"after 2027": years are unbounded, so (unlike months) this
+        // needs an open-ended form alongside the plain "years" list - see evalTerm
+        if (target && target.type === 'NUM' && !target.ordinal && isYearNumber(target.value)) {
+            state.pos++
+            return { kind: 'year', op, boundary: target.value, source: opSym.raw + ' ' + target.raw }
         }
         // minute-of-hour and anchored-time sub-conditions: "before quarter to
         // [the hour]", "after 20 past", "before quarter past five" (= before 05:15)
@@ -1626,6 +1739,10 @@
     function parseMoonCondition (state) {
         const start = peek(state)
         const cmp = peek(state, 1)
+        // azimuth: "moon azimuth is between 60 and 90 degrees"
+        if (cmp && cmp.type === 'AZIMUTH') {
+            return parseCelestialAzimuth(state, 'moonAzimuth')
+        }
         // illumination: "moon more than 50% illuminated"
         if (cmp && (cmp.type === 'MORE' || cmp.type === 'LESS')) {
             const pct = peek(state, 2)
@@ -1672,7 +1789,7 @@
     // must never set-union with plain terms
     function coalescable (term) {
         return MUTUALLY_EXCLUSIVE[term.kind] && !term.negate && !term.last && !term.weekOrdinal &&
-            !term.month && !term.year && !term.firstCount && !term.lastCount && !term.scope
+            !term.month && !term.year && !term.firstCount && !term.lastCount && !term.scope && !term.op
     }
 
     // Within an AND group, positive same-kind day/month terms union together:
@@ -1851,6 +1968,10 @@
                 break
             }
             case 'year': {
+                if (term.op) {
+                    text = 'year is ' + term.op + ' ' + term.boundary
+                    break
+                }
                 const years = term.years
                 const contiguous = years.length > 2 && years[years.length - 1] - years[0] === years.length - 1
                 if (contiguous) {
@@ -1957,6 +2078,12 @@
                     text = 'time is between ' + fmtMinutes(term.startMin) + ' and ' + fmtMinutes(term.endMin)
                     if (term.endMin <= term.startMin) { text += ' (overnight)' }
                 }
+                if (term.label) {
+                    // fixed clock hours, not solar - point at the sun-relative
+                    // words instead of guessing which one was meant
+                    const solarHints = { morning: 'dawn/sunrise', afternoon: 'afternoon sun/golden hour', evening: 'dusk/twilight' }
+                    text += ' (' + term.label + '; for sun-relative timing try ' + solarHints[term.label] + ')'
+                }
                 break
             case 'solarState': {
                 const labels = {
@@ -1993,6 +2120,9 @@
                     text = 'sun altitude is ' + term.op + ' ' + term.degrees + ' degrees'
                 }
                 break
+            case 'sunAzimuth':
+                text = 'sun azimuth is between ' + term.low + ' and ' + term.high + ' degrees'
+                break
             case 'solarEvent': {
                 const label = EVENT_LABELS[term.event] || term.event
                 if (term.op === 'within') {
@@ -2020,6 +2150,9 @@
                 } else {
                     text = 'moon altitude is ' + term.op + ' ' + term.degrees + ' degrees'
                 }
+                break
+            case 'moonAzimuth':
+                text = 'moon azimuth is between ' + term.low + ' and ' + term.high + ' degrees'
                 break
             case 'moonPhase': {
                 if (term.offsetDays) { // "day before blue moon", "2 days after a full moon"
@@ -2149,9 +2282,11 @@
         solarState: 'Sun',
         sunDirection: 'Sun',
         sunAltitude: 'Sun',
+        sunAzimuth: 'Sun',
         solarEvent: 'Sun',
         solarBetween: 'Sun',
         moonAltitude: 'Moon',
+        moonAzimuth: 'Moon',
         moonPhase: 'Moon',
         moonIllumination: 'Moon'
     }
@@ -2195,7 +2330,8 @@
         'on the 1st of the month',
         // dates
         'christmas day', 'christmas eve', 'day before christmas', '4 days after christmas',
-        'within 2 days of christmas', 'new years day',
+        'within 2 days of christmas', 'new years day', 'valentines day', 'st patricks day',
+        'april fools day', 'earth day', 'may day', 'boxing day', 'groundhog day',
         // clock times
         'between 9am and 5pm', '10pm to 6am', 'before noon', 'after 10pm', 'until 6pm',
         'quarter past five', 'ten past', 'between 15 minutes and 30 minutes past the hour', '2 hours before noon',
@@ -2203,9 +2339,11 @@
         'is night', 'during daylight', 'after dark', 'golden hour', 'sun rising', 'after sunset',
         'before sunrise', '2 hours after sunset', 'within 30 minutes of sunrise', 'between sunset and sunrise',
         'sun above 30 degrees', 'sun is between 10 and 12 degrees', 'sun is high',
+        'sun azimuth is between 134 and 138 degrees',
         // moon
         'when the moon is visible', 'full moon', 'blue moon', 'seasonal blue moon', 'day before blue moon',
         'moon is high', 'moon is 90% illuminated', 'moon more than 50% illuminated', 'new moon',
+        'moon azimuth is between 60 and 90 degrees',
         // combinations
         'on weekdays and during daylight', 'on weekends or after sunset', 'weekends or evenings except tuesday',
         '(last day of the month or wednesday) and after 10pm', 'every day'
