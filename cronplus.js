@@ -51,6 +51,50 @@ const PERMITTED_LUNAR_EVENTS = [
     'set'
 ]
 
+// Custom solar-angle schedules (solarType 'customRising'/'customSetting') fire when the sun
+// crosses a user-specified angle above/below the horizon, in a given direction. Unlike the
+// PERMITTED_SOLAR_EVENTS presets, direction lives in solarType itself and the angle (in degrees,
+// -90 to 90) is the *only* thing solarEvents holds for these two types - no string encoding to
+// keep in sync with the editor, just a plain number.
+const CUSTOM_SOLAR_TYPES = ['customRising', 'customSetting']
+
+/**
+ * Human friendly description of a custom solar-angle schedule, e.g. "sun rising 4° below the horizon"
+ * @param {string} solarType 'customRising' or 'customSetting'
+ * @param {number|string} angleDegrees degrees above (positive) or below (negative) the horizon
+ * @returns {string}
+ */
+function describeCustomAngle (solarType, angleDegrees) {
+    const direction = solarType === 'customRising' ? 'rising' : 'setting'
+    const angle = parseFloat(angleDegrees)
+    const position = angle === 0 ? 'at the horizon' : (angle > 0 ? `${angle}° above the horizon` : `${Math.abs(angle)}° below the horizon`)
+    return `sun ${direction} ${position}`
+}
+
+// Cache of custom angles already registered with SunCalc. SunCalc.addTime() simply pushes a new
+// entry onto its internal (module scoped) `times` array every time it's called, with no
+// de-duplication, so registering the same angle repeatedly (e.g. every time a schedule is
+// (re)computed) would leak memory and duplicate work - this cache prevents that.
+const registeredSolarAngles = new Map()
+
+/**
+ * Ensure a custom solar angle is registered with SunCalc, returning the generated rise/set
+ * property names that SunCalc.getTimes() will then populate for that angle.
+ * @param {number} angle Angle in degrees above (positive) or below (negative) the horizon
+ * @returns {{riseName: string, setName: string}}
+ */
+function ensureCustomSolarAngleRegistered (angle) {
+    const key = angle.toFixed(4)
+    let names = registeredSolarAngles.get(key)
+    if (!names) {
+        const safeKey = key.replace('-', 'n').replace('.', 'p')
+        names = { riseName: `customAngle_${safeKey}_rise`, setName: `customAngle_${safeKey}_set` }
+        SunCalc.addTime(angle, names.riseName, names.setName)
+        registeredSolarAngles.set(key, names)
+    }
+    return names
+}
+
 // accepted commands using topic as the command & (in compatible cases, the payload is the schedule name)
 // commands not supported by topic are : add/update & describe
 const controlTopics = [
@@ -163,11 +207,18 @@ function validateOpt (opt, permitDefaults = true) {
                 throw new Error(`Schedule '${opt.name}' - location property missing`)
             }
         }
-        if (isSolar && opt.solarType !== 'selected' && opt.solarType !== 'all') {
-            throw new Error(`Schedule '${opt.name}' - solarType property invalid or missing. Must be either "all" or "selected"`)
+        if (isSolar && opt.solarType !== 'selected' && opt.solarType !== 'all' && !CUSTOM_SOLAR_TYPES.includes(opt.solarType)) {
+            throw new Error(`Schedule '${opt.name}' - solarType property invalid or missing. Must be one of "all", "selected", "customRising" or "customSetting"`)
         }
         if (isLunar && opt.lunarType !== 'selected' && opt.lunarType !== 'all') {
             throw new Error(`Schedule '${opt.name}' - lunarType property invalid or missing. Must be either "all" or "selected"`)
+        }
+        if (isSolar && CUSTOM_SOLAR_TYPES.includes(opt.solarType)) {
+            const angle = parseFloat(opt.solarEvents)
+            if (opt.solarEvents === undefined || opt.solarEvents === null || opt.solarEvents === '' || isNaN(angle) || angle < -90 || angle > 90) {
+                throw new Error(`Schedule '${opt.name}' - solarEvents property must be a number of degrees between -90 and 90 when solarType is '${opt.solarType}'`)
+            }
+            return
         }
         const _type = isSolar ? opt.solarType : opt.lunarType
         const events = isSolar ? opt.solarEvents : opt.lunarEvents
@@ -330,10 +381,10 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             const offset = isNumber(opt.offset) ? parseInt(opt.offset) : 0
             const nowOffset = new Date(now.getTime() - offset * 60000)
             if (isSolar) {
-                result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset)
+                result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset, solarType)
                 // eslint-disable-next-line eqeqeq
                 if (opts.includeSolarStateOffset && offset != 0) {
-                    const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0)
+                    const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0, solarType)
                     result.solarStateOffset = ssOffset.solarState
                 }
             } else if (isLunar) {
@@ -376,6 +427,12 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             if (expressionType === 'solar') {
                 if (solarType === 'all') {
                     result.description = 'All Solar Events'
+                } else if (CUSTOM_SOLAR_TYPES.includes(solarType)) {
+                    const label = describeCustomAngle(solarType, solarEvents)
+                    result.description = "Solar Events: '" + label + "'"
+                    if (result.nextEvent) {
+                        result.prettyNext = label + ` in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
+                    }
                 } else {
                     result.description = "Solar Events: '" + solarEvents.split(',').join(', ') + "'"
                 }
@@ -573,7 +630,7 @@ function parseSolarTimes (opt) {
     const offset = opt.offset ? parseInt(opt.offset) : 0
     const date = opt.date ? new Date(opt.date) : new Date()
     const events = opt.solarType === 'all' ? PERMITTED_SOLAR_EVENTS : opt.solarEvents
-    const result = getSolarTimes(pos.lat, pos.lon, 0, events, date, offset)
+    const result = getSolarTimes(pos.lat, pos.lon, 0, events, date, offset, opt.solarType)
     const task = parseDateSequence(result.eventTimes.map((o) => o.timeOffset))
     task.solarEventTimes = result
     return task
@@ -616,7 +673,10 @@ function getMoonData (dateValue, lat, lng) {
     }, pos)
 }
 
-function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offset = 0) {
+function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offset = 0, solarType = 'selected') {
+    if (solarType === 'customRising' || solarType === 'customSetting') {
+        return getCustomAngleSolarTimes(lat, lng, solarEvents, startDate, offset, solarType)
+    }
     // performance.mark('Start');
     const solarEventsPast = [...PERMITTED_SOLAR_EVENTS]
     const solarEventsFuture = [...PERMITTED_SOLAR_EVENTS]
@@ -843,6 +903,59 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
         stateObject.dusk = stateObject.direction === 'fall' && stateObject.civilTwilight
         stateObject.morningGoldenHour = stateObject.direction === 'rise' && stateObject.goldenHour
         stateObject.eveningGoldenHour = stateObject.direction === 'fall' && stateObject.goldenHour
+    }
+}
+
+/**
+ * Compute the next occurrence (and, in a JSON-friendly shape matching getSolarTimes()'s return
+ * value, the current solarState) of the sun crossing a custom angle above/below the horizon, in
+ * a given direction. Used for solarType 'customRising'/'customSetting' - kept as a separate,
+ * dedicated computation rather than folded into getSolarTimes()'s PERMITTED_SOLAR_EVENTS scan
+ * since there is only ever one event of interest here (no day/night state to track across a
+ * whole set of presets).
+ * @param {number} lat
+ * @param {number} lng
+ * @param {number|string} angleDegrees degrees above (positive) or below (negative) the horizon
+ * @param {Date|string|null} startDate
+ * @param {number} offset minutes offset applied to the computed time
+ * @param {'customRising'|'customSetting'} solarType
+ * @returns {{solarState: object, nextEvent: (string|null), nextEventTime: (Date|null), nextEventTimeOffset: (Date|null), eventTimes: Array}}
+ */
+function getCustomAngleSolarTimes (lat, lng, angleDegrees, startDate, offset, solarType) {
+    const angle = parseFloat(angleDegrees)
+    const direction = solarType === 'customRising' ? 'rise' : 'set'
+    const eventName = solarType === 'customRising' ? 'customAngleRise' : 'customAngleSet'
+    const names = ensureCustomSolarAngleRegistered(angle)
+    const internalName = direction === 'rise' ? names.riseName : names.setName
+
+    offset = isNumber(offset) ? parseInt(offset) : 0
+    startDate = startDate ? new Date(startDate) : new Date()
+
+    // only a forward scan is needed - unlike getSolarTimes() there's no day/night state to
+    // derive from past occurrences, just the single next time this angle is crossed
+    const scanDate = new Date(startDate.toDateString())
+    scanDate.setDate(scanDate.getDate() - 1) // back one day to catch times ahead of current day
+    let loopMonitor = 0
+    let futureEvent = null
+    while (loopMonitor < 183 && !futureEvent) {
+        loopMonitor++
+        const times = getSunTimes(scanDate, lat, lng)
+        const seTime = times[internalName]
+        if (seTime && isValidDateObject(seTime)) {
+            const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
+            if (isValidDateObject(seTimeOffset) && seTimeOffset > startDate) {
+                futureEvent = { event: eventName, time: seTime, timeOffset: seTimeOffset }
+            }
+        }
+        scanDate.setDate(scanDate.getDate() + 1)
+    }
+
+    return {
+        solarState: {},
+        nextEvent: futureEvent ? futureEvent.event : null,
+        nextEventTime: futureEvent ? futureEvent.time : null,
+        nextEventTimeOffset: futureEvent ? futureEvent.timeOffset : null,
+        eventTimes: futureEvent ? [futureEvent] : []
     }
 }
 
@@ -1201,16 +1314,25 @@ module.exports = function (RED) {
                 const nx = (t._expression || t._sequence)
                 node.nextDate = nx.nextDate(now)
                 node.nextEvent = t.name
+                node.nextEventDisplay = t.name
                 node.nextIndicator = indicator
                 if (t.node_solarEventTimes && t.node_solarEventTimes.nextEvent) {
                     node.nextEvent = t.node_solarEventTimes.nextEvent
+                    // node.nextEvent stays the raw machine identifier (it also becomes
+                    // msg.cronplus.status.solarEvent) - only the status-text display gets the
+                    // friendly label, built directly from solarType/solarEvents (no encoding to decode)
+                    node.nextEventDisplay = CUSTOM_SOLAR_TYPES.includes(t.node_solarType)
+                        ? describeCustomAngle(t.node_solarType, t.node_solarEvents)
+                        : node.nextEvent
                 }
                 if (t.node_lunarEventTimes && t.node_lunarEventTimes.nextEvent) {
                     node.nextEvent = t.node_lunarEventTimes.nextEvent
+                    node.nextEventDisplay = node.nextEvent
                 }
             } else {
                 node.nextDate = null
                 node.nextEvent = ''
+                node.nextEventDisplay = ''
                 node.nextIndicator = ''
             }
         }
@@ -2146,7 +2268,7 @@ module.exports = function (RED) {
                 const indicator = node.nextIndicator || 'dot'
                 if (node.nextDate) {
                     const d = formatShortDateTimeWithTZ(node.nextDate, node.timeZone) || 'Never'
-                    node.status({ fill: 'blue', shape: indicator, text: (node.nextEvent || 'Next') + ': ' + d })
+                    node.status({ fill: 'blue', shape: indicator, text: (node.nextEventDisplay || 'Next') + ': ' + d })
                 } else if (node.tasks && node.tasks.length) {
                     node.status({ fill: 'grey', shape: indicator, text: 'All stopped' })
                 } else {

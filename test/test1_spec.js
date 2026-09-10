@@ -794,6 +794,75 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             commandChecker(result, test)
         })
+        it('describe a custom rising solar angle (-4 degrees)', async function (t) {
+            const test = {
+                description: t.name,
+                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'customRising', solarEvents: '-4', timeZone: 'Europe/London' } },
+                expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', "Solar Events: 'sun rising 4° below the horizon'"]] }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNodeCommandResponses.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+            result.payload.result.should.have.property('nextEvent', 'customAngleRise')
+            result.payload.result.should.have.property('nextEventTimeOffset').which.is.a.Date()
+        })
+        it('describe a custom setting solar angle (6.5 degrees)', async function (t) {
+            const test = {
+                description: t.name,
+                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'customSetting', solarEvents: '6.5', timeZone: 'Europe/London' } },
+                expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', "Solar Events: 'sun setting 6.5° above the horizon'"]] }
+            }
+            const resultPromise = new Promise(resolve => {
+                helperNodeCommandResponses.on('input', (msg) => {
+                    resolve(msg)
+                })
+            })
+            testNode.receive(test.send)
+            const result = await resultPromise
+            commandChecker(result, test)
+            result.payload.result.should.have.property('nextEvent', 'customAngleSet')
+        })
+        it('should reject adding a schedule with an out-of-range custom solar angle', async function () {
+            testNode.receive({
+                payload: {
+                    command: 'add',
+                    name: 'dynBadAngle',
+                    topic: 'dynBadAngle',
+                    expressionType: 'solar',
+                    location: '54.9992500,-1.4170300',
+                    solarType: 'customRising',
+                    solarEvents: '120',
+                    payloadType: 'default',
+                    limit: 1
+                }
+            })
+            await sleep(50) // let it unwind
+            const warnCall = testNode.warn.getCalls().find(c => c.args[0] && String(c.args[0].message || c.args[0]).includes('degrees between -90 and 90'))
+            should(warnCall).not.be.undefined()
+        })
+        it('should reject adding a schedule with a non-numeric custom solar angle', async function () {
+            testNode.receive({
+                payload: {
+                    command: 'add',
+                    name: 'dynBadAngle2',
+                    topic: 'dynBadAngle2',
+                    expressionType: 'solar',
+                    location: '54.9992500,-1.4170300',
+                    solarType: 'customSetting',
+                    solarEvents: 'not-a-number',
+                    payloadType: 'default',
+                    limit: 1
+                }
+            })
+            await sleep(50)
+            const warnCall = testNode.warn.getCalls().find(c => c.args[0] && String(c.args[0].message || c.args[0]).includes('degrees between -90 and 90'))
+            should(warnCall).not.be.undefined()
+        })
         it('describe lunar events for a location', async function (t) {
             const test = {
                 description: t.name,
@@ -1308,6 +1377,136 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             result.should.have.property('payload', 'schedule1')
             result.should.have.property('topic', 'trigger')
+        })
+    })
+
+    describe('custom solar angle schedules - end to end regression', function () {
+        // this describe block deliberately does NOT nest inside 'extended tests' - it needs its
+        // own isolated flow (rather than the large shared testNode flow used above) so this
+        // schedule is the *only* task on the node and node.status() always reflects it, with no
+        // risk of another schedule elsewhere in the shared flow racing to be "next" and masking
+        // the result. Nesting inside 'extended tests' would double-load the shared flow (which
+        // its own beforeEach already loaded) and fail with a "already wrapped" sinon error.
+        it('correctly runs a dynamically added custom-angle solar schedule end to end', async function () {
+            const flow = [
+                { id: 'helperCmd2', type: 'helper' },
+                {
+                    id: 'angleEndToEndNode',
+                    type: 'cronplus',
+                    name: 'angle-end-to-end',
+                    outputField: 'payload',
+                    timeZone: '',
+                    persistDynamic: false,
+                    commandResponseMsgOutput: 'output1',
+                    outputs: 1,
+                    options: [],
+                    wires: [['helperCmd2']]
+                }
+            ]
+            await helper.load(cronplusNode, flow)
+            const node = helper.getNode('angleEndToEndNode')
+            const helperCmd = helper.getNode('helperCmd2')
+
+            node.receive({
+                payload: {
+                    command: 'add',
+                    name: 'dynGoodAngle',
+                    topic: 'dynGoodAngle',
+                    expressionType: 'solar',
+                    location: '54.9992500,-1.4170300',
+                    solarType: 'customRising',
+                    solarEvents: '-4',
+                    offset: 0,
+                    payloadType: 'default'
+                }
+            })
+            await sleep(50)
+
+            const noWarnings = node.warn.getCalls().filter(c => c.args[0] && String(c.args[0].message || c.args[0]).includes('degrees between -90 and 90'))
+            noWarnings.should.have.length(0)
+
+            // 'status' forces an immediate (non-debounced) node.status() update - this is the
+            // real regression check: parseSolarTimes() (the function that builds the *actual*
+            // scheduled date sequence used to fire the schedule) must pass solarType through to
+            // getSolarTimes(), otherwise the custom angle is silently treated as an empty/invalid
+            // "selected events" CSV, the task ends up with no future date, and node.status()
+            // never reports a valid (fill: 'blue') next-fire status - the schedule never fires.
+            // Checking the 'list'/'describe' command output is NOT sufficient here: those
+            // independently recompute the description fresh each time and would report a
+            // plausible result even when the actual scheduled task itself is broken.
+            node.status.resetHistory()
+            node.receive({ payload: { command: 'status', name: 'dynGoodAngle' } })
+            await sleep(50)
+            const matchingStatus = node.status.getCalls().find(c => c.args[0] && c.args[0].fill === 'blue' &&
+                typeof c.args[0].text === 'string' && /below the horizon/.test(c.args[0].text))
+            should(matchingStatus).not.be.undefined()
+
+            const resultPromise = new Promise(resolve => {
+                helperCmd.once('input', (msg) => resolve(msg))
+            })
+            node.receive({ payload: { command: 'list', name: 'dynGoodAngle' } })
+            const result = await resultPromise
+            result.payload.result.should.have.property('config').which.is.an.Object()
+            result.payload.result.config.should.have.property('solarType', 'customRising')
+            result.payload.result.config.should.have.property('solarEvents', '-4')
+            result.payload.result.should.have.property('status').which.is.an.Object()
+            result.payload.result.status.should.have.property('nextDescription').which.is.a.String()
+            result.payload.result.status.nextDescription.should.match(/below the horizon/)
+            result.payload.result.status.should.have.property('nextDate').which.is.not.null()
+        })
+
+        it("accepts a dynamic custom-angle schedule with no location when the node's default location is 'fixed'", async function () {
+            // regression test: a dynamic add is validated before the node's own "Default
+            // Location" (fixed/env) setting is applied to it - this was already fixed once for
+            // preset solarType ('selected'/'all') schedules, but this codebase was rebuilt from a
+            // fresh main branch upload rather than branched from that fix, so it silently
+            // regressed for the new customRising/customSetting types too. Guarding both here.
+            const flow = [
+                { id: 'helperCmd3', type: 'helper' },
+                {
+                    id: 'defLocAngleNode',
+                    type: 'cronplus',
+                    name: 'default-location-angle-test',
+                    outputField: 'payload',
+                    timeZone: '',
+                    defaultLocationType: 'fixed',
+                    defaultLocation: '54.9992500,-1.4170300',
+                    persistDynamic: false,
+                    commandResponseMsgOutput: 'output1',
+                    outputs: 1,
+                    options: [],
+                    wires: [['helperCmd3']]
+                }
+            ]
+            await helper.load(cronplusNode, flow)
+            const node = helper.getNode('defLocAngleNode')
+            const helperCmd = helper.getNode('helperCmd3')
+
+            node.receive({
+                payload: {
+                    command: 'add',
+                    name: 'customDawn',
+                    topic: 'customDawn',
+                    expressionType: 'solar',
+                    solarType: 'customRising',
+                    solarEvents: '-4',
+                    payloadType: 'default'
+                    // no `location` - the node-level default must supply it
+                }
+            })
+            await sleep(50)
+
+            const locationWarnings = node.warn.getCalls().filter(c => c.args[0] && String(c.args[0].message || c.args[0]).includes('location property missing'))
+            locationWarnings.should.have.length(0)
+
+            const resultPromise = new Promise(resolve => helperCmd.once('input', resolve))
+            node.receive({ payload: { command: 'list', name: 'customDawn' } })
+            const result = await resultPromise
+            result.payload.result.should.have.property('config').which.is.an.Object()
+            result.payload.result.config.should.have.property('location', '54.9992500,-1.4170300')
+            result.payload.result.config.should.have.property('solarType', 'customRising')
+            result.payload.result.config.should.have.property('solarEvents', '-4')
+            result.payload.result.status.nextDescription.should.match(/below the horizon/)
         })
     })
 
