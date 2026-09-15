@@ -140,6 +140,18 @@ describe('when-gate-eval: solar terms (London)', function () {
         evalText('before sunset', { ts: sunset - 3600000, tz, ...LONDON }).pass.should.be.true()
     })
 
+    it('civil/nautical/astronomical dawn are three genuinely different real instants, not the same one relabelled', function () {
+        const t = SunCalc.getTimes(new Date('2026-09-15T12:00:00Z'), LONDON.lat, LONDON.lon)
+        // chronological order through the morning: astronomical -> nautical -> civil -> sunrise
+        t.nightEnd.valueOf().should.be.below(t.nauticalDawn.valueOf())
+        t.nauticalDawn.valueOf().should.be.below(t.dawn.valueOf()) // suncalc's own "dawn" is civil dawn
+        t.dawn.valueOf().should.be.below(t.sunrise.valueOf())
+        // "civil dawn" is true exactly through the civil band, not before/after it
+        evalText('civil dawn', { ts: (t.nightEnd.valueOf() + t.nauticalDawn.valueOf()) / 2, tz, ...LONDON }).pass.should.be.false() // astronomical band
+        evalText('civil dawn', { ts: (t.dawn.valueOf() + t.sunrise.valueOf()) / 2, tz, ...LONDON }).pass.should.be.true() // civil band
+        evalText('nautical dawn', { ts: (t.dawn.valueOf() + t.sunrise.valueOf()) / 2, tz, ...LONDON }).pass.should.be.false() // not nautical, already civil
+    })
+
     it('within 30 minutes of sunrise', function () {
         const sunrise = SunCalc.getTimes(new Date('2026-06-21T12:00:00Z'), LONDON.lat, LONDON.lon).sunrise.valueOf()
         evalText('within 30 minutes of sunrise', { ts: sunrise + 600000, tz, ...LONDON }).pass.should.be.true()

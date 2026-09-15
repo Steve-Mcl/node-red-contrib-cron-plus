@@ -102,6 +102,7 @@ Type the condition in plain English; a live "understanding" line below the field
 * `between 15 minutes and 30 minutes past the hour`, `quarter past`, `half past`, `ten past`, `5 to` (every hour; `quarter past five` is the clock time 05:15)
 * `is night`, `after dark`, `golden hour`, `sun rising`, `during daylight`
 * `after sunset`, `before sunrise`, `2 hours after sunset`, `within 30 minutes of sunrise`, `between sunset and sunrise`
+* bare `dawn`/`dusk` are colloquial and span the whole twilight band; `civil dawn`, `nautical dawn`, `astronomical dawn`/`astro dawn` (and the `dusk` equivalents) are precise, single-band instants instead
 * `when the moon is visible`, `full moon`, `blue moon` (second full moon of a calendar month), `seasonal blue moon` (third full moon in a season of four), `moon more than 50% illuminated`, `moon is 90% illuminated` (bare percentages mean "at least")
 * `sun is between 10 and 12 degrees`, `sun above 30 degrees`, `sun is high`/`sun is low`, `moon is high`/`moon is low`
 * `sun azimuth is between 134 and 138 degrees`, `moon azimuth between 60 and 90` (compass bearing from North, 0-360; wraps through north, e.g. `sun azimuth between 350 and 10`)

@@ -259,6 +259,19 @@
         { words: ['dawn'], sym: { type: 'SOLAR_AMBIG', state: { kind: 'solarState', states: ['twilight'], direction: 'rise' }, event: 'civilDawn' } },
         { words: ['sunup'], sym: { type: 'SOLAR_AMBIG', state: { kind: 'solarState', states: ['twilight'], direction: 'rise' }, event: 'sunrise' } },
         { words: ['dusk'], sym: { type: 'SOLAR_AMBIG', state: { kind: 'solarState', states: ['twilight'], direction: 'fall' }, event: 'civilDusk' } },
+        // qualified dawn/dusk: precise, single-band instants (unlike bare
+        // dawn/dusk above, which deliberately span the whole twilight band).
+        // "civil dawn"/"civil dusk" are redundant with bare dawn/dusk (already
+        // the default) but spelled out for symmetry with civil/nautical/
+        // astronomical twilight above
+        { words: ['civil', 'dawn'], sym: { type: 'SOLAR_AMBIG', state: { kind: 'solarState', states: ['civilTwilight'], direction: 'rise' }, event: 'civilDawn' } },
+        { words: ['civil', 'dusk'], sym: { type: 'SOLAR_AMBIG', state: { kind: 'solarState', states: ['civilTwilight'], direction: 'fall' }, event: 'civilDusk' } },
+        { words: ['nautical', 'dawn'], sym: { type: 'SOLAR_AMBIG', state: { kind: 'solarState', states: ['nauticalTwilight'], direction: 'rise' }, event: 'nauticalDawn' } },
+        { words: ['nautical', 'dusk'], sym: { type: 'SOLAR_AMBIG', state: { kind: 'solarState', states: ['nauticalTwilight'], direction: 'fall' }, event: 'nauticalDusk' } },
+        { words: ['astronomical', 'dawn'], sym: { type: 'SOLAR_AMBIG', state: { kind: 'solarState', states: ['astronomicalTwilight'], direction: 'rise' }, event: 'nightEnd' } },
+        { words: ['astro', 'dawn'], sym: { type: 'SOLAR_AMBIG', state: { kind: 'solarState', states: ['astronomicalTwilight'], direction: 'rise' }, event: 'nightEnd' } },
+        { words: ['astronomical', 'dusk'], sym: { type: 'SOLAR_AMBIG', state: { kind: 'solarState', states: ['astronomicalTwilight'], direction: 'fall' }, event: 'nightStart' } },
+        { words: ['astro', 'dusk'], sym: { type: 'SOLAR_AMBIG', state: { kind: 'solarState', states: ['astronomicalTwilight'], direction: 'fall' }, event: 'nightStart' } },
         { words: ['solar', 'noon'], sym: { type: 'EVENT', event: 'solarNoon' } },
         { words: ['noon'], sym: { type: 'TIMEWORD', minutes: 720 } },
         { words: ['midday'], sym: { type: 'TIMEWORD', minutes: 720 } },
@@ -1940,7 +1953,11 @@
         sunset: 'sunset',
         solarNoon: 'solar noon',
         civilDawn: 'dawn',
-        civilDusk: 'dusk'
+        civilDusk: 'dusk',
+        nauticalDawn: 'nautical dawn',
+        nauticalDusk: 'nautical dusk',
+        nightEnd: 'astronomical dawn',
+        nightStart: 'astronomical dusk'
     }
 
     function describeTerm (term) {
