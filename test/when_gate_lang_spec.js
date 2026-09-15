@@ -301,6 +301,22 @@ describe('when-gate-lang parse: time ranges', function () {
         term.endMin.should.equal(1050)
     })
 
+    it('parses military/4-digit time ("2130h", "0930h") when the trailing "h" makes it unambiguous', function () {
+        onlyTerm('2130h').should.have.properties({ kind: 'timeRange', style: 'at', startMin: 1290 })
+        onlyTerm('0930h').should.have.properties({ kind: 'timeRange', style: 'at', startMin: 570 })
+        lang.parse('between 2130h and 0600h').description.should.equal('time is between 21:30 and 06:00 (overnight)')
+    })
+
+    it('military time is strict: exactly 4 digits, a real 24h hour and minute, or it is left alone', function () {
+        // a bare 4-digit number is already a valid year ("2027") - without the
+        // "h" it must never be read as a time, or "between 2027 and 2029" (an
+        // existing, working year range) would silently break
+        lang.parse('between 2027 and 2029').description.should.equal('year is 2027 or 2029')
+        lang.parse('2570h').ok.should.be.false() // hour 25 is not real
+        lang.parse('2170h').ok.should.be.false() // minute 70 is not real
+        lang.parse('930h').ok.should.be.false() // only 3 digits - reject rather than assume a leading zero
+    })
+
     it('regression: a bare decimal in "between X and Y" is not silently mistaken for an hour count', function () {
         // "between 0.9 and 2.2" used to slip past the bare-hour branch (which only
         // meant to accept whole hours like "between 9 and 17") and multiply the
@@ -448,6 +464,19 @@ describe('when-gate-lang parse: solar', function () {
         // valid ranges (an instant on both sides) are unaffected
         lang.parse('dawn until noon').unmatched.should.be.empty()
     })
+
+    it('a partially-successful parse still offers a suggestion for the part that was ignored', function () {
+        // "dawn" alone parses fine, but nothing pointed the user at a real
+        // working range ("dawn until noon"/"dawn until dusk") for the failed
+        // "until golden hour" part - suggestions used to be computed only on
+        // total failure (ok:false), never alongside a partial success
+        const r = lang.parse('dawn until golden hour')
+        r.ok.should.be.true()
+        r.suggestions.should.containEql('dawn until noon')
+        r.warnings.should.matchAny(/Did you mean/)
+        // a fully-clean parse has nothing to suggest
+        lang.parse('dawn until noon').suggestions.should.be.empty()
+    })
 })
 
 describe('when-gate-lang parse: moon', function () {
@@ -582,6 +611,13 @@ describe('when-gate-lang parse: combinators', function () {
         const term = onlyTerm('every day')
         term.kind.should.equal('always')
         lang.parse('every day').description.should.equal('always')
+    })
+
+    it('"daily" is a synonym for "every day" - a harmless prefix, same as "always"', function () {
+        onlyTerm('daily').kind.should.equal('always')
+        lang.parse('daily').description.should.equal('always')
+        // combines as a no-op, same as "every day between 9am and 5pm" already does
+        lang.parse('daily between 9am and 5pm').description.should.equal('always and time is between 09:00 and 17:00')
     })
 })
 

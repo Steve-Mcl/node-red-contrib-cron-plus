@@ -97,7 +97,7 @@ Type the condition in plain English; a live "understanding" line below the field
 * `when day is odd`, `on even months`, `on even years`
 * `christmas eve`, `day before christmas`, `4 days after christmas`, `1 month before christmas`, `within 2 days of christmas`
 * other fixed dates (same everywhere, no moveable feasts or country-varying rules): `valentines day`, `groundhog day`, `st patricks day`, `april fools day`, `earth day`, `may day`, `boxing day` (each also works with `eve`, `day before`, etc.)
-* `between 9am and 5pm`, `before noon`, `between 10pm and 6am` (overnight)
+* `between 9am and 5pm`, `before noon`, `between 10pm and 6am` (overnight), `2130h` (military time - the trailing `h` is required, a bare 4-digit number is already a valid year)
 * `morning` (00:00-12:00), `afternoon` (12:00-18:00), `evening` (18:00-24:00) - fixed clock hours, not solar; the understanding line points to the sun-relative equivalent (`dawn`/`sunrise`, `afternoon sun`/`golden hour`, `dusk`/`twilight`)
 * `between 15 minutes and 30 minutes past the hour`, `quarter past`, `half past`, `ten past`, `5 to` (every hour; `quarter past five` is the clock time 05:15)
 * `is night`, `after dark`, `golden hour`, `sun rising`, `during daylight`
