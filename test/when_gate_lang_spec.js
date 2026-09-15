@@ -402,6 +402,32 @@ describe('when-gate-lang parse: solar', function () {
         term.op.should.equal('before')
     })
 
+    it('regression: "nautical dawn"/"astronomical dawn" used to silently collapse to civil dawn, dropping the qualifier', function () {
+        // bare dawn/dusk deliberately span the whole twilight band (states:
+        // ['twilight']) since that is what people mean colloquially. A qualified
+        // one is a precise, single-band instant instead, and must not fall back
+        // to civil (-6deg) when nautical (-12deg) or astronomical (-18deg) was
+        // asked for - that swap used to happen silently
+        onlyTerm('civil dawn').should.have.properties({ kind: 'solarState', states: ['civilTwilight'], direction: 'rise' })
+        onlyTerm('civil dusk').should.have.properties({ kind: 'solarState', states: ['civilTwilight'], direction: 'fall' })
+        onlyTerm('nautical dawn').should.have.properties({ kind: 'solarState', states: ['nauticalTwilight'], direction: 'rise' })
+        onlyTerm('nautical dusk').should.have.properties({ kind: 'solarState', states: ['nauticalTwilight'], direction: 'fall' })
+        onlyTerm('astronomical dawn').should.have.properties({ kind: 'solarState', states: ['astronomicalTwilight'], direction: 'rise' })
+        onlyTerm('astronomical dusk').should.have.properties({ kind: 'solarState', states: ['astronomicalTwilight'], direction: 'fall' })
+        onlyTerm('astro dawn').should.have.properties({ states: ['astronomicalTwilight'], direction: 'rise' })
+        onlyTerm('astro dusk').should.have.properties({ states: ['astronomicalTwilight'], direction: 'fall' })
+        lang.parse('civil dawn').unmatched.should.be.empty()
+        lang.parse('nautical dawn').unmatched.should.be.empty()
+        lang.parse('astronomical dawn').unmatched.should.be.empty()
+    })
+
+    it('qualified dawn/dusk resolve to their own distinct event for range endpoints, matching the base cron node\'s event IDs', function () {
+        onlyTerm('nautical dawn until noon').should.have.properties({ kind: 'solarBetween', from: 'nauticalDawn', toTime: 720 })
+        onlyTerm('nautical dusk until midnight').should.have.properties({ kind: 'solarBetween', from: 'nauticalDusk' })
+        onlyTerm('astronomical dawn to sunrise').should.have.properties({ kind: 'solarBetween', from: 'nightEnd', to: 'sunrise' })
+        onlyTerm('astronomical dusk to midnight').should.have.properties({ kind: 'solarBetween', from: 'nightStart' })
+    })
+
     it('parses "after sunset"', function () {
         const term = onlyTerm('after sunset')
         term.kind.should.equal('solarEvent')
