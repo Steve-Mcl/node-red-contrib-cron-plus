@@ -224,6 +224,7 @@
 
         // always
         { words: ['every', 'day'], sym: { type: 'TERM', term: { kind: 'always' } } },
+        { words: ['daily'], sym: { type: 'TERM', term: { kind: 'always' } } },
         { words: ['always'], sym: { type: 'TERM', term: { kind: 'always' } } },
         { words: ['anytime'], sym: { type: 'TERM', term: { kind: 'always' } } },
         { words: ['any', 'time'], sym: { type: 'TERM', term: { kind: 'always' } } },
@@ -446,6 +447,21 @@
                 continue
             }
             if (tok.type === 'percent') { symbols.push({ type: 'PERCENT', value: tok.value, raw: tok.raw }); i++; continue }
+            // military time: "2130h", "0930h" - the trailing 'h' is what makes
+            // this unambiguous. A bare 4-digit number is already a valid year
+            // ("2027"), so without the 'h' it stays a NUM/year, never a time.
+            // Strict: exactly 4 digits, and a real 24h hour/minute, or it's left
+            // alone rather than guessed at
+            if (tok.type === 'num' && !tok.ordinal && tokens[i + 1] && tokens[i + 1].type === 'word' && tokens[i + 1].word === 'h' &&
+                /^\d{4}$/.test(tok.raw)) {
+                const hh = Math.floor(tok.value / 100)
+                const mm = tok.value % 100
+                if (hh <= 23 && mm <= 59) {
+                    symbols.push({ type: 'TIME', minutes: (hh * 60) + mm, raw: tok.raw + tokens[i + 1].raw })
+                    i += 2
+                    continue
+                }
+            }
             if (tok.type === 'num') { symbols.push({ type: 'NUM', value: tok.value, ordinal: tok.ordinal, raw: tok.raw }); i++; continue }
             // word: special two-word day sets first
             if ((tok.word === 'business' || tok.word === 'work') && tokens[i + 1] && tokens[i + 1].type === 'word' && stripPlural(tokens[i + 1].word) === 'day') {
@@ -2336,8 +2352,9 @@
         'between 9am and 5pm', '10pm to 6am', 'before noon', 'after 10pm', 'until 6pm',
         'quarter past five', 'ten past', 'between 15 minutes and 30 minutes past the hour', '2 hours before noon',
         // sun
-        'is night', 'during daylight', 'after dark', 'golden hour', 'sun rising', 'after sunset',
+        'is night', 'during daylight', 'after dark', 'dawn', 'dusk', 'golden hour', 'sun rising', 'after sunset',
         'before sunrise', '2 hours after sunset', 'within 30 minutes of sunrise', 'between sunset and sunrise',
+        'dawn until noon', 'dawn until dusk', 'civil twilight',
         'sun above 30 degrees', 'sun is between 10 and 12 degrees', 'sun is high',
         'sun azimuth is between 134 and 138 degrees',
         // moon
@@ -2418,7 +2435,17 @@
             return { ok: false, ast: null, description: '', unmatched, warnings, suggestions, suggestion: suggestionText(trimmed, suggestions) }
         }
         unmatched.forEach(function (u) { warnings.push('Ignored: \'' + u + '\'') })
-        return { ok: true, ast, description: describe(ast), unmatched, warnings, suggestions: [], suggestion: '' }
+        // some input dropped even though enough of it parsed to succeed overall
+        // ("dawn until golden hour" keeps "dawn" but ignores the rest) - still
+        // worth a suggestion for the ignored part, not just on total failure
+        let suggestions = []
+        if (unmatched.length) {
+            suggestions = suggestExamples(unmatched.join(' '))
+            if (suggestions.length) {
+                warnings.push('Did you mean \'' + suggestions.join('\', \'') + '\'?')
+            }
+        }
+        return { ok: true, ast, description: describe(ast), unmatched, warnings, suggestions, suggestion: '' }
     }
 
     function suggestionText (text, suggestions) {
