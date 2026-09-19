@@ -797,7 +797,7 @@ describe('cron-plus Node', function () {
         it('describe a custom rising solar angle (-4 degrees)', async function (t) {
             const test = {
                 description: t.name,
-                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'altitudeRising', solarEvents: '-4', timeZone: 'Europe/London' } },
+                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'altitudeRising', solarAltitude: -4, timeZone: 'Europe/London' } },
                 expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', "Solar Events: 'sun rising 4° below the horizon (altitude)'"]] }
             }
             const resultPromise = new Promise(resolve => {
@@ -814,7 +814,7 @@ describe('cron-plus Node', function () {
         it('describe a custom setting solar angle (6.5 degrees)', async function (t) {
             const test = {
                 description: t.name,
-                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'altitudeSetting', solarEvents: '6.5', timeZone: 'Europe/London' } },
+                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'altitudeSetting', solarAltitude: 6.5, timeZone: 'Europe/London' } },
                 expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', "Solar Events: 'sun setting 6.5° above the horizon (altitude)'"]] }
             }
             const resultPromise = new Promise(resolve => {
@@ -836,7 +836,7 @@ describe('cron-plus Node', function () {
                     expressionType: 'solar',
                     location: '54.9992500,-1.4170300',
                     solarType: 'altitudeRising',
-                    solarEvents: '120',
+                    solarAltitude: 120,
                     payloadType: 'default',
                     limit: 1
                 }
@@ -854,7 +854,7 @@ describe('cron-plus Node', function () {
                     expressionType: 'solar',
                     location: '54.9992500,-1.4170300',
                     solarType: 'altitudeSetting',
-                    solarEvents: 'not-a-number',
+                    solarAltitude: 'not-a-number',
                     payloadType: 'default',
                     limit: 1
                 }
@@ -1415,7 +1415,7 @@ describe('cron-plus Node', function () {
                     expressionType: 'solar',
                     location: '54.9992500,-1.4170300',
                     solarType: 'altitudeRising',
-                    solarEvents: '-4',
+                    solarAltitude: -4,
                     offset: 0,
                     payloadType: 'default'
                 }
@@ -1448,7 +1448,7 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             result.payload.result.should.have.property('config').which.is.an.Object()
             result.payload.result.config.should.have.property('solarType', 'altitudeRising')
-            result.payload.result.config.should.have.property('solarEvents', '-4')
+            result.payload.result.config.should.have.property('solarAltitude', -4)
             result.payload.result.should.have.property('status').which.is.an.Object()
             result.payload.result.status.should.have.property('nextDescription').which.is.a.String()
             result.payload.result.status.nextDescription.should.match(/below the horizon/)
@@ -1489,7 +1489,7 @@ describe('cron-plus Node', function () {
                     topic: 'customDawn',
                     expressionType: 'solar',
                     solarType: 'altitudeRising',
-                    solarEvents: '-4',
+                    solarAltitude: -4,
                     payloadType: 'default'
                     // no `location` - the node-level default must supply it
                 }
@@ -1505,7 +1505,7 @@ describe('cron-plus Node', function () {
             result.payload.result.should.have.property('config').which.is.an.Object()
             result.payload.result.config.should.have.property('location', '54.9992500,-1.4170300')
             result.payload.result.config.should.have.property('solarType', 'altitudeRising')
-            result.payload.result.config.should.have.property('solarEvents', '-4')
+            result.payload.result.config.should.have.property('solarAltitude', -4)
             result.payload.result.status.nextDescription.should.match(/below the horizon/)
         })
     })

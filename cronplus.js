@@ -53,10 +53,9 @@ const PERMITTED_LUNAR_EVENTS = [
 
 // Altitude-angle solar schedules (solarType 'altitudeRising'/'altitudeSetting') fire when the sun
 // crosses a user-specified altitude (its elevation above/below the horizon, as opposed to its
-// azimuth/compass direction) in a given direction. Unlike the PERMITTED_SOLAR_EVENTS presets,
-// direction lives in solarType itself and the angle (in degrees, -90 to 90) is the *only* thing
-// solarEvents holds for these two types - no string encoding to keep in sync with the editor,
-// just a plain number.
+// azimuth/compass direction) in a given direction. Direction lives in solarType itself, and the
+// angle (in degrees, -90 to 90) lives in its own solarAltitude property, not solarEvents -
+// solarEvents is a CSV of preset event names and has no meaning for these two types.
 const ALTITUDE_SOLAR_TYPES = ['altitudeRising', 'altitudeSetting']
 
 /**
@@ -215,9 +214,9 @@ function validateOpt (opt, permitDefaults = true) {
             throw new Error(`Schedule '${opt.name}' - lunarType property invalid or missing. Must be either "all" or "selected"`)
         }
         if (isSolar && ALTITUDE_SOLAR_TYPES.includes(opt.solarType)) {
-            const angle = parseFloat(opt.solarEvents)
-            if (opt.solarEvents === undefined || opt.solarEvents === null || opt.solarEvents === '' || isNaN(angle) || angle < -90 || angle > 90) {
-                throw new Error(`Schedule '${opt.name}' - solarEvents property must be a number of degrees between -90 and 90 when solarType is '${opt.solarType}'`)
+            const angle = parseFloat(opt.solarAltitude)
+            if (opt.solarAltitude === undefined || opt.solarAltitude === null || opt.solarAltitude === '' || isNaN(angle) || angle < -90 || angle > 90) {
+                throw new Error(`Schedule '${opt.name}' - solarAltitude property must be a number of degrees between -90 and 90 when solarType is '${opt.solarType}'`)
             }
             return
         }
@@ -335,13 +334,14 @@ function isWildcardCronJob (expression) {
  * @param {string} expressionType The expression type ("cron" | "solar" | "dates")
  * @param {string} timeZone An optional timezone to use
  * @param {number} offset An optional offset to apply
- * @param {string} solarType Specifies either "all" or "selected" - related to solarEvents property
- * @param {string} solarEvents a CSV of solar events to be included
+ * @param {string} solarType Specifies "all", "selected", "altitudeRising" or "altitudeSetting" - related to solarEvents/solarAltitude
+ * @param {string} solarEvents a CSV of solar events to be included (solarType "selected" only)
+ * @param {number|string} solarAltitude degrees above/below the horizon (solarType "altitudeRising"/"altitudeSetting" only)
  * @param {string} lunarType Specifies either "all" or "selected" - related to lunarEvents property
  * @param {string} lunarEvents a CSV of lunar events to be included
  * @param {date} time Optional time to use (defaults to Date.now() if excluded)
  */
-function _describeExpression (expression, expressionType, timeZone, offset, solarType, solarEvents, lunarType, lunarEvents, time, opts) {
+function _describeExpression (expression, expressionType, timeZone, offset, solarType, solarEvents, solarAltitude, lunarType, lunarEvents, time, opts) {
     const now = time ? new Date(time) : new Date()
     opts = opts || {}
     let result = { description: undefined, nextDate: undefined, nextDescription: undefined, prettyNext: 'Never' }
@@ -372,6 +372,7 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             solarType: isSolar ? solarType : undefined,
             lunarType: isLunar ? lunarType : undefined,
             solarEvents: isSolar ? solarEvents : undefined,
+            solarAltitude: isSolar ? solarAltitude : undefined,
             lunarEvents: isLunar ? lunarEvents : undefined,
             payloadType: 'default',
             payload: ''
@@ -382,10 +383,10 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             const offset = isNumber(opt.offset) ? parseInt(opt.offset) : 0
             const nowOffset = new Date(now.getTime() - offset * 60000)
             if (isSolar) {
-                result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset, solarType)
+                result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset, solarType, solarAltitude)
                 // eslint-disable-next-line eqeqeq
                 if (opts.includeSolarStateOffset && offset != 0) {
-                    const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0, solarType)
+                    const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0, solarType, solarAltitude)
                     result.solarStateOffset = ssOffset.solarState
                 }
             } else if (isLunar) {
@@ -425,7 +426,7 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             // the angle can be outside the range this location's sun altitude ever reaches
             // (e.g. a latitude never gets low/high enough) - say so instead of falling through
             // to the generic "Date sequence" text above, which is meaningless here
-            result.description = "Solar Events: '" + describeAltitudeAngle(solarType, solarEvents) + "' - never occurs at this location"
+            result.description = "Solar Events: '" + describeAltitudeAngle(solarType, solarAltitude) + "' - never occurs at this location"
         }
         if (task && task._sequence && count) {
             result.nextDate = dsFutureDates[0]
@@ -435,7 +436,7 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
                 if (solarType === 'all') {
                     result.description = 'All Solar Events'
                 } else if (ALTITUDE_SOLAR_TYPES.includes(solarType)) {
-                    const label = describeAltitudeAngle(solarType, solarEvents)
+                    const label = describeAltitudeAngle(solarType, solarAltitude)
                     result.description = "Solar Events: '" + label + "'"
                     if (result.nextEvent) {
                         result.prettyNext = label + ` in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
@@ -637,7 +638,7 @@ function parseSolarTimes (opt) {
     const offset = opt.offset ? parseInt(opt.offset) : 0
     const date = opt.date ? new Date(opt.date) : new Date()
     const events = opt.solarType === 'all' ? PERMITTED_SOLAR_EVENTS : opt.solarEvents
-    const result = getSolarTimes(pos.lat, pos.lon, 0, events, date, offset, opt.solarType)
+    const result = getSolarTimes(pos.lat, pos.lon, 0, events, date, offset, opt.solarType, opt.solarAltitude)
     const task = parseDateSequence(result.eventTimes.map((o) => o.timeOffset))
     task.solarEventTimes = result
     return task
@@ -680,9 +681,9 @@ function getMoonData (dateValue, lat, lng) {
     }, pos)
 }
 
-function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offset = 0, solarType = 'selected') {
+function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offset = 0, solarType = 'selected', solarAltitude) {
     if (solarType === 'altitudeRising' || solarType === 'altitudeSetting') {
-        return getAltitudeSolarTimes(lat, lng, solarEvents, startDate, offset, solarType)
+        return getAltitudeSolarTimes(lat, lng, solarAltitude, startDate, offset, solarType)
     }
     // performance.mark('Start');
     const solarEventsPast = [...PERMITTED_SOLAR_EVENTS]
@@ -1118,6 +1119,7 @@ function exportTask (task, includeStatus) {
     if (o.expressionType === 'solar') {
         o.solarType = task.node_solarType
         o.solarEvents = task.node_solarEvents
+        o.solarAltitude = task.node_solarAltitude
         o.location = task.node_location
         o.offset = task.node_offset
     } else if (o.expressionType === 'lunar') {
@@ -1151,7 +1153,7 @@ function getTaskStatus (node, task, opts) {
     const isSolar = task.node_expressionType === 'solar'
     const isLunar = task.node_expressionType === 'lunar'
     const exp = (isSolar || isLunar) ? task.node_location : task.node_expression
-    const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, task.node_lunarType, task.node_lunarEvents, null, opts)
+    const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, task.node_solarAltitude, task.node_lunarType, task.node_lunarEvents, null, opts)
     let nextDescription = null
     let nextDate = null
     const running = !isTaskFinished(task)
@@ -1331,9 +1333,9 @@ module.exports = function (RED) {
                     node.nextEvent = t.node_solarEventTimes.nextEvent
                     // node.nextEvent stays the raw machine identifier (it also becomes
                     // msg.cronplus.status.solarEvent) - only the status-text display gets the
-                    // friendly label, built directly from solarType/solarEvents (no encoding to decode)
+                    // friendly label, built directly from solarType/solarAltitude (no encoding to decode)
                     node.nextEventDisplay = ALTITUDE_SOLAR_TYPES.includes(t.node_solarType)
-                        ? describeAltitudeAngle(t.node_solarType, t.node_solarEvents)
+                        ? describeAltitudeAngle(t.node_solarType, t.node_solarAltitude)
                         : node.nextEvent
                 }
                 if (t.node_lunarEventTimes && t.node_lunarEventTimes.nextEvent) {
@@ -1577,7 +1579,7 @@ module.exports = function (RED) {
                                 const isLunar = cmd.expressionType === 'lunar'
                                 const exp = (isSolar || isLunar) ? cmd.location : cmd.expression
                                 applyOptionDefaults(node, cmd)
-                                newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.lunarType, cmd.lunarEvents, cmd.time, { includeSolarStateOffset: true, includeLunarStateOffset: true, locationType: node.node_locationType })
+                                newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.solarAltitude, cmd.lunarType, cmd.lunarEvents, cmd.time, { includeSolarStateOffset: true, includeLunarStateOffset: true, locationType: node.node_locationType })
                                 sendCommandResponse(newMsg)
                             }
                             break
@@ -1725,6 +1727,7 @@ module.exports = function (RED) {
                             thisDebug.offset = task.node_offset
                             thisDebug.solarType = task.node_expressionType === 'solar' ? task.node_solarType : undefined
                             thisDebug.solarEvents = task.node_expressionType === 'solar' ? task.node_solarEvents : undefined
+                            thisDebug.solarAltitude = task.node_expressionType === 'solar' ? task.node_solarAltitude : undefined
                             thisDebug.lunarType = task.node_expressionType === 'lunar' ? task.node_lunarType : undefined
                             thisDebug.lunarEvents = task.node_expressionType === 'lunar' ? task.node_lunarEvents : undefined
                             newMsg.payload = thisDebug
@@ -1746,6 +1749,7 @@ module.exports = function (RED) {
                                         thisDebug.offset = task.node_offset
                                         thisDebug.solarType = task.node_expressionType === 'solar' ? task.node_solarType : undefined
                                         thisDebug.solarEvents = task.node_expressionType === 'solar' ? task.node_solarEvents : undefined
+                                        thisDebug.solarAltitude = task.node_expressionType === 'solar' ? task.node_solarAltitude : undefined
                                         thisDebug.lunarType = task.node_expressionType === 'lunar' ? task.node_lunarType : undefined
                                         thisDebug.lunarEvents = task.node_expressionType === 'lunar' ? task.node_lunarEvents : undefined
                                         results.push(thisDebug)
@@ -2064,6 +2068,7 @@ module.exports = function (RED) {
             task.node_location = opt.location
             task.node_solarType = opt.expressionType === 'solar' ? opt.solarType : undefined
             task.node_solarEvents = opt.expressionType === 'solar' ? opt.solarEvents : undefined
+            task.node_solarAltitude = opt.expressionType === 'solar' ? opt.solarAltitude : undefined
             task.node_lunarType = opt.expressionType === 'lunar' ? opt.lunarType : undefined
             task.node_lunarEvents = opt.expressionType === 'lunar' ? opt.lunarEvents : undefined
             task.node_offset = opt.offset
@@ -2439,6 +2444,7 @@ module.exports = function (RED) {
                     if (isSolar || isLunar) {
                         opts.solarType = isSolar ? req.body.solarType || '' : undefined
                         opts.solarEvents = isSolar ? req.body.solarEvents || '' : undefined
+                        opts.solarAltitude = isSolar ? req.body.solarAltitude : undefined
                         opts.lunarType = isLunar ? req.body.lunarType || '' : undefined
                         opts.lunarEvents = isLunar ? req.body.lunarEvents || '' : undefined
                         let pos = ''
@@ -2493,7 +2499,7 @@ module.exports = function (RED) {
                     }
                 }
                 const exp = (isSolar || isLunar) ? opts.location : opts.expression
-                const h = _describeExpression(exp, opts.expressionType, opts.timezone, opts.offset, opts.solarType, opts.solarEvents, opts.lunarType, opts.lunarEvents, null, { locationType: opts.locationType || opts.defaultLocationType, defaultLocationType: opts.defaultLocationType, defaultLocation: opts.defaultLocation })
+                const h = _describeExpression(exp, opts.expressionType, opts.timezone, opts.offset, opts.solarType, opts.solarEvents, opts.solarAltitude, opts.lunarType, opts.lunarEvents, null, { locationType: opts.locationType || opts.defaultLocationType, defaultLocationType: opts.defaultLocationType, defaultLocation: opts.defaultLocation })
                 let r = null
                 if (isSolar || isLunar) {
                     const times = h.eventTimes && h.eventTimes.slice(1)

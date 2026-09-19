@@ -436,7 +436,11 @@ copies or substantial portions of the Software.
     // angle, in degrees, as the typedInput's own value for those two types - no CSV, no encoded
     // string, just a plain number, validated with typedInput's own validate hook (see
     // solarEventsField below) so a bad value turns the box red as you type instead of failing
-    // silently on save.
+    // silently on save. On save it's copied into its own solarAltitude property rather than
+    // solarEvents (which otherwise only ever holds a CSV of preset event names) - see oneditsave.
+    function isAltitudeSolarType (solarType) {
+        return solarType === 'altitudeRising' || solarType === 'altitudeSetting'
+    }
     const ALTITUDE_ANGLE_VALUE_REGEX = /^-?\d+(?:\.\d+)?$/
     function validateAltitudeAngleValue (value, _opt) {
         const v = String(value == null ? '' : value).trim()
@@ -780,9 +784,9 @@ copies or substantial portions of the Software.
                                     console.warn('cron-plus: validation error - solarEvents missing')
                                     return false
                                 }
-                                if ((value[i].solarType === 'altitudeRising' || value[i].solarType === 'altitudeSetting') &&
-                                    validateAltitudeAngleValue(value[i].solarEvents) !== true) {
-                                    console.warn('cron-plus: validation error - solarEvents is not a valid altitude angle (-90 to 90)')
+                                if (isAltitudeSolarType(value[i].solarType) &&
+                                    validateAltitudeAngleValue(value[i].solarAltitude) !== true) {
+                                    console.warn('cron-plus: validation error - solarAltitude is not a valid altitude angle (-90 to 90)')
                                     return false
                                 }
                             } else if (value[i].expressionType === 'lunar') {
@@ -1501,7 +1505,11 @@ copies or substantial portions of the Software.
                                     e.location = expression
                                     if (expressionType === 'solar') {
                                         e.solarType = solarType
-                                        e.solarEvents = solarEvents
+                                        if (isAltitudeSolarType(solarType)) {
+                                            e.solarAltitude = solarEvents
+                                        } else {
+                                            e.solarEvents = solarEvents
+                                        }
                                     } else {
                                         e.lunarType = $lunarEvents.typedInput('type')
                                         e.lunarEvents = $lunarEvents.typedInput('value')
@@ -1756,7 +1764,9 @@ copies or substantial portions of the Software.
                     ]
                 })
                 solarEventsField.typedInput('type', option.solarType || 'all')
-                solarEventsField.typedInput('value', option.solarEvents || '')// added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
+                solarEventsField.typedInput('value', isAltitudeSolarType(option.solarType)
+                    ? (option.solarAltitude == null ? '' : String(option.solarAltitude))
+                    : (option.solarEvents || ''))// added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
                 // the two altitude-angle types share hasValue's free-text box with every other
                 // type, so switching in leaves whatever was typed/selected before (e.g. a
                 // "sunrise,sunset" CSV from "Selected Solar Events"). Clear it out unless it's
@@ -1765,7 +1775,7 @@ copies or substantial portions of the Software.
                 solarEventsField.on('typedinputtypechange', function () {
                     const currentType = solarEventsField.typedInput('type')
                     const $visibleInput = solarEventsDiv.find('.red-ui-typedInput-input')
-                    if (currentType === 'altitudeRising' || currentType === 'altitudeSetting') {
+                    if (isAltitudeSolarType(currentType)) {
                         $visibleInput.attr('placeholder', 'degrees, -90 to 90')
                         if (!ALTITUDE_ANGLE_VALUE_REGEX.test(String(solarEventsField.typedInput('value') || '').trim())) {
                             solarEventsField.typedInput('value', '')
@@ -1981,10 +1991,16 @@ copies or substantial portions of the Software.
                     expression: option.find('.node-input-option-expression').val(),
                     location: option.find('.node-input-option-location').typedInput('value'),
                     offset: option.find('.node-input-option-offset').val(),
-                    solarType: option.find('.node-input-option-solarEvents').typedInput('type') || 'all',
-                    solarEvents: option.find('.node-input-option-solarEvents').typedInput('value'),
                     lunarType: option.find('.node-input-option-lunarEvents').typedInput('type') || 'all',
                     lunarEvents: option.find('.node-input-option-lunarEvents').typedInput('value')
+                }
+                const solarType = option.find('.node-input-option-solarEvents').typedInput('type') || 'all'
+                const solarValue = option.find('.node-input-option-solarEvents').typedInput('value')
+                o.solarType = solarType
+                if (isAltitudeSolarType(solarType)) {
+                    o.solarAltitude = parseFloat(solarValue)
+                } else {
+                    o.solarEvents = solarValue
                 }
                 if (option.find('.node-input-option-value').typedInput('type') === 'num') {
                     o.payload = Number(o.value)
@@ -2705,7 +2721,8 @@ function onSchedulesExpandCompress () {
                         <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
                         <li>expressionType: (string|required) specify the schedule type. Set to "solar" for solar events</li>
                         <li>solarType: (string|required) specify the events to fire.  Accepted values are "all", "selected", "altitudeRising" or "altitudeSetting"</li>
-                        <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected" (a CSV of event names, see <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">above</a>) or solarType == "altitudeRising"/"altitudeSetting" (a single number of degrees, -90 to 90, the sun's altitude above (+) or below (-) the horizon)</li>
+                        <li>solarEvents: (string|optional) a CSV of event names to fire. Only required when solarType == "selected", see <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">above</a></li>
+                        <li>solarAltitude: (number|optional) a single number of degrees, -90 to 90, the sun's altitude above (+) or below (-) the horizon. Only required when solarType == "altitudeRising" or "altitudeSetting"</li>
                         <li>location: (string|required) longitude latitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
                         <li>offset: (number|optional) number of minutes to offset a sunrise or sunset</li>
                         <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
@@ -2841,7 +2858,7 @@ msg.payload = "name"; //  name of the schedule</code></pre>
   "expressionType": "solar",
   "location": "54.9992500,-1.4170300",
   "solarType": "altitudeRising",
-  "solarEvents": "-4",
+  "solarAltitude": -4,
   "timeZone": "Europe/London"
 }</code></pre>
                 <p><i>Details...</i><br>
