@@ -593,7 +593,10 @@ function applyOptionDefaults (node, option, optionIndex) {
     if (option.expressionType === 'cron' && !option.expression) option.expression = '0 * * * * * *'
     if (option.expressionType === 'solar') {
         if (!option.solarType) option.solarType = option.solarEvents ? 'selected' : 'all'
-        if (!option.solarEvents) option.solarEvents = 'sunrise,sunset'
+        // solarEvents has no meaning for the altitude types (they use solarAltitude instead) -
+        // don't default-fill it there, or it shows up as a misleading "sunrise,sunset" alongside
+        // the actual solarAltitude value in echoed/exported command output
+        if (!ALTITUDE_SOLAR_TYPES.includes(option.solarType) && !option.solarEvents) option.solarEvents = 'sunrise,sunset'
         if (!option.location) option.location = ''
         option.locationType = node.defaultLocationType
     }

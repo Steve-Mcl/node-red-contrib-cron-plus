@@ -1379,7 +1379,8 @@ copies or substantial portions of the Software.
                 delete option.type
                 if (option.expressionType === 'cron' && !option.expression) option.expression = '0 * * * * * *'
                 if (!option.solarType) option.solarType = option.solarEvents ? 'selected' : 'all'
-                if (!option.solarEvents) option.solarEvents = 'sunrise,sunset'
+                // solarEvents has no meaning for the altitude types (they use solarAltitude instead)
+                if (!isAltitudeSolarType(option.solarType) && !option.solarEvents) option.solarEvents = 'sunrise,sunset'
                 if (!option.lunarType) option.lunarType = option.lunarEvents ? 'selected' : 'all'
                 if (!option.lunarEvents) option.lunarEvents = 'rise,set'
                 if (!option.location) option.location = ''
