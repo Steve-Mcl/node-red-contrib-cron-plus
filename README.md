@@ -59,6 +59,8 @@ FEATURES
    * <img width="665" height="592" alt="chrome_4uSXOX59at" src="https://github.com/user-attachments/assets/475b2a2a-55d9-4617-9410-eaef31f14bcc" />
 ------------
 
+Solar schedules aren't limited to the named presets (sunrise, civil dusk, etc.). For cases the presets don't cover, `solarType: "altitudeRising"`/`"altitudeSetting"` with a `solarAltitude` (degrees, -90 to 90) fires on any custom sun altitude instead. See the node's built-in help for the full list of presets and the custom-altitude details.
+
 Schedules can fire on moon events at a location, alongside the existing solar events:
 
 | Event ID | Event | Information |
