@@ -797,8 +797,8 @@ describe('cron-plus Node', function () {
         it('describe a custom rising solar angle (-4 degrees)', async function (t) {
             const test = {
                 description: t.name,
-                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'customRising', solarEvents: '-4', timeZone: 'Europe/London' } },
-                expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', "Solar Events: 'sun rising 4° below the horizon'"]] }
+                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'altitudeRising', solarEvents: '-4', timeZone: 'Europe/London' } },
+                expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', "Solar Events: 'sun rising 4° below the horizon (altitude)'"]] }
             }
             const resultPromise = new Promise(resolve => {
                 helperNodeCommandResponses.on('input', (msg) => {
@@ -808,14 +808,14 @@ describe('cron-plus Node', function () {
             testNode.receive(test.send)
             const result = await resultPromise
             commandChecker(result, test)
-            result.payload.result.should.have.property('nextEvent', 'customAngleRise')
+            result.payload.result.should.have.property('nextEvent', 'altitudeRise')
             result.payload.result.should.have.property('nextEventTimeOffset').which.is.a.Date()
         })
         it('describe a custom setting solar angle (6.5 degrees)', async function (t) {
             const test = {
                 description: t.name,
-                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'customSetting', solarEvents: '6.5', timeZone: 'Europe/London' } },
-                expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', "Solar Events: 'sun setting 6.5° above the horizon'"]] }
+                send: { payload: { command: 'describe', expressionType: 'solar', location: '54.9992500,-1.4170300', solarType: 'altitudeSetting', solarEvents: '6.5', timeZone: 'Europe/London' } },
+                expected: { command: 'describe', propertyValues: [['payload.result.description', 'string', "Solar Events: 'sun setting 6.5° above the horizon (altitude)'"]] }
             }
             const resultPromise = new Promise(resolve => {
                 helperNodeCommandResponses.on('input', (msg) => {
@@ -825,7 +825,7 @@ describe('cron-plus Node', function () {
             testNode.receive(test.send)
             const result = await resultPromise
             commandChecker(result, test)
-            result.payload.result.should.have.property('nextEvent', 'customAngleSet')
+            result.payload.result.should.have.property('nextEvent', 'altitudeSet')
         })
         it('should reject adding a schedule with an out-of-range custom solar angle', async function () {
             testNode.receive({
@@ -835,7 +835,7 @@ describe('cron-plus Node', function () {
                     topic: 'dynBadAngle',
                     expressionType: 'solar',
                     location: '54.9992500,-1.4170300',
-                    solarType: 'customRising',
+                    solarType: 'altitudeRising',
                     solarEvents: '120',
                     payloadType: 'default',
                     limit: 1
@@ -853,7 +853,7 @@ describe('cron-plus Node', function () {
                     topic: 'dynBadAngle2',
                     expressionType: 'solar',
                     location: '54.9992500,-1.4170300',
-                    solarType: 'customSetting',
+                    solarType: 'altitudeSetting',
                     solarEvents: 'not-a-number',
                     payloadType: 'default',
                     limit: 1
@@ -1414,7 +1414,7 @@ describe('cron-plus Node', function () {
                     topic: 'dynGoodAngle',
                     expressionType: 'solar',
                     location: '54.9992500,-1.4170300',
-                    solarType: 'customRising',
+                    solarType: 'altitudeRising',
                     solarEvents: '-4',
                     offset: 0,
                     payloadType: 'default'
@@ -1447,7 +1447,7 @@ describe('cron-plus Node', function () {
             node.receive({ payload: { command: 'list', name: 'dynGoodAngle' } })
             const result = await resultPromise
             result.payload.result.should.have.property('config').which.is.an.Object()
-            result.payload.result.config.should.have.property('solarType', 'customRising')
+            result.payload.result.config.should.have.property('solarType', 'altitudeRising')
             result.payload.result.config.should.have.property('solarEvents', '-4')
             result.payload.result.should.have.property('status').which.is.an.Object()
             result.payload.result.status.should.have.property('nextDescription').which.is.a.String()
@@ -1460,7 +1460,7 @@ describe('cron-plus Node', function () {
             // Location" (fixed/env) setting is applied to it - this was already fixed once for
             // preset solarType ('selected'/'all') schedules, but this codebase was rebuilt from a
             // fresh main branch upload rather than branched from that fix, so it silently
-            // regressed for the new customRising/customSetting types too. Guarding both here.
+            // regressed for the new altitudeRising/altitudeSetting types too. Guarding both here.
             const flow = [
                 { id: 'helperCmd3', type: 'helper' },
                 {
@@ -1488,7 +1488,7 @@ describe('cron-plus Node', function () {
                     name: 'customDawn',
                     topic: 'customDawn',
                     expressionType: 'solar',
-                    solarType: 'customRising',
+                    solarType: 'altitudeRising',
                     solarEvents: '-4',
                     payloadType: 'default'
                     // no `location` - the node-level default must supply it
@@ -1504,7 +1504,7 @@ describe('cron-plus Node', function () {
             const result = await resultPromise
             result.payload.result.should.have.property('config').which.is.an.Object()
             result.payload.result.config.should.have.property('location', '54.9992500,-1.4170300')
-            result.payload.result.config.should.have.property('solarType', 'customRising')
+            result.payload.result.config.should.have.property('solarType', 'altitudeRising')
             result.payload.result.config.should.have.property('solarEvents', '-4')
             result.payload.result.status.nextDescription.should.match(/below the horizon/)
         })

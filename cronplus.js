@@ -51,44 +51,45 @@ const PERMITTED_LUNAR_EVENTS = [
     'set'
 ]
 
-// Custom solar-angle schedules (solarType 'customRising'/'customSetting') fire when the sun
-// crosses a user-specified angle above/below the horizon, in a given direction. Unlike the
-// PERMITTED_SOLAR_EVENTS presets, direction lives in solarType itself and the angle (in degrees,
-// -90 to 90) is the *only* thing solarEvents holds for these two types - no string encoding to
-// keep in sync with the editor, just a plain number.
-const CUSTOM_SOLAR_TYPES = ['customRising', 'customSetting']
+// Altitude-angle solar schedules (solarType 'altitudeRising'/'altitudeSetting') fire when the sun
+// crosses a user-specified altitude (its elevation above/below the horizon, as opposed to its
+// azimuth/compass direction) in a given direction. Unlike the PERMITTED_SOLAR_EVENTS presets,
+// direction lives in solarType itself and the angle (in degrees, -90 to 90) is the *only* thing
+// solarEvents holds for these two types - no string encoding to keep in sync with the editor,
+// just a plain number.
+const ALTITUDE_SOLAR_TYPES = ['altitudeRising', 'altitudeSetting']
 
 /**
- * Human friendly description of a custom solar-angle schedule, e.g. "sun rising 4° below the horizon"
- * @param {string} solarType 'customRising' or 'customSetting'
+ * Human friendly description of an altitude-angle solar schedule, e.g. "sun rising 4° below the horizon (altitude)"
+ * @param {string} solarType 'altitudeRising' or 'altitudeSetting'
  * @param {number|string} angleDegrees degrees above (positive) or below (negative) the horizon
  * @returns {string}
  */
-function describeCustomAngle (solarType, angleDegrees) {
-    const direction = solarType === 'customRising' ? 'rising' : 'setting'
+function describeAltitudeAngle (solarType, angleDegrees) {
+    const direction = solarType === 'altitudeRising' ? 'rising' : 'setting'
     const angle = parseFloat(angleDegrees)
-    const position = angle === 0 ? 'at the horizon' : (angle > 0 ? `${angle}° above the horizon` : `${Math.abs(angle)}° below the horizon`)
+    const position = angle === 0 ? 'at the horizon (altitude)' : (angle > 0 ? `${angle}° above the horizon (altitude)` : `${Math.abs(angle)}° below the horizon (altitude)`)
     return `sun ${direction} ${position}`
 }
 
-// Cache of custom angles already registered with SunCalc. SunCalc.addTime() simply pushes a new
+// Cache of altitude angles already registered with SunCalc. SunCalc.addTime() simply pushes a new
 // entry onto its internal (module scoped) `times` array every time it's called, with no
 // de-duplication, so registering the same angle repeatedly (e.g. every time a schedule is
 // (re)computed) would leak memory and duplicate work - this cache prevents that.
 const registeredSolarAngles = new Map()
 
 /**
- * Ensure a custom solar angle is registered with SunCalc, returning the generated rise/set
+ * Ensure an altitude angle is registered with SunCalc, returning the generated rise/set
  * property names that SunCalc.getTimes() will then populate for that angle.
  * @param {number} angle Angle in degrees above (positive) or below (negative) the horizon
  * @returns {{riseName: string, setName: string}}
  */
-function ensureCustomSolarAngleRegistered (angle) {
+function ensureAltitudeAngleRegistered (angle) {
     const key = angle.toFixed(4)
     let names = registeredSolarAngles.get(key)
     if (!names) {
         const safeKey = key.replace('-', 'n').replace('.', 'p')
-        names = { riseName: `customAngle_${safeKey}_rise`, setName: `customAngle_${safeKey}_set` }
+        names = { riseName: `altitude_${safeKey}_rise`, setName: `altitude_${safeKey}_set` }
         SunCalc.addTime(angle, names.riseName, names.setName)
         registeredSolarAngles.set(key, names)
     }
@@ -207,13 +208,13 @@ function validateOpt (opt, permitDefaults = true) {
                 throw new Error(`Schedule '${opt.name}' - location property missing`)
             }
         }
-        if (isSolar && opt.solarType !== 'selected' && opt.solarType !== 'all' && !CUSTOM_SOLAR_TYPES.includes(opt.solarType)) {
-            throw new Error(`Schedule '${opt.name}' - solarType property invalid or missing. Must be one of "all", "selected", "customRising" or "customSetting"`)
+        if (isSolar && opt.solarType !== 'selected' && opt.solarType !== 'all' && !ALTITUDE_SOLAR_TYPES.includes(opt.solarType)) {
+            throw new Error(`Schedule '${opt.name}' - solarType property invalid or missing. Must be one of "all", "selected", "altitudeRising" or "altitudeSetting"`)
         }
         if (isLunar && opt.lunarType !== 'selected' && opt.lunarType !== 'all') {
             throw new Error(`Schedule '${opt.name}' - lunarType property invalid or missing. Must be either "all" or "selected"`)
         }
-        if (isSolar && CUSTOM_SOLAR_TYPES.includes(opt.solarType)) {
+        if (isSolar && ALTITUDE_SOLAR_TYPES.includes(opt.solarType)) {
             const angle = parseFloat(opt.solarEvents)
             if (opt.solarEvents === undefined || opt.solarEvents === null || opt.solarEvents === '' || isNaN(angle) || angle < -90 || angle > 90) {
                 throw new Error(`Schedule '${opt.name}' - solarEvents property must be a number of degrees between -90 and 90 when solarType is '${opt.solarType}'`)
@@ -427,8 +428,8 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             if (expressionType === 'solar') {
                 if (solarType === 'all') {
                     result.description = 'All Solar Events'
-                } else if (CUSTOM_SOLAR_TYPES.includes(solarType)) {
-                    const label = describeCustomAngle(solarType, solarEvents)
+                } else if (ALTITUDE_SOLAR_TYPES.includes(solarType)) {
+                    const label = describeAltitudeAngle(solarType, solarEvents)
                     result.description = "Solar Events: '" + label + "'"
                     if (result.nextEvent) {
                         result.prettyNext = label + ` in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
@@ -674,8 +675,8 @@ function getMoonData (dateValue, lat, lng) {
 }
 
 function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offset = 0, solarType = 'selected') {
-    if (solarType === 'customRising' || solarType === 'customSetting') {
-        return getCustomAngleSolarTimes(lat, lng, solarEvents, startDate, offset, solarType)
+    if (solarType === 'altitudeRising' || solarType === 'altitudeSetting') {
+        return getAltitudeSolarTimes(lat, lng, solarEvents, startDate, offset, solarType)
     }
     // performance.mark('Start');
     const solarEventsPast = [...PERMITTED_SOLAR_EVENTS]
@@ -908,24 +909,24 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
 
 /**
  * Compute the next occurrence (and, in a JSON-friendly shape matching getSolarTimes()'s return
- * value, the current solarState) of the sun crossing a custom angle above/below the horizon, in
- * a given direction. Used for solarType 'customRising'/'customSetting' - kept as a separate,
- * dedicated computation rather than folded into getSolarTimes()'s PERMITTED_SOLAR_EVENTS scan
- * since there is only ever one event of interest here (no day/night state to track across a
+ * value, the current solarState) of the sun crossing a custom altitude above/below the horizon,
+ * in a given direction. Used for solarType 'altitudeRising'/'altitudeSetting' - kept as a
+ * separate, dedicated computation rather than folded into getSolarTimes()'s PERMITTED_SOLAR_EVENTS
+ * scan since there is only ever one event of interest here (no day/night state to track across a
  * whole set of presets).
  * @param {number} lat
  * @param {number} lng
  * @param {number|string} angleDegrees degrees above (positive) or below (negative) the horizon
  * @param {Date|string|null} startDate
  * @param {number} offset minutes offset applied to the computed time
- * @param {'customRising'|'customSetting'} solarType
+ * @param {'altitudeRising'|'altitudeSetting'} solarType
  * @returns {{solarState: object, nextEvent: (string|null), nextEventTime: (Date|null), nextEventTimeOffset: (Date|null), eventTimes: Array}}
  */
-function getCustomAngleSolarTimes (lat, lng, angleDegrees, startDate, offset, solarType) {
+function getAltitudeSolarTimes (lat, lng, angleDegrees, startDate, offset, solarType) {
     const angle = parseFloat(angleDegrees)
-    const direction = solarType === 'customRising' ? 'rise' : 'set'
-    const eventName = solarType === 'customRising' ? 'customAngleRise' : 'customAngleSet'
-    const names = ensureCustomSolarAngleRegistered(angle)
+    const direction = solarType === 'altitudeRising' ? 'rise' : 'set'
+    const eventName = solarType === 'altitudeRising' ? 'altitudeRise' : 'altitudeSet'
+    const names = ensureAltitudeAngleRegistered(angle)
     const internalName = direction === 'rise' ? names.riseName : names.setName
 
     offset = isNumber(offset) ? parseInt(offset) : 0
@@ -1321,8 +1322,8 @@ module.exports = function (RED) {
                     // node.nextEvent stays the raw machine identifier (it also becomes
                     // msg.cronplus.status.solarEvent) - only the status-text display gets the
                     // friendly label, built directly from solarType/solarEvents (no encoding to decode)
-                    node.nextEventDisplay = CUSTOM_SOLAR_TYPES.includes(t.node_solarType)
-                        ? describeCustomAngle(t.node_solarType, t.node_solarEvents)
+                    node.nextEventDisplay = ALTITUDE_SOLAR_TYPES.includes(t.node_solarType)
+                        ? describeAltitudeAngle(t.node_solarType, t.node_solarEvents)
                         : node.nextEvent
                 }
                 if (t.node_lunarEventTimes && t.node_lunarEventTimes.nextEvent) {

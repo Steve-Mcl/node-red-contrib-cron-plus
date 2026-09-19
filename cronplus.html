@@ -432,15 +432,16 @@ copies or substantial portions of the Software.
         }
     }
 
-    // Custom solar-angle schedules (solarType 'customRising'/'customSetting') hold their angle,
-    // in degrees, as the typedInput's own value for those two types - no CSV, no encoded string,
-    // just a plain number, validated with typedInput's own validate hook (see solarEventsField
-    // below) so a bad value turns the box red as you type instead of failing silently on save.
-    const CUSTOM_ANGLE_VALUE_REGEX = /^-?\d+(?:\.\d+)?$/
-    function validateCustomAngleValue (value, _opt) {
+    // Altitude-angle solar schedules (solarType 'altitudeRising'/'altitudeSetting') hold their
+    // angle, in degrees, as the typedInput's own value for those two types - no CSV, no encoded
+    // string, just a plain number, validated with typedInput's own validate hook (see
+    // solarEventsField below) so a bad value turns the box red as you type instead of failing
+    // silently on save.
+    const ALTITUDE_ANGLE_VALUE_REGEX = /^-?\d+(?:\.\d+)?$/
+    function validateAltitudeAngleValue (value, _opt) {
         const v = String(value == null ? '' : value).trim()
         if (v === '') return 'Enter a number of degrees (-90 to 90)'
-        if (!CUSTOM_ANGLE_VALUE_REGEX.test(v)) return 'Enter a number of degrees (-90 to 90)'
+        if (!ALTITUDE_ANGLE_VALUE_REGEX.test(v)) return 'Enter a number of degrees (-90 to 90)'
         const n = parseFloat(v)
         if (n < -90 || n > 90) return 'Must be between -90 and 90 degrees'
         return true
@@ -770,8 +771,8 @@ copies or substantial portions of the Software.
                                     return false
                                 }
                             } else if (value[i].expressionType === 'solar') {
-                                if (!['all', 'selected', 'customRising', 'customSetting'].includes(value[i].solarType)) {
-                                    console.warn("cron-plus: validation error - solarType is not 'all', 'selected', 'customRising' or 'customSetting'")
+                                if (!['all', 'selected', 'altitudeRising', 'altitudeSetting'].includes(value[i].solarType)) {
+                                    console.warn("cron-plus: validation error - solarType is not 'all', 'selected', 'altitudeRising' or 'altitudeSetting'")
                                     // $("#node-input-option-container > li:nth-child(" + (i+1) + ")  .node-input-option-solarType").addClass("input-error");
                                     return false
                                 }
@@ -779,9 +780,9 @@ copies or substantial portions of the Software.
                                     console.warn('cron-plus: validation error - solarEvents missing')
                                     return false
                                 }
-                                if ((value[i].solarType === 'customRising' || value[i].solarType === 'customSetting') &&
-                                    validateCustomAngleValue(value[i].solarEvents) !== true) {
-                                    console.warn('cron-plus: validation error - solarEvents is not a valid custom angle (-90 to 90)')
+                                if ((value[i].solarType === 'altitudeRising' || value[i].solarType === 'altitudeSetting') &&
+                                    validateAltitudeAngleValue(value[i].solarEvents) !== true) {
+                                    console.warn('cron-plus: validation error - solarEvents is not a valid altitude angle (-90 to 90)')
                                     return false
                                 }
                             } else if (value[i].expressionType === 'lunar') {
@@ -1735,28 +1736,28 @@ copies or substantial portions of the Software.
                             showLabel: true
                         },
                         {
-                            value: 'customRising',
-                            label: 'Custom Rising Angle',
-                            title: 'Custom Rising Angle',
+                            value: 'altitudeRising',
+                            label: 'Custom Rising Altitude',
+                            title: 'Custom Rising Altitude',
                             icon: 'fa fa-arrow-circle-o-up',
                             showLabel: true,
                             hasValue: true,
-                            validate: validateCustomAngleValue
+                            validate: validateAltitudeAngleValue
                         },
                         {
-                            value: 'customSetting',
-                            label: 'Custom Setting Angle',
-                            title: 'Custom Setting Angle',
+                            value: 'altitudeSetting',
+                            label: 'Custom Setting Altitude',
+                            title: 'Custom Setting Altitude',
                             icon: 'fa fa-arrow-circle-o-down',
                             showLabel: true,
                             hasValue: true,
-                            validate: validateCustomAngleValue
+                            validate: validateAltitudeAngleValue
                         }
                     ]
                 })
                 solarEventsField.typedInput('type', option.solarType || 'all')
                 solarEventsField.typedInput('value', option.solarEvents || '')// added as setting value on invocation doesnt seem to set the "2 selected" text of the widget!
-                // the two custom-angle types share hasValue's free-text box with every other
+                // the two altitude-angle types share hasValue's free-text box with every other
                 // type, so switching in leaves whatever was typed/selected before (e.g. a
                 // "sunrise,sunset" CSV from "Selected Solar Events"). Clear it out unless it's
                 // already a usable angle, and swap the placeholder so it doesn't still read
@@ -1764,9 +1765,9 @@ copies or substantial portions of the Software.
                 solarEventsField.on('typedinputtypechange', function () {
                     const currentType = solarEventsField.typedInput('type')
                     const $visibleInput = solarEventsDiv.find('.red-ui-typedInput-input')
-                    if (currentType === 'customRising' || currentType === 'customSetting') {
+                    if (currentType === 'altitudeRising' || currentType === 'altitudeSetting') {
                         $visibleInput.attr('placeholder', 'degrees, -90 to 90')
-                        if (!CUSTOM_ANGLE_VALUE_REGEX.test(String(solarEventsField.typedInput('value') || '').trim())) {
+                        if (!ALTITUDE_ANGLE_VALUE_REGEX.test(String(solarEventsField.typedInput('value') || '').trim())) {
                             solarEventsField.typedInput('value', '')
                         }
                     } else {
@@ -2570,11 +2571,13 @@ function onSchedulesExpandCompress () {
             </table>
             <p>
                 <b>Custom sun angle</b> - if none of the presets above are the angle you need, select
-                <i>Custom Rising Angle</i> or <i>Custom Setting Angle</i> from the type dropdown
-                instead of <i>Selected Solar Events</i>, then enter the angle (in degrees, -90 to 90,
-                above (+) or below (-) the horizon) directly into the box. Choosing the type already
-                tells cron-plus which direction you mean, so the angle itself is all that's needed;
-                a bad value turns the box red as you type.
+                <i>Custom Rising Altitude</i> or <i>Custom Setting Altitude</i> from
+                the type dropdown instead of <i>Selected Solar Events</i>, then enter the angle (in
+                degrees, -90 to 90, above (+) or below (-) the horizon) directly into the box. This is
+                the sun's <i>altitude</i> (its elevation above/below the horizon) - not its azimuth
+                (compass direction) - the same angle used by the presets above (e.g. civil dusk is
+                -6°). Choosing the type already tells cron-plus which direction you mean, so the angle
+                itself is all that's needed; a bad value turns the box red as you type.
             </p>
         </div>
         <h4 id="cron-plus-lunar-events-info">Schedules - Lunar Events</h4>
@@ -2703,8 +2706,8 @@ function onSchedulesExpandCompress () {
                         <li>name: (string|required) This will identify schedule</li>
                         <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
                         <li>expressionType: (string|required) specify the schedule type. Set to "solar" for solar events</li>
-                        <li>solarType: (string|required) specify the events to fire.  Accepted values are "all", "selected", "customRising" or "customSetting"</li>
-                        <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected" (a CSV of event names, see <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">above</a>) or solarType == "customRising"/"customSetting" (a single number of degrees, -90 to 90, above (+) or below (-) the horizon)</li>
+                        <li>solarType: (string|required) specify the events to fire.  Accepted values are "all", "selected", "altitudeRising" or "altitudeSetting"</li>
+                        <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected" (a CSV of event names, see <b>Schedules - Solar Events</b> <a href="#cron-plus-solar-events-info">above</a>) or solarType == "altitudeRising"/"altitudeSetting" (a single number of degrees, -90 to 90, the sun's altitude above (+) or below (-) the horizon)</li>
                         <li>location: (string|required) longitude latitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
                         <li>offset: (number|optional) number of minutes to offset a sunrise or sunset</li>
                         <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
@@ -2834,12 +2837,12 @@ msg.payload = "name"; //  name of the schedule</code></pre>
   "solarEvents": "civilDawn,sunrise,sunset,civilDusk",
   "timeZone": "Europe/London"
 }</code></pre>
-                Example : cmd payload to describe a custom sun angle (fires as the sun rises through 4° below the horizon)...<br>
+                Example : cmd payload to describe a custom solar altitude (fires as the sun rises through 4° below the horizon)...<br>
     <pre class="cron-plus-code"><code>{
   "command": "describe",
   "expressionType": "solar",
   "location": "54.9992500,-1.4170300",
-  "solarType": "customRising",
+  "solarType": "altitudeRising",
   "solarEvents": "-4",
   "timeZone": "Europe/London"
 }</code></pre>
