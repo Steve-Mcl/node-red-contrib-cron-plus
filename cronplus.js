@@ -421,6 +421,12 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
         const dsFutureDates = dates.filter(d => d >= now)
         const count = dsFutureDates ? dsFutureDates.length : 0
         result.description = 'Date sequence with fixed dates'
+        if (expressionType === 'solar' && ALTITUDE_SOLAR_TYPES.includes(solarType) && !count) {
+            // the angle can be outside the range this location's sun altitude ever reaches
+            // (e.g. a latitude never gets low/high enough) - say so instead of falling through
+            // to the generic "Date sequence" text above, which is meaningless here
+            result.description = "Solar Events: '" + describeAltitudeAngle(solarType, solarEvents) + "' - never occurs at this location"
+        }
         if (task && task._sequence && count) {
             result.nextDate = dsFutureDates[0]
             const ms = result.nextDate.valueOf() - now.valueOf()
@@ -933,12 +939,16 @@ function getAltitudeSolarTimes (lat, lng, angleDegrees, startDate, offset, solar
     startDate = startDate ? new Date(startDate) : new Date()
 
     // only a forward scan is needed - unlike getSolarTimes() there's no day/night state to
-    // derive from past occurrences, just the single next time this angle is crossed
+    // derive from past occurrences, just the single next time this angle is crossed. The scan
+    // must cover a full year: an angle near this location's seasonal min/max altitude may only
+    // be crossed during a brief window once a year, which can be up to ~365 days away depending
+    // where "now" falls in the year (e.g. a 37 degree rising angle at 54.9N is next reached 190
+    // days after 2026-09-19 - a shorter cap missed it and produced a false "never occurs").
     const scanDate = new Date(startDate.toDateString())
     scanDate.setDate(scanDate.getDate() - 1) // back one day to catch times ahead of current day
     let loopMonitor = 0
     let futureEvent = null
-    while (loopMonitor < 183 && !futureEvent) {
+    while (loopMonitor < 366 && !futureEvent) {
         loopMonitor++
         const times = getSunTimes(scanDate, lat, lng)
         const seTime = times[internalName]
