@@ -187,6 +187,7 @@ Acknowledgements
 ---------------
 * Inspired by [node-red-contrib-cron](https://github.com/chameleonbr/node-red-contrib-cron)
 * Cron expression builder adapted for cron-plus from https://github.com/juliacscai/jquery-cron-quartz (not on NPM)
+* Custom solar altitude angle scheduling contributed by [@evilbunny2008](https://github.com/evilbunny2008)
 * Big thanks for continued support by [@jaclark](https://github.com/jaclarke) for the excellent [cronosjs](https://github.com/jaclarke/cronosjs)
 
 Dependencies
