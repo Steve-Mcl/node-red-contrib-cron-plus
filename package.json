@@ -66,6 +66,12 @@
     "author": {
         "name": "Steve-Mcl"
     },
+    "contributors": [
+        {
+            "name": "evilbunny2008",
+            "url": "https://github.com/evilbunny2008"
+        }
+    ],
     "license": "MIT",
     "bugs": {
         "url": "https://github.com/Steve-Mcl/node-red-contrib-cron-plus/issues"
