@@ -326,8 +326,13 @@
         return words
     })()
 
-    // units that "every <n> ..." accepts (singular forms - the caller strips plurals)
+    // units "every <n> ..." accepts as a repeating clock step. Deliberately
+    // narrower than DURATION_UNITS below: "every 2 days" is not a clock step
     const STEP_UNITS = ['minute', 'min', 'hour', 'hr']
+
+    // singular unit words that make a preceding number a LENGTH rather than a
+    // date ("2 hours", "5 days") - callers strip the plural before looking up
+    const DURATION_UNITS = ['minute', 'min', 'hour', 'hr', 'day', 'week', 'month']
 
     // Single-word vocabulary for distance-1 fuzzy fallback (typo tolerance)
     const FUZZY_VOCAB = (function () {
@@ -573,6 +578,21 @@
                     symbols.push({ type: 'DAY_GENERIC', raw: tok.raw })
                     i++
                     continue
+                }
+                // "day is 13th" / "day 13": a day-of-month number, not daylight.
+                // Refused when a duration unit follows the number, because that
+                // makes it a length instead ("day 2 hours before noon")
+                if (following && following.type === 'num' && Number.isInteger(following.value) &&
+                    following.value >= 1 && following.value <= 31) {
+                    let k = j + 1
+                    while (tokens[k] && tokens[k].type === 'word' && NOISE_WORDS.indexOf(tokens[k].word) >= 0) { k++ }
+                    const isDuration = tokens[k] && tokens[k].type === 'word' &&
+                        DURATION_UNITS.indexOf(stripPlural(tokens[k].word)) >= 0
+                    if (!isDuration) {
+                        symbols.push({ type: 'DAY_GENERIC', raw: tok.raw })
+                        i++
+                        continue
+                    }
                 }
             }
             // "<date> eve": christmas eve, new years eve, halloween eve
@@ -882,6 +902,21 @@
             case 'DAY_GENERIC':
             case 'MONTH_GENERIC':
             case 'YEAR_GENERIC': {
+                // "day is 13th" / "day 13". A bare number is normally not a
+                // condition on its own (parseDayOfMonth wants an ordinal), but
+                // the explicit 'day' in front removes the ambiguity, so promote
+                // it and reuse the same path
+                const next = peek(state, 1)
+                if (sym.type === 'DAY_GENERIC' && next && next.type === 'NUM' &&
+                    Number.isInteger(next.value) && next.value >= 1 && next.value <= 31) {
+                    state.pos++
+                    if (!next.ordinal) {
+                        state.symbols[state.pos] = { type: 'NUM', value: next.value, ordinal: true, raw: next.raw }
+                    }
+                    const dom = parseDayOfMonth(state)
+                    if (dom) { absorbDayNumbers(state, dom) } // "day is 13 or 27"
+                    return dom
+                }
                 // "day is odd", "month is even", "year is odd" (parity trails)
                 if (peek(state, 1) && peek(state, 1).type === 'PARITY') {
                     const unit = sym.type === 'DAY_GENERIC' ? 'day' : (sym.type === 'MONTH_GENERIC' ? 'month' : 'year')
@@ -1121,6 +1156,29 @@
             source += ' of the month'
         }
         return { kind: 'dayOfMonth', days: [num.value], source }
+    }
+
+    // "day is 13 or 27", "day 1, 15": once an explicit 'day' has made the first
+    // number a date, the rest of an and/or/comma run of bare numbers is one too.
+    // Stops at a number a UNIT follows, which is a length instead
+    // ("day 13 and 2 hours before noon").
+    function absorbDayNumbers (state, term) {
+        for (;;) {
+            const joiner = peek(state)
+            const num = peek(state, 1)
+            if (!joiner || ['AND', 'OR', 'COMMA'].indexOf(joiner.type) < 0) { break }
+            if (!num || num.type !== 'NUM' || !Number.isInteger(num.value) || num.value < 1 || num.value > 31) { break }
+            if (peek(state, 2) && peek(state, 2).type === 'UNIT') { break }
+            term.days = uniqSorted(term.days.concat([num.value]))
+            term.source += ' or ' + num.raw
+            state.pos += 2
+        }
+        // an "of the month" tail now sits after the LAST number, not the first
+        if (peek(state) && peek(state).type === 'OF' && peek(state, 1) && peek(state, 1).type === 'MONTH_GENERIC') {
+            state.pos += 2
+        } else if (peek(state) && peek(state).type === 'MONTH_GENERIC') {
+            state.pos++
+        }
     }
 
     function eventFromSym (sym) {
