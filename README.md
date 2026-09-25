@@ -102,6 +102,7 @@ Type the condition in plain English; a live "understanding" line below the field
 * `between 9am and 5pm`, `before noon`, `between 10pm and 6am` (overnight), `2130h` (military time - the trailing `h` is required, a bare 4-digit number is already a valid year)
 * `morning` (00:00-12:00), `afternoon` (12:00-18:00), `evening` (18:00-24:00) - fixed clock hours, not solar; the understanding line points to the sun-relative equivalent (`dawn`/`sunrise`, `afternoon sun`/`golden hour`, `dusk`/`twilight`)
 * `between 15 minutes and 30 minutes past the hour`, `quarter past`, `half past`, `ten past`, `5 to` (every hour; `quarter past five` is the clock time 05:15)
+* `on the hour`, `every hour`, `hourly`, `every half hour`, `every quarter hour`, `every 5 minutes`, `every 2 hours` - a repeating step counted from local midnight, matching for one minute each time (`every 45 minutes` = 00:00, 00:45, 01:30 ...). This is a *time window*, not a rate limit: it allows any message that arrives during a matching minute
 * `is night`, `after dark`, `golden hour`, `sun rising`, `during daylight`
 * `after sunset`, `before sunrise`, `2 hours after sunset`, `within 30 minutes of sunrise`, `between sunset and sunrise`
 * `when the moon is visible`, `full moon`, `blue moon` (second full moon of a calendar month), `seasonal blue moon` (third full moon in a season of four), `moon more than 50% illuminated`, `moon is 90% illuminated` (bare percentages mean "at least")

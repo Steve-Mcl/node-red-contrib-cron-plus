@@ -622,6 +622,13 @@ copies or substantial portions of the Software.
             <code>evening</code> (18:00-24:00) - fixed clock hours, not solar; the understanding
             line names the sun-relative equivalent instead (<code>dawn</code>/<code>sunrise</code>,
             <code>afternoon sun</code>/<code>golden hour</code>, <code>dusk</code>/<code>twilight</code>)</li>
+        <li><b>Repeating steps:</b> <code>on the hour</code>, <code>every hour</code>,
+            <code>hourly</code>, <code>every half hour</code>, <code>every quarter hour</code>,
+            <code>every 5 minutes</code>, <code>every 2 hours</code>, <code>every 45 minutes</code>.
+            The step is counted from local midnight and matches for one minute each time
+            (<code>every 45 minutes</code> = 00:00, 00:45, 01:30 ...); the understanding line
+            spells out the first few. This is a time window, not a rate limit - it allows
+            every message that arrives during a matching minute</li>
         <li><b>Minute of the hour:</b> <code>between 15 minutes and 30 minutes past the hour</code>,
             <code>from 0 minutes to 10 minutes</code>, <code>quarter past</code>, <code>half past</code>,
             <code>quarter to</code>, <code>ten past</code>, <code>5 to</code> (every hour).

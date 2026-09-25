@@ -967,6 +967,71 @@ describe('when-gate-lang parse: minute of the hour', function () {
     })
 })
 
+describe('when-gate-lang parse: repeating clock steps', function () {
+    it('parses "on the hour" / "every hour" / "hourly" as a 60 minute step', function () {
+        ;['on the hour', 'every hour', 'hourly', 'only on the hour'].forEach(function (text) {
+            onlyTerm(text).should.have.properties({ kind: 'clockEvery', stepMin: 60, stepValue: 1, unit: 'hour' })
+        })
+        lang.parse('on the hour').description.should.equal('the time is on the hour (every hour, at 0 minutes past)')
+    })
+
+    it('parses half and quarter hour phrases', function () {
+        ;['every half hour', 'every half an hour', 'on the half hour'].forEach(function (text) {
+            onlyTerm(text).should.have.properties({ kind: 'clockEvery', stepMin: 30 })
+        })
+        onlyTerm('every quarter hour').should.have.properties({ kind: 'clockEvery', stepMin: 15 })
+        onlyTerm('every minute').should.have.properties({ kind: 'clockEvery', stepMin: 1 })
+    })
+
+    it('parses "every N minutes" and "every N hours"', function () {
+        onlyTerm('every 5 minutes').should.have.properties({ kind: 'clockEvery', stepMin: 5, stepValue: 5, unit: 'minute' })
+        onlyTerm('every 2 hours').should.have.properties({ kind: 'clockEvery', stepMin: 120, stepValue: 2, unit: 'hour' })
+        onlyTerm('every 45 mins').should.have.properties({ kind: 'clockEvery', stepMin: 45 })
+        onlyTerm('every twenty five minutes').should.have.properties({ kind: 'clockEvery', stepMin: 25 })
+        lang.parse('every 5 minutes').description.should.equal('the time is every 5 minutes counted from midnight (00:00, 00:05, 00:10 ...)')
+    })
+
+    it('rejects step sizes that cannot be counted from midnight', function () {
+        ;['every 0 minutes', 'every 3000 minutes', 'every 2.5 minutes'].forEach(function (text) {
+            lang.parse(text).ok.should.be.false()
+        })
+    })
+
+    it('does not steal minute-of-the-hour readings: "every 30 minutes past the hour"', function () {
+        const r = lang.parse('every 30 minutes past the hour')
+        r.unmatched.should.have.length(0)
+        onlyTerm('every 30 minutes past the hour').should.have.properties({ kind: 'minuteOfHour', style: 'at', startMin: 30 })
+    })
+
+    it('describes a day-length step as a single time, not a repeating list', function () {
+        lang.parse('every 24 hours').description.should.equal('the time is 00:00 (every 24 hours)')
+        lang.parse('every 12 hours').description.should.equal('the time is every 12 hours counted from midnight (00:00, 12:00 ...)')
+    })
+
+    it('leaves "every" as noise everywhere else, and bare "hour" as a unit', function () {
+        onlyTerm('every monday').kind.should.equal('day')
+        onlyTerm('every day').kind.should.equal('always')
+        onlyTerm('2 hours before noon').should.have.properties({ kind: 'timeRange', style: 'before', endMin: 600 })
+        onlyTerm('within 1 hour of sunset').withinMin.should.equal(60)
+        onlyTerm('golden hour').kind.should.equal('solarState')
+    })
+
+    it('says one idea once: "every hour on the hour" is a single term', function () {
+        const terms = onlyGroupTerms('every hour on the hour')
+        terms.should.have.length(1)
+        terms[0].should.have.properties({ kind: 'clockEvery', stepMin: 60 })
+    })
+
+    it('combines with other conditions (the reported case)', function () {
+        const r = lang.parse('every hour on the hour between sunrise and sunset')
+        r.ok.should.be.true()
+        r.unmatched.should.have.length(0)
+        r.ast.groups[0].terms.should.have.length(2)
+        r.description.should.equal('the time is on the hour (every hour, at 0 minutes past) and between sunrise and sunset')
+        lang.parse('every 5 minutes between 12:00 and 13:00').unmatched.should.have.length(0)
+    })
+})
+
 describe('when-gate-lang parse: decimal numbers', function () {
     it('parses float degrees: "sun is between 43.2 and 80.5 deg"', function () {
         const term = onlyTerm('sun is between 43.2 and 80.5 deg')

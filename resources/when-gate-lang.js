@@ -186,6 +186,20 @@
         { words: ['moon', 'high'], sym: { type: 'TERM', term: { kind: 'moonAltitude', op: 'above', degrees: 45, label: 'high' } } },
         { words: ['moon', 'low'], sym: { type: 'TERM', term: { kind: 'moonAltitude', op: 'between', low: 0, high: 15, label: 'low' } } },
 
+        // repeating clock steps with a FIXED size. "every N minutes/hours" is a
+        // number, so it cannot be a phrase - matchSymbols emits an EVERY symbol
+        // for it (see parseEvery). 'on'/'the'/'an' are noise words, which is what
+        // lets ['on','hour'] match "on the hour" and ['every','half','hour'] match
+        // "every half an hour". A BARE 'hour' must never become a term of its own:
+        // it is the unit in "2 hours before noon" / "within 1 hour of sunset"
+        { words: ['every', 'hour'], sym: { type: 'TERM', term: { kind: 'clockEvery', stepMin: 60, stepValue: 1, unit: 'hour' } } },
+        { words: ['on', 'hour'], sym: { type: 'TERM', term: { kind: 'clockEvery', stepMin: 60, stepValue: 1, unit: 'hour' } } },
+        { words: ['hourly'], sym: { type: 'TERM', term: { kind: 'clockEvery', stepMin: 60, stepValue: 1, unit: 'hour' } } },
+        { words: ['every', 'half', 'hour'], sym: { type: 'TERM', term: { kind: 'clockEvery', stepMin: 30, stepValue: 30, unit: 'minute' } } },
+        { words: ['on', 'half', 'hour'], sym: { type: 'TERM', term: { kind: 'clockEvery', stepMin: 30, stepValue: 30, unit: 'minute' } } },
+        { words: ['every', 'quarter', 'hour'], sym: { type: 'TERM', term: { kind: 'clockEvery', stepMin: 15, stepValue: 15, unit: 'minute' } } },
+        { words: ['every', 'minute'], sym: { type: 'TERM', term: { kind: 'clockEvery', stepMin: 1, stepValue: 1, unit: 'minute' } } },
+
         // minute-of-hour: "quarter past [five]", "half past", "10 past", "5 to"
         { words: ['quarter', 'past'], sym: { type: 'TERM', term: { kind: 'minuteOfHour', style: 'at', startMin: 15, rel: 'past' } } },
         { words: ['half', 'past'], sym: { type: 'TERM', term: { kind: 'minuteOfHour', style: 'at', startMin: 30, rel: 'past' } } },
@@ -300,6 +314,21 @@
     // 'at' is included: "at 9am" parses as a bare time, "at night" as the night state.
     const NOISE_WORDS = ['only', 'just', 'when', 'whenever', 'if', 'the', 'on', 'in', 'is', 'it', 'its', 'was', 'are', 'be', 'during', 'a', 'an', 'at', 'whilst', 'while', 'time', 'times', 'every', 'each', 'them', 'those', 'their', 'altitude']
 
+    // Single-word number spellings, taken straight from the phrase table so the
+    // two can never drift. Only used as a LOOKAHEAD test ("every five minutes"):
+    // the phrase table still does the actual matching, so "twenty five" - which
+    // starts with the one-word 'twenty' - is recognised here and read as 25 there
+    const NUMBER_WORDS = (function () {
+        const words = {}
+        PHRASES.forEach(function (p) {
+            if (p.sym.type === 'NUM' && p.words.length === 1) { words[p.words[0]] = true }
+        })
+        return words
+    })()
+
+    // units that "every <n> ..." accepts (singular forms - the caller strips plurals)
+    const STEP_UNITS = ['minute', 'min', 'hour', 'hr']
+
     // Single-word vocabulary for distance-1 fuzzy fallback (typo tolerance)
     const FUZZY_VOCAB = (function () {
         const words = {}
@@ -404,6 +433,13 @@
         return word
     }
 
+    // index of the first token at or after `from` that is not a noise word
+    function skipNoise (tokens, from) {
+        let j = from
+        while (tokens[j] && tokens[j].type === 'word' && NOISE_WORDS.indexOf(tokens[j].word) >= 0) { j++ }
+        return j
+    }
+
     function wordSymbol (word) {
         // single-word direct lookups (after phrase table missed)
         let w = word
@@ -476,6 +512,32 @@
                 symbols.push({ type: 'TERM', term: { kind: 'namedDate', month: 1, day: 1, name: 'new years day' }, raw: 'new years day' })
                 i += consumed
                 continue
+            }
+            // "every 5 minutes" / "every two hours": a repeating clock step whose
+            // size is a number, so it cannot live in the phrase table. 'every' is
+            // noise everywhere else ("every monday", "every day"), so it only
+            // becomes a symbol when a number AND a minute/hour unit really follow
+            if (tok.word === 'every') {
+                const numIdx = skipNoise(tokens, i + 1)
+                const numTok = tokens[numIdx]
+                const isNum = numTok && (numTok.type === 'num'
+                    ? !numTok.ordinal
+                    : (numTok.type === 'word' && NUMBER_WORDS[numTok.word]))
+                // walk past the number - spelled-out numbers can take two words
+                // ("twenty five") - to find the unit that makes this a step
+                let u = skipNoise(tokens, numIdx + 1)
+                while (tokens[u] && tokens[u].type === 'word' && NUMBER_WORDS[tokens[u].word]) { u = skipNoise(tokens, u + 1) }
+                const unitTok = tokens[u]
+                // "every 30 minutes past the hour" is a minute OF the hour, not a
+                // 30 minute step - leave those to parseMinuteOfHour by not taking
+                // the 'every' when its minutes are followed by "past"/"to"
+                const tail = tokens[skipNoise(tokens, u + 1)]
+                const minuteOfHour = tail && tail.type === 'word' && (tail.word === 'past' || tail.word === 'to')
+                if (isNum && !minuteOfHour && unitTok && unitTok.type === 'word' && STEP_UNITS.indexOf(stripPlural(unitTok.word)) >= 0) {
+                    symbols.push({ type: 'EVERY', raw: tok.raw })
+                    i++
+                    continue
+                }
             }
             // context-sensitive words - checked before the phrase table because
             // 'day'/'week'/'month' mean something else standalone
@@ -813,6 +875,8 @@
                 if (!sym.ordinal && isYearNumber(sym.value)) { return parseYearCond(state) }
                 return parseDayOfMonth(state)
             }
+            case 'EVERY':
+                return parseEvery(state)
             case 'PARITY':
                 return parseParity(state)
             case 'DAY_GENERIC':
@@ -1398,6 +1462,29 @@
         return undefined
     }
 
+    // "every 5 minutes", "every 2 hours", "every twenty five minutes".
+    // The EVERY symbol is only emitted when a number and a minute/hour unit
+    // follow (see matchSymbols), but the symbols in between are re-checked here
+    // because the phrase pass could have turned them into something else.
+    // Steps are counted from local midnight, which is what makes an odd size
+    // ("every 7 minutes") well defined - the description says so explicitly.
+    function parseEvery (state) {
+        const everySym = peek(state)
+        const num = peek(state, 1)
+        const unit = peek(state, 2)
+        if (!num || num.type !== 'NUM' || num.ordinal || !unit || unit.type !== 'UNIT') { return null }
+        state.pos += 3
+        const source = everySym.raw + ' ' + num.raw + ' ' + unit.raw
+        const stepMin = num.value * unit.factor
+        // a step must be a whole number of minutes and fit inside a day, or
+        // "counted from midnight" stops meaning anything
+        if (!Number.isInteger(stepMin) || stepMin < 1 || stepMin > 1440) {
+            state.unmatched.push(source)
+            return null
+        }
+        return { kind: 'clockEvery', stepMin, stepValue: num.value, unit: unit.unit, source }
+    }
+
     // parity leading: "odd days", "even months", "even years"
     function parseParity (state) {
         const paritySym = peek(state)
@@ -1814,6 +1901,14 @@
         const out = []
         terms.forEach(function (term) {
             const prop = MUTUALLY_EXCLUSIVE[term.kind]
+            // "every hour on the hour" is one idea said twice - ANDing identical
+            // steps is harmless but describing both reads like a bug
+            if (term.kind === 'clockEvery') {
+                const dup = out.find(function (t) {
+                    return t.kind === 'clockEvery' && t.stepMin === term.stepMin && !t.negate === !term.negate
+                })
+                if (dup) { return }
+            }
             if (coalescable(term)) {
                 const existing = out.find(function (t) { return t.kind === term.kind && coalescable(t) })
                 if (existing) {
@@ -2071,6 +2166,25 @@
                 text = 'date is ' + day + ' ' + MONTH_NAMES[month] + (term.year ? ' ' + term.year : '') + (term.name ? ' (' + term.name + ')' : '')
                 break
             }
+            case 'clockEvery': {
+                const label = term.stepValue === 1
+                    ? 'every ' + term.unit
+                    : 'every ' + term.stepValue + ' ' + term.unit + 's'
+                if (term.stepMin === 60) {
+                    text = 'the time is on the hour (' + label + ', at 0 minutes past)'
+                } else if (term.stepMin === 1) {
+                    text = 'the time is ' + label + ' (any minute)'
+                } else if (term.stepMin === 1440) {
+                    text = 'the time is 00:00 (' + label + ')'
+                } else {
+                    // the midnight anchor is a judgement call, so it is spelled out
+                    // along with the first few matches it produces
+                    const samples = []
+                    for (let m = 0; m < 1440 && samples.length < 3; m += term.stepMin) { samples.push(fmtMinutes(m)) }
+                    text = 'the time is ' + label + ' counted from midnight (' + samples.join(', ') + ' ...)'
+                }
+                break
+            }
             case 'minuteOfHour':
                 if (term.style === 'at') {
                     text = 'the minute is ' + term.startMin + ' past the hour (every hour)'
@@ -2295,6 +2409,7 @@
         year: 'Years',
         timeRange: 'Times',
         minuteOfHour: 'Times',
+        clockEvery: 'Times',
         solarState: 'Sun',
         sunDirection: 'Sun',
         sunAltitude: 'Sun',
@@ -2351,6 +2466,8 @@
         // clock times
         'between 9am and 5pm', '10pm to 6am', 'before noon', 'after 10pm', 'until 6pm',
         'quarter past five', 'ten past', 'between 15 minutes and 30 minutes past the hour', '2 hours before noon',
+        // repeating clock steps
+        'on the hour', 'every hour', 'every half hour', 'every 5 minutes', 'every 2 hours',
         // sun
         'is night', 'during daylight', 'after dark', 'dawn', 'dusk', 'golden hour', 'sun rising', 'after sunset',
         'before sunrise', '2 hours after sunset', 'within 30 minutes of sunrise', 'between sunset and sunrise',

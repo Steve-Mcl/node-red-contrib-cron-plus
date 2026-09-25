@@ -573,6 +573,64 @@ describe('when-gate-eval: minute of the hour', function () {
     })
 })
 
+describe('when-gate-eval: repeating clock steps', function () {
+    const tz = 'UTC'
+
+    it('"on the hour" passes only at minute 0', function () {
+        ;['on the hour', 'every hour', 'hourly'].forEach(function (cond) {
+            evalText(cond, { ts: Date.parse('2026-06-20T08:00:00Z'), tz }).pass.should.be.true()
+            evalText(cond, { ts: Date.parse('2026-06-20T08:01:00Z'), tz }).pass.should.be.false()
+            evalText(cond, { ts: Date.parse('2026-06-20T23:00:00Z'), tz }).pass.should.be.true()
+        })
+    })
+
+    it('"every 5 minutes" passes on multiples of 5', function () {
+        evalText('every 5 minutes', { ts: Date.parse('2026-06-20T08:00:00Z'), tz }).pass.should.be.true()
+        evalText('every 5 minutes', { ts: Date.parse('2026-06-20T08:35:00Z'), tz }).pass.should.be.true()
+        evalText('every 5 minutes', { ts: Date.parse('2026-06-20T08:36:00Z'), tz }).pass.should.be.false()
+    })
+
+    it('"every 2 hours" is anchored to midnight, not to the current hour', function () {
+        evalText('every 2 hours', { ts: Date.parse('2026-06-20T00:00:00Z'), tz }).pass.should.be.true()
+        evalText('every 2 hours', { ts: Date.parse('2026-06-20T14:00:00Z'), tz }).pass.should.be.true()
+        evalText('every 2 hours', { ts: Date.parse('2026-06-20T15:00:00Z'), tz }).pass.should.be.false()
+        evalText('every 2 hours', { ts: Date.parse('2026-06-20T14:01:00Z'), tz }).pass.should.be.false()
+    })
+
+    it('a step that does not divide the hour still lands from midnight', function () {
+        ;['00:00', '00:45', '01:30', '02:15'].forEach(function (hhmm) {
+            evalText('every 45 minutes', { ts: Date.parse('2026-06-20T' + hhmm + ':00Z'), tz }).pass.should.be.true()
+        })
+        evalText('every 45 minutes', { ts: Date.parse('2026-06-20T01:00:00Z'), tz }).pass.should.be.false()
+    })
+
+    it('steps are local, so they follow the timezone', function () {
+        // 07:00 UTC is 08:00 in London in June (BST)
+        evalText('every 2 hours', { ts: Date.parse('2026-06-20T07:00:00Z'), tz: 'Europe/London' }).pass.should.be.true()
+        evalText('every 2 hours', { ts: Date.parse('2026-06-20T08:00:00Z'), tz: 'Europe/London' }).pass.should.be.false()
+    })
+
+    it('finds hourly windows between sunrise and sunset (the reported case)', function () {
+        const parsed = lang.parse('every hour on the hour between sunrise and sunset')
+        const result = evaluator.findWindows(parsed.ast, { ts: Date.parse('2026-06-20T05:30:00Z'), tz: 'UTC', budgetMs: 5000, maxWindows: 3, ...LONDON })
+        result.windows.length.should.equal(3)
+        result.windows.forEach(function (w) {
+            new Date(w.start).getUTCMinutes().should.equal(0)
+            ;(w.end - w.start).should.equal(60000) // one minute wide
+        })
+        result.windows[0].start.should.equal(Date.parse('2026-06-20T06:00:00Z'))
+        result.windows[1].start.should.equal(Date.parse('2026-06-20T07:00:00Z'))
+    })
+
+    it('scans at a resolution the step actually lands on', function () {
+        const parsed = lang.parse('every 5 minutes')
+        const result = evaluator.findWindows(parsed.ast, { ts: Date.parse('2026-06-20T00:02:00Z'), tz: 'UTC', budgetMs: 5000, maxWindows: 2 })
+        result.resolutionMinutes.should.equal(1) // a proper divisor of the step, or the gap is never sampled
+        result.windows[0].start.should.equal(Date.parse('2026-06-20T00:05:00Z'))
+        result.windows[0].end.should.equal(Date.parse('2026-06-20T00:06:00Z'))
+    })
+})
+
 describe('when-gate-eval: findWindows (upcoming-matches preview)', function () {
     it('finds office-hours windows from a Saturday start', function () {
         const parsed = lang.parse('weekdays between 9am and 5pm')
@@ -588,6 +646,25 @@ describe('when-gate-eval: findWindows (upcoming-matches preview)', function () {
         result.windows.length.should.equal(1)
         result.windows[0].start.should.equal(Date.parse('2026-12-25T00:00:00Z'))
         result.windows[0].end.should.equal(Date.parse('2026-12-26T00:00:00Z'))
+    })
+
+    it('never reports a window that already closed (regression: status said "deny until 12:30" at 12:42)', function () {
+        // the scan grid is 15 minutes here, so the aligned sample before "now"
+        // is 12:30 - the minute this condition last matched
+        const ts = Date.parse('2026-09-23T12:42:00Z')
+        ;[['on the hour', '13:00'], ['quarter past', '13:15'], ['every 30 minutes past the hour', '13:30']].forEach(function (pair) {
+            const parsed = lang.parse(pair[0])
+            const result = evaluator.findWindows(parsed.ast, { ts, tz: 'UTC', budgetMs: 2000, maxWindows: 1 })
+            result.windows[0].start.should.equal(Date.parse('2026-09-23T' + pair[1] + ':00Z'))
+        })
+    })
+
+    it('reports a window already in progress as starting now', function () {
+        const ts = Date.parse('2026-09-23T12:42:00Z')
+        const parsed = lang.parse('between 9am and 5pm')
+        const result = evaluator.findWindows(parsed.ast, { ts, tz: 'UTC', budgetMs: 2000, maxWindows: 1 })
+        result.windows[0].start.should.equal(ts)
+        result.windows[0].end.should.equal(Date.parse('2026-09-23T17:00:00Z'))
     })
 
     it('reports an open-ended window for always-true conditions', function () {
