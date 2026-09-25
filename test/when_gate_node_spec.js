@@ -3,13 +3,32 @@
 // Time-sensitive tests inject msg.ts explicitly so no fake timers are needed.
 const should = require('should')
 const sinon = require('sinon')
-const helper = require('node-red-node-test-helper')
 const SunCalc = require('suncalc')
 const whenGateNode = require('../cronplus-when-gate.js')
 const cronplusNode = require('../cronplus.js')
 const { describe, it, beforeEach, afterEach, after } = require('node:test')
 
-helper.init(require.resolve('node-red'))
+// node-red 5 declares engines.node >=22.9. It still loads below that today, so
+// this is a tripwire rather than a coverage cut: the helper-driven suites stand
+// down only if node-red actually stops loading, and only on a runtime it never
+// promised to support. At 22.9+ a load failure is a real one, so it rethrows.
+// The parser and evaluator specs need no node-red at all and always run.
+// Guarding the require matters as much as the describe: both of these run at
+// module load, before any describe callback, so a throw here fails the file.
+const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number)
+const meetsNodeRed5 = nodeMajor > 22 || (nodeMajor === 22 && nodeMinor >= 9)
+let helper = null
+try {
+    helper = require('node-red-node-test-helper')
+    helper.init(require.resolve('node-red'))
+} catch (err) {
+    if (meetsNodeRed5) { throw err }
+}
+const nrLoaded = !!helper
+// passed as describe's options argument rather than swapping in describe.skip,
+// which keeps this a literal describe() call so IDE test-runner gutters still
+// find it. false runs the suite; a string skips it and prints the reason
+const skipUnlessNodeRed = nrLoaded ? false : 'node-red did not load on Node ' + process.versions.node
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 // see test1_spec.js - align so every-second cron schedules fire predictably
 const alignToSecondBoundary = () => sleep(1050 - (Date.now() % 1000))
@@ -34,7 +53,7 @@ function whenGateFlow (conditionOrProps) {
     ]
 }
 
-describe('cronplus-when-gate Node', function () {
+describe('cronplus-when-gate Node', { skip: skipUnlessNodeRed }, function () {
     'use strict'
 
     beforeEach((t, done) => { helper.startServer(done) })
