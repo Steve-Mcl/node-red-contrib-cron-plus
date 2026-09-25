@@ -1,10 +1,24 @@
 /// <reference types="should" />
 const should = require('should')
-const helper = require('node-red-node-test-helper')
 const cronplusNode = require('../cronplus.js')
 const { describe, it, beforeEach, afterEach, after } = require('node:test')
 
-helper.init(require.resolve('node-red'))
+// see when_gate_node_spec.js for the reasoning - node-red 5 declares
+// engines.node >=22.9 but still loads below it, so this stands the suite down
+// only if node-red genuinely stops loading on a runtime it never promised.
+// The require and init both run at module load, so guarding the describe alone
+// would not help: a throw up here fails the whole file before any test runs.
+const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number)
+const meetsNodeRed5 = nodeMajor > 22 || (nodeMajor === 22 && nodeMinor >= 9)
+let helper = null
+try {
+    helper = require('node-red-node-test-helper')
+    helper.init(require.resolve('node-red'))
+} catch (err) {
+    if (meetsNodeRed5) { throw err }
+}
+const nrLoaded = !!helper
+const skipUnlessNodeRed = nrLoaded ? false : 'node-red did not load on Node ' + process.versions.node
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 // wait until just after a wall-clock second boundary so every-second cron schedules
 // created after this fire at predictable ~950/1950/2950ms offsets. Without it, a
@@ -19,7 +33,7 @@ after(() => {
     setTimeout(() => process.exit(process.exitCode ?? 0), 1000).unref()
 })
 
-describe('cron-plus Node', function () {
+describe('cron-plus Node', { skip: skipUnlessNodeRed }, function () {
     'use strict'
 
     beforeEach((t, done) => { helper.startServer(done) })
