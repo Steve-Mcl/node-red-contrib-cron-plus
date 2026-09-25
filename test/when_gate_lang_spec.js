@@ -754,6 +754,56 @@ describe('when-gate-lang parse: years', function () {
     })
 })
 
+describe('when-gate-lang parse: "day is <n>" (regression: read as daylight)', function () {
+    it('reads an explicit day number as a date, not as daylight', function () {
+        // "every friday and day is 13th" came out as Friday AND daylight AND the 13th
+        const r = lang.parse('every friday and day is 13th')
+        r.unmatched.should.have.length(0)
+        r.ast.groups[0].terms.should.have.length(2)
+        r.description.should.equal('day is Friday and day of the month is 13')
+    })
+
+    it('accepts a bare number after "day", which is not a condition on its own', function () {
+        ;['day is 13th', 'day is 13', 'day 13th', 'day 13'].forEach(function (text) {
+            onlyTerm(text).should.have.properties({ kind: 'dayOfMonth', days: [13] })
+        })
+        lang.parse('13').ok.should.be.false() // still not a condition without the 'day'
+    })
+
+    it('takes a list of day numbers', function () {
+        onlyTerm('day is 13 or 27').days.should.eql([13, 27])
+        onlyTerm('day is 13, 27').days.should.eql([13, 27])
+        onlyTerm('day 13 or 27 or 5').days.should.eql([5, 13, 27])
+        onlyTerm('day is 13 or 27 of the month').days.should.eql([13, 27])
+        lang.parse('day is 13 or 27 of the month').unmatched.should.have.length(0)
+    })
+
+    it('leaves every other meaning of "day" alone', function () {
+        onlyTerm('day').kind.should.equal('sunAltitude') // daylight
+        onlyTerm('during the day').kind.should.equal('sunAltitude')
+        onlyTerm('day before christmas').kind.should.equal('namedDate')
+        onlyTerm('2 days before friday').kind.should.equal('day')
+        onlyTerm('last 5 days of the month').should.have.properties({ kind: 'dayOfMonth', lastCount: 5 })
+        onlyTerm('1st day of the month').should.have.properties({ kind: 'dayOfMonth', days: [1] })
+        onlyTerm('every day').kind.should.equal('always')
+        onlyTerm('day is odd').kind.should.equal('parity')
+    })
+
+    it('a number a unit follows is a length, not a date', function () {
+        const r = lang.parse('day 2 hours before noon')
+        r.ast.groups[0].terms[0].kind.should.equal('sunAltitude') // still daylight
+        r.ast.groups[0].terms[1].should.have.properties({ kind: 'timeRange', style: 'before', endMin: 600 })
+        const list = lang.parse('day 13 and 2 hours before noon')
+        list.ast.groups[0].terms[0].should.have.properties({ kind: 'dayOfMonth', days: [13] })
+        list.ast.groups[0].terms[1].should.have.properties({ kind: 'timeRange', style: 'before', endMin: 600 })
+    })
+
+    it('ignores a number that cannot be a day of the month', function () {
+        onlyTerm('day is 32').kind.should.equal('sunAltitude') // out of range, so 'day' stays daylight
+        lang.parse('day is 32').unmatched.should.eql(['32'])
+    })
+})
+
 describe('when-gate-lang parse: even/odd', function () {
     it('parses "when day is odd" as day-of-month parity', function () {
         const term = onlyTerm('when day is odd')
