@@ -1251,7 +1251,7 @@ module.exports = function (RED) {
         node.queuedSerialisationRequest = null
         node.serialisationRequestBusy = null
 
-        setInterval(async function () {
+        const serialisationTimer = setInterval(async function () {
             if (node.serialisationRequestBusy) return
             if (node.queuedSerialisationRequest) {
                 node.serialisationRequestBusy = node.queuedSerialisationRequest
@@ -1459,6 +1459,7 @@ module.exports = function (RED) {
         })()
 
         node.on('close', async function (done) {
+            clearInterval(serialisationTimer)
             try {
                 await serialise()
             } catch (error) {

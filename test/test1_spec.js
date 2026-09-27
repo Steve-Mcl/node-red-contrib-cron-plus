@@ -1,5 +1,9 @@
 /// <reference types="should" />
 const should = require('should')
+const sinon = require('sinon')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
 const cronplusNode = require('../cronplus.js')
 const { describe, it, beforeEach, afterEach, after } = require('node:test')
 
@@ -141,6 +145,76 @@ describe('cron-plus Node', { skip: skipUnlessNodeRed }, function () {
             })
             // also exercise the describe path with the impossible expression
             t1n5.receive({ payload: { command: 'describe', expressionType: 'cron', expression: '0 0 30 02 *' } })
+        })
+    })
+
+    describe('node shutdown', function () {
+        it('should release interval timers after every deploy', async function () {
+            const clock = sinon.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+            try {
+                const timerCount = clock.countTimers()
+                for (let deploy = 1; deploy <= 3; deploy++) {
+                    const flow = Array.from({ length: deploy }, (_, index) => ({
+                        id: 'shutdown' + index, type: 'cronplus', options: [], storeName: index ? 'memory' : '', wires: [[]]
+                    }))
+                    await helper.load(cronplusNode, flow)
+                    clock.countTimers().should.be.above(timerCount)
+                    await helper.unload()
+                    clock.countTimers().should.equal(timerCount)
+                }
+            } finally {
+                await helper.unload()
+                clock.restore()
+            }
+        })
+
+        it('should save pending schedules once while waiting for shutdown persistence', async function () {
+            const clock = sinon.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+            const userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cronplus-shutdown-'))
+            helper.settings({ userDir })
+            const pendingSaves = []
+            let closing
+            try {
+                await helper.load(cronplusNode, [{
+                    id: 'shutdown', type: 'cronplus', options: [], storeName: 'memory', wires: [['output']]
+                }, { id: 'output', type: 'helper' }])
+                const node = helper.getNode('shutdown')
+                await new Promise(resolve => {
+                    helper.getNode('output').once('input', resolve)
+                    node.receive({
+                        payload: [{
+                            command: 'add',
+                            name: 'retained',
+                            expressionType: 'cron',
+                            expression: '0 0 * * * * 2000',
+                            payloadType: 'str',
+                            payload: 'saved'
+                        }, { command: 'export', name: 'retained' }]
+                    })
+                })
+                const save = sinon.stub().callsFake((key, state, store, done) => {
+                    pendingSaves.push(done)
+                })
+                sinon.stub(node, 'context').returns({ set: save })
+                closing = helper.unload()
+                await new Promise(resolve => setImmediate(resolve))
+                save.callCount.should.equal(1)
+                save.firstCall.args[0].should.equal('state')
+                save.firstCall.args[1].dynamicSchedules.should.containDeep([{ name: 'retained', payload: 'saved' }])
+                save.firstCall.args[2].should.equal('memory')
+                clock.tick(5000)
+                save.callCount.should.equal(1)
+                pendingSaves.shift()()
+                await closing
+                clock.countTimers().should.equal(0)
+            } finally {
+                pendingSaves.forEach(done => done())
+                if (closing) { await closing }
+                await helper.unload()
+                clock.restore()
+                helper.settings({})
+                fs.rmSync(userDir, { recursive: true, force: true })
+            }
         })
     })
 
